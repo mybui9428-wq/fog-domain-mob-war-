@@ -9,7 +9,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
@@ -32,11 +31,11 @@ public final class MobWarAI {
     private static final Map<PathfinderMob, Boolean> REGISTERED =
             new WeakHashMap<>();
 
-    private MobWarAI() {}
+    private MobWarAI() {
+    }
 
     private static boolean isController(Player player) {
-        return player.getGameProfile()
-                .getName()
+        return player.getName().getString()
                 .equalsIgnoreCase("tubi2531");
     }
 
@@ -45,8 +44,8 @@ public final class MobWarAI {
 
         return level.players().stream().anyMatch(player ->
                 isController(player)
-                && player.isAlive()
-                && player.distanceToSqr(entity)
+                        && player.isAlive()
+                        && player.distanceToSqr(entity)
                         <= RADIUS * RADIUS);
     }
 
@@ -54,6 +53,7 @@ public final class MobWarAI {
         if (!(entity.level() instanceof ServerLevel level)) {
             return false;
         }
+
         return inDomain(level, entity);
     }
 
@@ -64,11 +64,12 @@ public final class MobWarAI {
 
         if (!MobWarCommands.enabled
                 || target == null
-                || target == attacker) {
+                || target == attacker
+                || !target.isAlive()) {
             return false;
         }
 
-        if (!(target instanceof Mob)
+        if (!(target instanceof net.minecraft.world.entity.Mob)
                 && !(target instanceof Player)) {
             return false;
         }
@@ -155,9 +156,7 @@ public final class MobWarAI {
 
         int processed = 0;
 
-        for (ServerLevel level :
-                event.getServer().getAllLevels()) {
-
+        for (ServerLevel level : event.getServer().getAllLevels()) {
             for (ServerPlayer player : level.players()) {
                 if (!isController(player) || !player.isAlive()) {
                     continue;

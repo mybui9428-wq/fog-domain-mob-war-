@@ -24,7 +24,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 public final class MobWarAI {
 
     private static final double RADIUS = 30.0D;
-    private static final int MAX_PER_SCAN = 60;
+    private static final int MAX_PER_SCAN = 10;
+    private static final int SCAN_INTERVAL = 20;
 
     private static int tickCounter = 0;
     private static int rotation = 0;
@@ -40,21 +41,21 @@ public final class MobWarAI {
                 .equalsIgnoreCase("tubi2531");
     }
 
-    private static boolean inDomain(
-            ServerLevel level, Entity entity) {
-
-        return level.players().stream().anyMatch(player ->
-                isController(player)
-                        && player.isAlive()
-                        && player.distanceToSqr(entity)
-                        <= RADIUS * RADIUS);
+    private static boolean inDomain(ServerLevel level, Entity entity) {
+        for (ServerPlayer player : level.players()) {
+            if (isController(player)
+                    && player.isAlive()
+                    && player.distanceToSqr(entity) <= RADIUS * RADIUS) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean inDomain(Entity entity) {
         if (!(entity.level() instanceof ServerLevel level)) {
             return false;
         }
-
         return inDomain(level, entity);
     }
 
@@ -66,17 +67,13 @@ public final class MobWarAI {
         if (!MobWarCommands.enabled
                 || target == null
                 || target == attacker
-                || !target.isAlive()) {
+                || !target.isAlive()
+                || !(target instanceof Mob)
+                    && !(target instanceof Player)) {
             return false;
         }
 
-        if (!(target instanceof Mob)
-                && !(target instanceof Player)) {
-            return false;
-        }
-
-        if (target instanceof Player player
-                && isController(player)) {
+        if (target instanceof Player player && isController(player)) {
             return false;
         }
 
@@ -84,65 +81,66 @@ public final class MobWarAI {
                 && inDomain(level, target);
     }
 
-    private static boolean hasValidTarget(
-            PathfinderMob pathfinder) {
-
-        if (!(pathfinder.level() instanceof ServerLevel level)) {
+    private static boolean hasValidTarget(PathfinderMob mob) {
+        if (!(mob.level() instanceof ServerLevel level)) {
             return false;
         }
 
-        return validTarget(
-                pathfinder,
-                pathfinder.getTarget(),
-                level);
+        return validTarget(mob, mob.getTarget(), level);
     }
 
-    private static void registerMob(PathfinderMob pathfinder) {
-        if (REGISTERED.containsKey(pathfinder)) {
+    private static void registerMob(PathfinderMob mob) {
+        if (mob.isRemoved() || REGISTERED.containsKey(mob)) {
             return;
         }
 
-        REGISTERED.put(pathfinder, Boolean.TRUE);
+        REGISTERED.put(mob, Boolean.TRUE);
 
-        pathfinder.targetSelector.addGoal(
-                0,
+        mob.targetSelector.addGoal(
+                1,
                 new NearestAttackableTargetGoal<LivingEntity>(
-                        pathfinder,
+                        mob,
                         LivingEntity.class,
+                        10,
                         true,
+                        false,
                         (target, level) ->
-                                validTarget(pathfinder, target, level)) {
+                                validTarget(mob, target, level)) {
 
                     @Override
                     public boolean canUse() {
                         return MobWarCommands.enabled
-                                && inDomain(pathfinder)
+                                && !mob.isRemoved()
+                                && inDomain(mob)
                                 && super.canUse();
                     }
 
                     @Override
                     public boolean canContinueToUse() {
                         return MobWarCommands.enabled
-                                && hasValidTarget(pathfinder)
+                                && !mob.isRemoved()
+                                && hasValidTarget(mob)
                                 && super.canContinueToUse();
                     }
                 });
 
-        pathfinder.goalSelector.addGoal(
-                0,
-                new MeleeAttackGoal(pathfinder, 1.2D, true) {
+        mob.goalSelector.addGoal(
+                1,
+                new MeleeAttackGoal(mob, 1.0D, true) {
 
                     @Override
                     public boolean canUse() {
                         return MobWarCommands.enabled
-                                && hasValidTarget(pathfinder)
+                                && !mob.isRemoved()
+                                && hasValidTarget(mob)
                                 && super.canUse();
                     }
 
                     @Override
                     public boolean canContinueToUse() {
                         return MobWarCommands.enabled
-                                && hasValidTarget(pathfinder)
+                                && !mob.isRemoved()
+                                && hasValidTarget(mob)
                                 && super.canContinueToUse();
                     }
                 });
@@ -154,7 +152,7 @@ public final class MobWarAI {
             return;
         }
 
-        if (++tickCounter % 10 != 0) {
+        if (++tickCounter % SCAN_INTERVAL != 0) {
             return;
         }
 
@@ -166,12 +164,12 @@ public final class MobWarAI {
                     continue;
                 }
 
-                List<PathfinderMob> mobs =
-                        level.getEntitiesOfClass(
-                                PathfinderMob.class,
-                                player.getBoundingBox().inflate(RADIUS),
-                                mob -> player.distanceToSqr(mob)
-                                        <= RADIUS * RADIUS);
+                List<PathfinderMob> mobs = level.getEntitiesOfClass(
+                        PathfinderMob.class,
+                        player.getBoundingBox().inflate(RADIUS),
+                        mob -> !mob.isRemoved()
+                                && player.distanceToSqr(mob)
+                                    <= RADIUS * RADIUS);
 
                 if (mobs.isEmpty()) {
                     continue;
@@ -184,8 +182,7 @@ public final class MobWarAI {
                 int start = Math.floorMod(rotation, mobs.size());
 
                 for (int i = 0; i < count; i++) {
-                    registerMob(
-                            mobs.get((start + i) % mobs.size()));
+                    registerMob(mobs.get((start + i) % mobs.size()));
                 }
 
                 processed += count;
@@ -199,18 +196,13 @@ public final class MobWarAI {
     }
 
     @SubscribeEvent
-    public static void protectTubi(
-            LivingIncomingDamageEvent event) {
-
+    public static void protectTubi(LivingIncomingDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
             return;
         }
 
-        if (!isController(player)) {
-            return;
-        }
-
-        if (event.getSource().getEntity() != null) {
+        if (isController(player)
+                && event.getSource().getEntity() != null) {
             event.setCanceled(true);
         }
     }

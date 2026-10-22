@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
@@ -69,7 +70,7 @@ public final class MobWarAI {
             return false;
         }
 
-        if (!(target instanceof net.minecraft.world.entity.Mob)
+        if (!(target instanceof Mob)
                 && !(target instanceof Player)) {
             return false;
         }
@@ -84,78 +85,64 @@ public final class MobWarAI {
     }
 
     private static boolean hasValidTarget(
-            PathfinderMob mob) {
+            PathfinderMob pathfinder) {
 
-        if (!(mob.level() instanceof ServerLevel level)) {
+        if (!(pathfinder.level() instanceof ServerLevel level)) {
             return false;
         }
 
-        return validTarget(mob, mob.getTarget(), level);
+        return validTarget(
+                pathfinder,
+                pathfinder.getTarget(),
+                level);
     }
 
-    private static void registerMob(PathfinderMob mob) {
-        if (REGISTERED.containsKey(mob)) {
+    private static void registerMob(PathfinderMob pathfinder) {
+        if (REGISTERED.containsKey(pathfinder)) {
             return;
         }
 
-        REGISTERED.put(mob, Boolean.TRUE);
+        REGISTERED.put(pathfinder, Boolean.TRUE);
 
-        mob.targetSelector.addGoal(
+        pathfinder.targetSelector.addGoal(
                 0,
                 new NearestAttackableTargetGoal<LivingEntity>(
-                        mob,
+                        pathfinder,
                         LivingEntity.class,
                         true,
                         (target, level) ->
-                                validTarget(mob, target, level)) {
+                                validTarget(pathfinder, target, level)) {
 
                     @Override
                     public boolean canUse() {
                         return MobWarCommands.enabled
-                                && inDomain(mob)
+                                && inDomain(pathfinder)
                                 && super.canUse();
                     }
 
                     @Override
                     public boolean canContinueToUse() {
                         return MobWarCommands.enabled
-                                && hasValidTarget(mob)
+                                && hasValidTarget(pathfinder)
                                 && super.canContinueToUse();
                     }
                 });
 
-        
-mob.goalSelector.addGoal(
-        0,
-        new MeleeAttackGoal(mob, 1.2D, true) {
-            @Override
-            public boolean canUse() {
-                return MobWarCommands.enabled
-                        && inDomain(mob)
-                        && super.canUse();
-            }
-
-            @Override
-            public boolean canContinueToUse() {
-                return MobWarCommands.enabled
-                        && inDomain(mob)
-                        && mob.getTarget() != null
-                        && mob.getTarget().isAlive()
-                        && super.canContinueToUse();
-            }
-        });
+        pathfinder.goalSelector.addGoal(
+                0,
+                new MeleeAttackGoal(pathfinder, 1.2D, true) {
 
                     @Override
                     public boolean canUse() {
                         return MobWarCommands.enabled
-                                && hasValidTarget(mob)
+                                && hasValidTarget(pathfinder)
                                 && super.canUse();
                     }
 
                     @Override
                     public boolean canContinueToUse() {
                         return MobWarCommands.enabled
-                                && hasValidTarget(mob)
+                                && hasValidTarget(pathfinder)
                                 && super.canContinueToUse();
                     }
                 });

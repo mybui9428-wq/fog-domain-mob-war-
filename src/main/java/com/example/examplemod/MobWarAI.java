@@ -124,9 +124,26 @@ public final class MobWarAI {
                     }
                 });
 
-        mob.goalSelector.addGoal(
-                0,
-                new MeleeAttackGoal(mob, 1.2D, true) {
+        
+mob.goalSelector.addGoal(
+        0,
+        new MeleeAttackGoal(mob, 1.2D, true) {
+            @Override
+            public boolean canUse() {
+                return MobWarCommands.enabled
+                        && inDomain(mob)
+                        && super.canUse();
+            }
+
+            @Override
+            public boolean canContinueToUse() {
+                return MobWarCommands.enabled
+                        && inDomain(mob)
+                        && mob.getTarget() != null
+                        && mob.getTarget().isAlive()
+                        && super.canContinueToUse();
+            }
+        });
 
                     @Override
                     public boolean canUse() {

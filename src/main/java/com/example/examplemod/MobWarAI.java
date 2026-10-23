@@ -11,6 +11,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 
 import net.neoforged.bus.api.SubscribeEvent;
@@ -30,6 +33,9 @@ public final class MobWarAI {
     private static boolean wasEnabled = false;
 
     private static final Map<Mob, Boolean> CONTROLLED =
+            new WeakHashMap<>();
+
+    private static final Map<PathfinderMob, Boolean> MELEE_REGISTERED =
             new WeakHashMap<>();
 
     private MobWarAI() {
@@ -111,6 +117,28 @@ public final class MobWarAI {
         return nearest;
     }
 
+    private static void registerPassiveMelee(Mob mob) {
+        if (!(mob instanceof PathfinderMob pathfinder)) {
+            return;
+        }
+
+        // Không thay AI tấn công của quái vật thù địch.
+        if (mob instanceof Enemy) {
+            return;
+        }
+
+        if (MELEE_REGISTERED.containsKey(pathfinder)) {
+            return;
+        }
+
+        MELEE_REGISTERED.put(pathfinder, Boolean.TRUE);
+
+        pathfinder.goalSelector.addGoal(
+                1,
+                new MeleeAttackGoal(pathfinder, 1.2D, true)
+        );
+    }
+
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         if (!MobWarCommands.enabled) {
@@ -158,6 +186,8 @@ public final class MobWarAI {
                             (start + i) % mobs.size());
 
                     CONTROLLED.put(attacker, Boolean.TRUE);
+
+                    registerPassiveMelee(attacker);
 
                     LivingEntity target =
                             findTarget(attacker, mobs, level);

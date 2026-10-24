@@ -1,4 +1,3 @@
-
 package com.example.examplemod;
 
 import java.util.ArrayList;
@@ -13,6 +12,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.monster.warden.Warden;
 import net.minecraft.world.entity.player.Player;
 
 import net.neoforged.bus.api.SubscribeEvent;
@@ -49,7 +49,8 @@ public final class MobWarAI {
         for (ServerPlayer player : level.players()) {
             if (isController(player)
                     && player.isAlive()
-                    && player.distanceToSqr(entity) <= RADIUS * RADIUS) {
+                    && player.distanceToSqr(entity)
+                            <= RADIUS * RADIUS) {
                 return true;
             }
         }
@@ -91,8 +92,9 @@ public final class MobWarAI {
             return;
         }
 
-        // Sinh vật vốn có AI chiến đấu giữ AI gốc của chúng.
-        if (mob instanceof Enemy) {
+        // Giữ AI gốc của mob thù địch,
+        // nhưng cho phép Warden dùng goal chiến đấu của Mob War.
+        if (mob instanceof Enemy && !(mob instanceof Warden)) {
             return;
         }
 
@@ -134,7 +136,7 @@ public final class MobWarAI {
             return nearestPlayer;
         }
 
-        // Không có người chơi hợp lệ: giữ mục tiêu mob hiện tại.
+        // Giữ mục tiêu mob hiện tại nếu còn hợp lệ.
         LivingEntity current = attacker.getTarget();
 
         if (current instanceof Mob
@@ -142,7 +144,7 @@ public final class MobWarAI {
             return current;
         }
 
-        // Nếu không còn mục tiêu hợp lệ, tìm mob gần nhất.
+        // Nếu không có mục tiêu hợp lệ, tìm mob gần nhất.
         LivingEntity nearestMob = null;
         double nearestDistance = Double.MAX_VALUE;
 
@@ -250,4 +252,4 @@ public final class MobWarAI {
             event.setCanceled(true);
         }
     }
-}
+            }

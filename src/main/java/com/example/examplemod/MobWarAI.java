@@ -11,6 +11,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 
 import net.neoforged.bus.api.SubscribeEvent;
@@ -30,6 +32,9 @@ public final class MobWarAI {
     private static boolean wasEnabled = false;
 
     private static final Map<Mob, Boolean> CONTROLLED =
+            new WeakHashMap<>();
+
+    private static final Map<PathfinderMob, Boolean> COMBAT_GOALS =
             new WeakHashMap<>();
 
     private MobWarAI() {
@@ -81,18 +86,64 @@ public final class MobWarAI {
                 && inDomain(level, target);
     }
 
+    private static void registerCombatGoal(Mob mob) {
+        if (!(mob instanceof PathfinderMob pathfinder)) {
+            return;
+        }
+
+        // Sinh vật vốn có AI chiến đấu giữ AI gốc của chúng.
+        if (mob instanceof Enemy) {
+            return;
+        }
+
+        if (COMBAT_GOALS.containsKey(pathfinder)) {
+            return;
+        }
+
+        pathfinder.goalSelector.addGoal(
+                3,
+                new MobWarCombatGoal(pathfinder)
+        );
+
+        COMBAT_GOALS.put(pathfinder, Boolean.TRUE);
+    }
+
     private static LivingEntity findTarget(
             Mob attacker,
             List<Mob> mobs,
             ServerLevel level) {
 
+        // Ưu tiên người chơi khác trong vùng trước.
+        ServerPlayer nearestPlayer = null;
+        double nearestPlayerDistance = Double.MAX_VALUE;
+
+        for (ServerPlayer player : level.players()) {
+            if (!validTarget(attacker, player, level)) {
+                continue;
+            }
+
+            double distance = attacker.distanceToSqr(player);
+
+            if (distance < nearestPlayerDistance) {
+                nearestPlayerDistance = distance;
+                nearestPlayer = player;
+            }
+        }
+
+        if (nearestPlayer != null) {
+            return nearestPlayer;
+        }
+
+        // Không có người chơi hợp lệ: giữ mục tiêu mob hiện tại.
         LivingEntity current = attacker.getTarget();
 
-        if (validTarget(attacker, current, level)) {
+        if (current instanceof Mob
+                && validTarget(attacker, current, level)) {
             return current;
         }
 
-        LivingEntity nearest = null;
+        // Nếu không còn mục tiêu hợp lệ, tìm mob gần nhất.
+        LivingEntity nearestMob = null;
         double nearestDistance = Double.MAX_VALUE;
 
         for (Mob candidate : mobs) {
@@ -104,11 +155,11 @@ public final class MobWarAI {
 
             if (distance < nearestDistance) {
                 nearestDistance = distance;
-                nearest = candidate;
+                nearestMob = candidate;
             }
         }
 
-        return nearest;
+        return nearestMob;
     }
 
     @SubscribeEvent
@@ -143,7 +194,7 @@ public final class MobWarAI {
                                 && player.distanceToSqr(mob)
                                         <= RADIUS * RADIUS);
 
-                if (mobs.size() < 2) {
+                if (mobs.isEmpty()) {
                     continue;
                 }
 
@@ -158,13 +209,12 @@ public final class MobWarAI {
                             (start + i) % mobs.size());
 
                     CONTROLLED.put(attacker, Boolean.TRUE);
+                    registerCombatGoal(attacker);
 
                     LivingEntity target =
                             findTarget(attacker, mobs, level);
 
-                    if (target != null) {
-                        attacker.setTarget(target);
-                    }
+                    attacker.setTarget(target);
                 }
 
                 processed += count;

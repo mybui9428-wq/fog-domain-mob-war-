@@ -1,4 +1,3 @@
-
 package com.example.examplemod;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -49,24 +48,27 @@ public final class FogDomainSkills {
     private static final String COMPANION_TAG = "fog_domain_companion";
     private static final String TEMP_TAG = "fog_skill_temp";
 
-    // Kỹ năng đang chọn: 1, 2 hoặc 3.
     private static final Map<UUID, Integer> SELECTED_SKILL =
             new HashMap<>();
 
-    // Danh sách sinh vật đã bị nô dịch theo UUID của chủ nhân.
     private static final Map<UUID, List<Mob>> ENSLAVED =
             new HashMap<>();
 
-    // Mục tiêu mà các sinh vật nô dịch cần bảo vệ chủ nhân khỏi.
     private static final Map<UUID, LivingEntity> ORDERS =
             new HashMap<>();
 
-    // Số giây mỗi thực thể đã ở liên tục trong lĩnh vực.
     private static final Map<UUID, Integer> DOMAIN_SECONDS =
             new HashMap<>();
 
     private static final Map<UUID, ArmorStand> COMPANIONS =
             new HashMap<>();
+
+    // Dùng UUID thay cho getTags() để nhận diện Armor Stand.
+    private static final Set<UUID> COMPANION_STAND_IDS =
+            new HashSet<>();
+
+    private static final Set<UUID> TEMP_STAND_IDS =
+            new HashSet<>();
 
     private static final List<BeamTask> BEAM_TASKS =
             new ArrayList<>();
@@ -96,7 +98,8 @@ public final class FogDomainSkills {
         return false;
     }
 
-    private static boolean isEnslavedBy(UUID owner, LivingEntity entity) {
+    private static boolean isEnslavedBy(
+            UUID owner, LivingEntity entity) {
         if (!(entity instanceof Mob mob)) {
             return false;
         }
@@ -124,7 +127,8 @@ public final class FogDomainSkills {
     }
 
     private static ServerPlayer getController(
-            CommandSourceStack source) throws CommandSyntaxException {
+            CommandSourceStack source)
+            throws CommandSyntaxException {
 
         ServerPlayer player = source.getPlayerOrException();
 
@@ -139,7 +143,8 @@ public final class FogDomainSkills {
     }
 
     private static int cycleSkill(
-            CommandSourceStack source) throws CommandSyntaxException {
+            CommandSourceStack source)
+            throws CommandSyntaxException {
 
         ServerPlayer player = getController(source);
         if (player == null) {
@@ -150,7 +155,6 @@ public final class FogDomainSkills {
                 player.getUUID(), 1);
 
         int next = current % 3 + 1;
-
         SELECTED_SKILL.put(player.getUUID(), next);
 
         String name = switch (next) {
@@ -168,7 +172,8 @@ public final class FogDomainSkills {
     }
 
     private static int showStatus(
-            CommandSourceStack source) throws CommandSyntaxException {
+            CommandSourceStack source)
+            throws CommandSyntaxException {
 
         ServerPlayer player = getController(source);
         if (player == null) {
@@ -194,7 +199,8 @@ public final class FogDomainSkills {
     }
 
     private static int castSkill(
-            CommandSourceStack source) throws CommandSyntaxException {
+            CommandSourceStack source)
+            throws CommandSyntaxException {
 
         ServerPlayer player = getController(source);
         if (player == null) {
@@ -216,7 +222,6 @@ public final class FogDomainSkills {
         if (skill == 3) {
             if (!(target instanceof Mob mob)
                     || mob instanceof Warden
-                    || mob == player
                     || !mob.isAlive()) {
                 source.sendFailure(Component.literal(
                         "Hay nham vao mot sinh vat co the no dich."
@@ -287,13 +292,10 @@ public final class FogDomainSkills {
         return 1;
     }
 
-    // Tìm thực thể sống nằm ngay phía trước hướng nhìn.
     private static LivingEntity findLookTarget(
-            ServerPlayer player,
-            double range) {
+            ServerPlayer player, double range) {
 
-        ServerLevel level = player.serverLevel();
-
+        ServerLevel level = (ServerLevel) player.level();
         Vec3 eye = player.getEyePosition();
         Vec3 look = player.getLookAngle().normalize();
 
@@ -353,18 +355,27 @@ public final class FogDomainSkills {
             boolean netheriteArmor,
             float yaw) {
 
-        ArmorStand stand = net.minecraft.world.entity.EntityType.ARMOR_STAND
-                .create(level, EntitySpawnReason.COMMAND);
+        ArmorStand stand =
+                net.minecraft.world.entity.EntityType.ARMOR_STAND
+                        .create(level, EntitySpawnReason.COMMAND);
 
         if (stand == null) {
             return null;
         }
 
-        stand.moveTo(x, y, z, yaw, 0.0F);
+        stand.setPos(x, y, z);
+        stand.setYRot(yaw);
+        stand.setXRot(0.0F);
         stand.setNoGravity(true);
         stand.setInvulnerable(true);
         stand.setShowArms(true);
         stand.addTag(tag);
+
+        if (COMPANION_TAG.equals(tag)) {
+            COMPANION_STAND_IDS.add(stand.getUUID());
+        } else if (TEMP_TAG.equals(tag)) {
+            TEMP_STAND_IDS.add(stand.getUUID());
+        }
 
         if (diamondArmor) {
             stand.setItemSlot(EquipmentSlot.HEAD,
@@ -393,13 +404,14 @@ public final class FogDomainSkills {
     }
 
     private static ArmorStand ensureCompanion(ServerPlayer player) {
-        ServerLevel level = player.serverLevel();
+        ServerLevel level = (ServerLevel) player.level();
         UUID id = player.getUUID();
 
         ArmorStand stand = COMPANIONS.get(id);
 
         if (stand != null
                 && (!stand.isAlive() || stand.level() != level)) {
+            COMPANION_STAND_IDS.remove(stand.getUUID());
             stand.discard();
             COMPANIONS.remove(id);
             stand = null;
@@ -409,14 +421,16 @@ public final class FogDomainSkills {
             List<ArmorStand> found = level.getEntitiesOfClass(
                     ArmorStand.class,
                     player.getBoundingBox().inflate(RADIUS + 10.0D),
-                    candidate -> candidate.getTags()
-                            .contains(COMPANION_TAG));
+                    candidate -> COMPANION_STAND_IDS
+                            .contains(candidate.getUUID()));
 
             if (!found.isEmpty()) {
                 stand = found.get(0);
 
                 for (int i = 1; i < found.size(); i++) {
-                    found.get(i).discard();
+                    ArmorStand extra = found.get(i);
+                    COMPANION_STAND_IDS.remove(extra.getUUID());
+                    extra.discard();
                 }
             } else {
                 stand = createStand(
@@ -438,8 +452,6 @@ public final class FogDomainSkills {
 
         if (stand != null) {
             double yaw = Math.toRadians(player.getYRot());
-
-            // Theo sau lung nguoi choi.
             double x = player.getX() + Math.sin(yaw) * 1.3D;
             double z = player.getZ() - Math.cos(yaw) * 1.3D;
 
@@ -450,8 +462,9 @@ public final class FogDomainSkills {
         return stand;
     }
 
-    private static void removeOtherArmorStands(ServerLevel level,
-                                                ServerPlayer player) {
+    private static void removeOtherArmorStands(
+            ServerLevel level, ServerPlayer player) {
+
         List<ArmorStand> stands = level.getEntitiesOfClass(
                 ArmorStand.class,
                 player.getBoundingBox().inflate(RADIUS),
@@ -459,12 +472,15 @@ public final class FogDomainSkills {
                         <= RADIUS * RADIUS);
 
         for (ArmorStand stand : stands) {
-            if (stand.getTags().contains(COMPANION_TAG)
-                    || stand.getTags().contains(TEMP_TAG)) {
+            UUID id = stand.getUUID();
+
+            if (COMPANION_STAND_IDS.contains(id)
+                    || TEMP_STAND_IDS.contains(id)) {
                 continue;
             }
 
-            // Xoa gia de giap cu trong pham vi linh vuc.
+            // Luu y: thao tac nay xoa ca Armor Stand trang tri
+            // khong do mod tao ra trong pham vi linh vuc.
             stand.discard();
         }
     }
@@ -472,10 +488,9 @@ public final class FogDomainSkills {
     // ---------------- SKILL 1: ENERGY BEAM ----------------
 
     private static void startEnergyBeam(
-            ServerPlayer owner,
-            LivingEntity target) {
+            ServerPlayer owner, LivingEntity target) {
 
-        ServerLevel level = owner.serverLevel();
+        ServerLevel level = (ServerLevel) owner.level();
         List<ArmorStand> stands = new ArrayList<>();
 
         double[][] corners = {
@@ -506,22 +521,17 @@ public final class FogDomainSkills {
     }
 
     private static void drawBeam(
-            ServerLevel level,
-            Vec3 start,
-            Vec3 end) {
+            ServerLevel level, Vec3 start, Vec3 end) {
 
         Vec3 difference = end.subtract(start);
         double distance = difference.length();
 
         int steps = Math.max(
-                1,
-                Math.min(40, (int) (distance * 2.0D)));
+                1, Math.min(40, (int) (distance * 2.0D)));
 
         for (int i = 0; i <= steps; i++) {
             double fraction = i / (double) steps;
-
-            Vec3 point = start.add(
-                    difference.scale(fraction));
+            Vec3 point = start.add(difference.scale(fraction));
 
             level.sendParticles(
                     ParticleTypes.END_ROD,
@@ -543,7 +553,7 @@ public final class FogDomainSkills {
 
             if (owner == null || !owner.isAlive()
                     || target == null || !target.isAlive()
-                    || owner.serverLevel() != target.level()
+                    || owner.level() != target.level()
                     || !MobWarCommands.enabled) {
                 removeStands(task.stands);
                 iterator.remove();
@@ -563,7 +573,7 @@ public final class FogDomainSkills {
                 Vec3 end = target.position().add(
                         0.0D, target.getBbHeight() * 0.5D, 0.0D);
 
-                drawBeam(owner.serverLevel(), start, end);
+                drawBeam((ServerLevel) owner.level(), start, end);
             }
 
             if (task.age >= 20) {
@@ -584,10 +594,9 @@ public final class FogDomainSkills {
     // ---------------- SKILL 2: 10-SECOND CAGE ----------------
 
     private static void startCage(
-            ServerPlayer owner,
-            LivingEntity target) {
+            ServerPlayer owner, LivingEntity target) {
 
-        ServerLevel level = owner.serverLevel();
+        ServerLevel level = (ServerLevel) owner.level();
         List<ArmorStand> stands = new ArrayList<>();
 
         double[][] corners = {
@@ -629,7 +638,7 @@ public final class FogDomainSkills {
 
             if (owner == null || !owner.isAlive()
                     || target == null || !target.isAlive()
-                    || owner.serverLevel() != target.level()
+                    || owner.level() != target.level()
                     || !MobWarCommands.enabled) {
                 removeStands(task.stands);
                 iterator.remove();
@@ -642,7 +651,7 @@ public final class FogDomainSkills {
                         2.0F
                 );
 
-                ServerLevel level = owner.serverLevel();
+                ServerLevel level = (ServerLevel) owner.level();
 
                 level.sendParticles(
                         ParticleTypes.SMOKE,
@@ -675,8 +684,14 @@ public final class FogDomainSkills {
 
     private static void removeStands(List<ArmorStand> stands) {
         for (ArmorStand stand : stands) {
-            if (stand != null && stand.isAlive()) {
-                stand.discard();
+            if (stand != null) {
+                UUID id = stand.getUUID();
+                COMPANION_STAND_IDS.remove(id);
+                TEMP_STAND_IDS.remove(id);
+
+                if (stand.isAlive()) {
+                    stand.discard();
+                }
             }
         }
 
@@ -762,28 +777,26 @@ public final class FogDomainSkills {
 
             DOMAIN_SECONDS.put(entity.getUUID(), seconds);
 
-            // Sau 10 giay lien tuc trong linh vuc se bi dot.
             if (seconds >= 10) {
-                entity.setSecondsOnFire(3);
+                entity.igniteForSeconds(3.0F);
             }
         }
     }
 
     private static void spawnDomainParticles(
-            ServerLevel level,
-            ServerPlayer owner) {
+            ServerLevel level, ServerPlayer owner) {
 
         for (int i = 0; i < 6; i++) {
-            double angle = level.random.nextDouble()
+            double angle = level.getRandom().nextDouble()
                     * Math.PI * 2.0D;
 
-            double radius = Math.sqrt(level.random.nextDouble())
-                    * RADIUS;
+            double radius = Math.sqrt(
+                    level.getRandom().nextDouble()) * RADIUS;
 
             double x = owner.getX() + Math.cos(angle) * radius;
             double z = owner.getZ() + Math.sin(angle) * radius;
             double y = owner.getY() + 0.5D
-                    + level.random.nextDouble() * 5.0D;
+                    + level.getRandom().nextDouble() * 5.0D;
 
             level.sendParticles(
                     ParticleTypes.FLAME,
@@ -792,18 +805,17 @@ public final class FogDomainSkills {
             );
         }
 
-        // Hat khoi den va tro trang roi tu tren cao.
         for (int i = 0; i < 7; i++) {
-            double angle = level.random.nextDouble()
+            double angle = level.getRandom().nextDouble()
                     * Math.PI * 2.0D;
 
-            double radius = Math.sqrt(level.random.nextDouble())
-                    * RADIUS;
+            double radius = Math.sqrt(
+                    level.getRandom().nextDouble()) * RADIUS;
 
             double x = owner.getX() + Math.cos(angle) * radius;
             double z = owner.getZ() + Math.sin(angle) * radius;
             double y = owner.getY() + 8.0D
-                    + level.random.nextDouble() * 8.0D;
+                    + level.getRandom().nextDouble() * 8.0D;
 
             level.sendParticles(
                     ParticleTypes.SMOKE,
@@ -820,9 +832,14 @@ public final class FogDomainSkills {
     }
 
     private static void clearDomainVisuals(MinecraftServer server) {
-        for (ArmorStand stand : new ArrayList<>(COMPANIONS.values())) {
-            if (stand != null && stand.isAlive()) {
-                stand.discard();
+        for (ArmorStand stand :
+                new ArrayList<>(COMPANIONS.values())) {
+            if (stand != null) {
+                COMPANION_STAND_IDS.remove(stand.getUUID());
+
+                if (stand.isAlive()) {
+                    stand.discard();
+                }
             }
         }
 
@@ -838,25 +855,25 @@ public final class FogDomainSkills {
         }
         CAGE_TASKS.clear();
 
-        DOMAIN_SECONDS.clear();
-
         for (ServerLevel level : server.getAllLevels()) {
-            for (ServerPlayer player : level.players()) {
-                if (!isController(player)) {
-                    continue;
-                }
+            List<ArmorStand> tagged = level.getEntitiesOfClass(
+                    ArmorStand.class,
+                    new AABB(
+                            -3.0E7D, level.getMinY(), -3.0E7D,
+                            3.0E7D, level.getMaxY(), 3.0E7D),
+                    stand -> COMPANION_STAND_IDS
+                            .contains(stand.getUUID())
+                            || TEMP_STAND_IDS
+                            .contains(stand.getUUID()));
 
-                List<ArmorStand> tagged = level.getEntitiesOfClass(
-                        ArmorStand.class,
-                        player.getBoundingBox().inflate(RADIUS + 10.0D),
-                        stand -> stand.getTags().contains(COMPANION_TAG)
-                                || stand.getTags().contains(TEMP_TAG));
-
-                for (ArmorStand stand : tagged) {
-                    stand.discard();
-                }
+            for (ArmorStand stand : tagged) {
+                stand.discard();
             }
         }
+
+        COMPANION_STAND_IDS.clear();
+        TEMP_STAND_IDS.clear();
+        DOMAIN_SECONDS.clear();
     }
 
     // ---------------- ENSLAVED MOBS ----------------
@@ -868,7 +885,6 @@ public final class FogDomainSkills {
         Entity source = event.getSource().getEntity();
         LivingEntity victim = event.getEntity();
 
-        // Khi tubi2531 tan cong mot sinh vat.
         if (source instanceof ServerPlayer owner
                 && isController(owner)
                 && victim != owner
@@ -879,7 +895,6 @@ public final class FogDomainSkills {
             return;
         }
 
-        // Khi mot thuc the tan cong tubi2531.
         if (victim instanceof ServerPlayer owner
                 && isController(owner)
                 && source instanceof LivingEntity attacker
@@ -892,8 +907,7 @@ public final class FogDomainSkills {
     }
 
     private static void orderSlaves(
-            ServerPlayer owner,
-            LivingEntity target) {
+            ServerPlayer owner, LivingEntity target) {
 
         List<Mob> slaves = ENSLAVED.get(owner.getUUID());
 
@@ -958,7 +972,8 @@ public final class FogDomainSkills {
                     double distance = slave.distanceToSqr(owner);
 
                     if (distance > 16.0D) {
-                        pathfinder.getNavigation().moveTo(owner, 1.1D);
+                        pathfinder.getNavigation()
+                                .moveTo(owner, 1.1D);
                     } else if (distance < 6.0D) {
                         pathfinder.getNavigation().stop();
                     }
@@ -1000,4 +1015,4 @@ public final class FogDomainSkills {
             this.stands = stands;
         }
     }
-}
+    }

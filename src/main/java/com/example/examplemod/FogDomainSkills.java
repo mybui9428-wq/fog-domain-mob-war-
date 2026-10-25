@@ -929,7 +929,7 @@ public final class FogDomainSkills {
     }
 
     // ---------------- ENSLAVED MOBS ----------------
-
+    
     @SubscribeEvent
     public static void enslavedProtectOwner(
             LivingIncomingDamageEvent event) {
@@ -937,6 +937,15 @@ public final class FogDomainSkills {
         Entity source = event.getSource().getEntity();
         LivingEntity victim = event.getEntity();
 
+        // Bao ve tubi2531 khi linh vuc dang bat.
+        if (MobWarCommands.enabled
+                && victim instanceof ServerPlayer player
+                && isController(player)) {
+            event.setCanceled(true);
+            return;
+        }
+
+        // Khi tubi2531 tan cong, no dich truy duoi muc tieu.
         if (source instanceof ServerPlayer owner
                 && isController(owner)
                 && victim != owner
@@ -946,6 +955,18 @@ public final class FogDomainSkills {
             orderSlaves(owner, victim);
             return;
         }
+
+        // Khi tubi2531 bi tan cong, no dich phan cong.
+        if (victim instanceof ServerPlayer owner
+                && isController(owner)
+                && source instanceof LivingEntity attacker
+                && attacker != owner
+                && !isEnslavedBy(owner.getUUID(), attacker)) {
+
+            ORDERS.put(owner.getUUID(), attacker);
+            orderSlaves(owner, attacker);
+        }
+    }
 
         if (victim instanceof ServerPlayer owner
                 && isController(owner)

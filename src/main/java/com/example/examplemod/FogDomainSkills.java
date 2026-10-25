@@ -1,3 +1,4 @@
+
 package com.example.examplemod;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -20,6 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -63,7 +65,6 @@ public final class FogDomainSkills {
     private static final Map<UUID, ArmorStand> COMPANIONS =
             new HashMap<>();
 
-    // Dùng UUID thay cho getTags() để nhận diện Armor Stand.
     private static final Set<UUID> COMPANION_STAND_IDS =
             new HashSet<>();
 
@@ -122,7 +123,7 @@ public final class FogDomainSkills {
                                         castSkill(context.getSource())))
                         .then(Commands.literal("status")
                                 .executes(context ->
-                                        showStatus(context.getSource())))
+                                        showStatus(context.getSource()))
         );
     }
 
@@ -355,9 +356,12 @@ public final class FogDomainSkills {
             boolean netheriteArmor,
             float yaw) {
 
+        // FIX: NeoForge 26.2 su dung EntityTypes.ARMOR_STAND.
         ArmorStand stand =
-                net.minecraft.world.entity.EntityType.ARMOR_STAND
-                        .create(level, EntitySpawnReason.COMMAND);
+                EntityTypes.ARMOR_STAND.create(
+                        level,
+                        EntitySpawnReason.COMMAND
+                );
 
         if (stand == null) {
             return null;
@@ -479,8 +483,8 @@ public final class FogDomainSkills {
                 continue;
             }
 
-            // Luu y: thao tac nay xoa ca Armor Stand trang tri
-            // khong do mod tao ra trong pham vi linh vuc.
+            // Canh bao: xoa ca Armor Stand trang tri
+            // trong pham vi linh vuc.
             stand.discard();
         }
     }
@@ -1015,4 +1019,4 @@ public final class FogDomainSkills {
             this.stands = stands;
         }
     }
-    }
+}

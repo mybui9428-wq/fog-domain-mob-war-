@@ -5,6 +5,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ExplosionEvent;
@@ -22,7 +23,9 @@ public final class FogDomainProtection {
                 .equalsIgnoreCase("tubi2531");
     }
 
-    private static boolean inDomain(ServerLevel level, Entity entity) {
+    private static boolean inDomain(
+            ServerLevel level, Entity entity) {
+
         for (ServerPlayer player : level.players()) {
             if (isController(player)
                     && player.isAlive()
@@ -31,16 +34,25 @@ public final class FogDomainProtection {
                 return true;
             }
         }
+
         return false;
     }
 
     @SubscribeEvent
-    public static void protectExplosion(ExplosionEvent.Detonate event) {
+    public static void protectExplosion(
+            ExplosionEvent.Detonate event) {
+
+        // Linh vuc tat: khong chan pha block.
+        if (!MobWarCommands.enabled) {
+            return;
+        }
+
         if (!(event.getLevel() instanceof ServerLevel level)) {
             return;
         }
 
-        Entity source = event.getExplosion().getIndirectSourceEntity();
+        Entity source =
+                event.getExplosion().getIndirectSourceEntity();
 
         if (source == null) {
             source = event.getExplosion().getDirectSourceEntity();
@@ -65,6 +77,7 @@ public final class FogDomainProtection {
             }
         }
 
+        // Chi chan pha block trong ban kinh linh vuc dang bat.
         if (protect) {
             event.getAffectedBlocks().clear();
         }

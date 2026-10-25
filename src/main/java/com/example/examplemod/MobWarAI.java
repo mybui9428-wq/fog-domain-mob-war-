@@ -1,3 +1,4 @@
+
 package com.example.examplemod;
 
 import java.util.ArrayList;
@@ -11,8 +12,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
-import net.minecraft.world.entity.monster.Enemy;
-import net.minecraft.world.entity.monster.warden.Warden;
 import net.minecraft.world.entity.player.Player;
 
 import net.neoforged.bus.api.SubscribeEvent;
@@ -24,7 +23,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 public final class MobWarAI {
 
     private static final double RADIUS = 30.0D;
-    private static final int SCAN_INTERVAL = 10;
+    private static final int SCAN_INTERVAL = 20;
     private static final int MAX_MOBS_PER_SCAN = 8;
 
     private static int tickCounter = 0;
@@ -49,8 +48,7 @@ public final class MobWarAI {
         for (ServerPlayer player : level.players()) {
             if (isController(player)
                     && player.isAlive()
-                    && player.distanceToSqr(entity)
-                            <= RADIUS * RADIUS) {
+                    && player.distanceToSqr(entity) <= RADIUS * RADIUS) {
                 return true;
             }
         }
@@ -78,8 +76,7 @@ public final class MobWarAI {
             return false;
         }
 
-        if (target instanceof Player player
-                && isController(player)) {
+        if (target instanceof Player player && isController(player)) {
             return false;
         }
 
@@ -89,12 +86,6 @@ public final class MobWarAI {
 
     private static void registerCombatGoal(Mob mob) {
         if (!(mob instanceof PathfinderMob pathfinder)) {
-            return;
-        }
-
-        // Giữ AI gốc của mob thù địch,
-        // nhưng cho phép Warden dùng goal chiến đấu của Mob War.
-        if (mob instanceof Enemy && !(mob instanceof Warden)) {
             return;
         }
 
@@ -115,7 +106,6 @@ public final class MobWarAI {
             List<Mob> mobs,
             ServerLevel level) {
 
-        // Ưu tiên người chơi khác trong vùng trước.
         ServerPlayer nearestPlayer = null;
         double nearestPlayerDistance = Double.MAX_VALUE;
 
@@ -136,7 +126,6 @@ public final class MobWarAI {
             return nearestPlayer;
         }
 
-        // Giữ mục tiêu mob hiện tại nếu còn hợp lệ.
         LivingEntity current = attacker.getTarget();
 
         if (current instanceof Mob
@@ -144,7 +133,6 @@ public final class MobWarAI {
             return current;
         }
 
-        // Nếu không có mục tiêu hợp lệ, tìm mob gần nhất.
         LivingEntity nearestMob = null;
         double nearestDistance = Double.MAX_VALUE;
 
@@ -193,8 +181,7 @@ public final class MobWarAI {
                         Mob.class,
                         player.getBoundingBox().inflate(RADIUS),
                         mob -> mob.isAlive()
-                                && player.distanceToSqr(mob)
-                                        <= RADIUS * RADIUS);
+                                && player.distanceToSqr(mob) <= RADIUS * RADIUS);
 
                 if (mobs.isEmpty()) {
                     continue;
@@ -207,15 +194,12 @@ public final class MobWarAI {
                 int start = Math.floorMod(rotation, mobs.size());
 
                 for (int i = 0; i < count; i++) {
-                    Mob attacker = mobs.get(
-                            (start + i) % mobs.size());
+                    Mob attacker = mobs.get((start + i) % mobs.size());
 
                     CONTROLLED.put(attacker, Boolean.TRUE);
                     registerCombatGoal(attacker);
 
-                    LivingEntity target =
-                            findTarget(attacker, mobs, level);
-
+                    LivingEntity target = findTarget(attacker, mobs, level);
                     attacker.setTarget(target);
                 }
 
@@ -252,4 +236,4 @@ public final class MobWarAI {
             event.setCanceled(true);
         }
     }
-            }
+}

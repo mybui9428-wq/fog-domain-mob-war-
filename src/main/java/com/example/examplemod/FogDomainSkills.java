@@ -110,7 +110,7 @@ public final class FogDomainSkills {
     }
 
     // ---------------- COMMANDS ----------------
-    
+
     @SubscribeEvent
     public static void registerCommands(RegisterCommandsEvent event) {
         event.getDispatcher().register(
@@ -123,11 +123,13 @@ public final class FogDomainSkills {
                                         castSkill(context.getSource())))
                         .then(Commands.literal("status")
                                 .executes(context ->
-                                        showStatus(context.getSource()))
+                                        showStatus(context.getSource())))
+                        .then(Commands.literal("swap")
+                                .executes(context ->
+                                        swapEnslaved(context.getSource()))
                 )
         );
     }
-
 
     private static ServerPlayer getController(
             CommandSourceStack source)
@@ -137,8 +139,7 @@ public final class FogDomainSkills {
 
         if (!isController(player)) {
             source.sendFailure(Component.literal(
-                    "Chi tubi2531 moi su dung duoc ky nang."
-            ));
+                    "Chi tubi2531 moi su dung duoc ky nang."));
             return null;
         }
 
@@ -167,12 +168,14 @@ public final class FogDomainSkills {
         };
 
         source.sendSuccess(
-                () -> Component.literal("Ky nang da chon: " + name),
-                false
-        );
+                () -> Component.literal(
+                        "Ky nang da chon: " + name),
+                false);
 
         return 1;
     }
+
+    // BANG TRANG THAI KY NANG
 
     private static int showStatus(
             CommandSourceStack source)
@@ -183,20 +186,104 @@ public final class FogDomainSkills {
             return 0;
         }
 
-        int skill = SELECTED_SKILL.getOrDefault(
-                player.getUUID(), 1);
+        UUID ownerId = player.getUUID();
 
-        List<Mob> slaves = ENSLAVED.getOrDefault(
-                player.getUUID(), new ArrayList<>());
+        int skill = SELECTED_SKILL.getOrDefault(ownerId, 1);
+
+        List<Mob> slaves = ENSLAVED.computeIfAbsent(
+                ownerId, ignored -> new ArrayList<>());
+
+        slaves.removeIf(mob -> mob == null
+                || mob.isRemoved()
+                || !mob.isAlive());
+
+        String skillName = switch (skill) {
+            case 1 -> "Tia nang luong";
+            case 2 -> "Lao giam 10 giay";
+            default -> "No dich";
+        };
+
+        String mobWar = MobWarCommands.enabled
+                ? "DANG BAT"
+                : "DANG TAT";
 
         source.sendSuccess(
                 () -> Component.literal(
-                        "Ky nang dang chon: " + skill
-                                + " | Sinh vat no dich: "
-                                + slaves.size() + "/" + MAX_ENSLAVED
-                ),
-                false
-        );
+                        "===== LINH VUC SUONG MU ====="),
+                false);
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Mob War: " + mobWar),
+                false);
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Ky nang: " + skill
+                                + " - " + skillName),
+                false);
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Sinh vat no dich: "
+                                + slaves.size()
+                                + "/" + MAX_ENSLAVED),
+                false);
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Lenh: /fogskill cycle | /fogskill cast"
+                                + " | /fogskill swap | /fogskill status"),
+                false);
+
+        return 1;
+    }
+
+    // HOAN DOI VI TRI VOI SINH VAT NO DICH
+
+    private static int swapEnslaved(
+            CommandSourceStack source)
+            throws CommandSyntaxException {
+
+        ServerPlayer player = getController(source);
+        if (player == null) {
+            return 0;
+        }
+
+        if (!MobWarCommands.enabled) {
+            source.sendFailure(Component.literal(
+                    "Hay bat linh vuc bang /fogmobwar on truoc."));
+            return 0;
+        }
+
+        LivingEntity target = findLookTarget(
+                player, SKILL_RANGE);
+
+        if (!(target instanceof Mob mob)
+                || !isEnslavedBy(player.getUUID(), mob)
+                || !mob.isAlive()
+                || mob.level() != player.level()) {
+
+            source.sendFailure(Component.literal(
+                    "Hay nham vao sinh vat da no dich trong tam 25 block."));
+            return 0;
+        }
+
+        double playerX = player.getX();
+        double playerY = player.getY();
+        double playerZ = player.getZ();
+
+        double mobX = mob.getX();
+        double mobY = mob.getY();
+        double mobZ = mob.getZ();
+
+        player.teleportTo(mobX, mobY, mobZ);
+        mob.teleportTo(playerX, playerY, playerZ);
+
+        source.sendSuccess(
+                () -> Component.literal(
+                        "Hoan doi thanh cong voi sinh vat no dich!"),
+                false);
 
         return 1;
     }
@@ -212,23 +299,22 @@ public final class FogDomainSkills {
 
         if (!MobWarCommands.enabled) {
             source.sendFailure(Component.literal(
-                    "Hay bat linh vuc bang /fogmobwar on truoc."
-            ));
+                    "Hay bat linh vuc bang /fogmobwar on truoc."));
             return 0;
         }
 
         int skill = SELECTED_SKILL.getOrDefault(
                 player.getUUID(), 1);
 
-        LivingEntity target = findLookTarget(player, SKILL_RANGE);
+        LivingEntity target = findLookTarget(
+                player, SKILL_RANGE);
 
         if (skill == 3) {
             if (!(target instanceof Mob mob)
                     || mob instanceof Warden
                     || !mob.isAlive()) {
                 source.sendFailure(Component.literal(
-                        "Hay nham vao mot sinh vat co the no dich."
-                ));
+                        "Hay nham vao mot sinh vat co the no dich."));
                 return 0;
             }
 
@@ -241,15 +327,13 @@ public final class FogDomainSkills {
 
             if (slaves.contains(mob)) {
                 source.sendFailure(Component.literal(
-                        "Sinh vat nay da bi no dich."
-                ));
+                        "Sinh vat nay da bi no dich."));
                 return 0;
             }
 
             if (slaves.size() >= MAX_ENSLAVED) {
                 source.sendFailure(Component.literal(
-                        "Da dat gioi han 5 sinh vat no dich."
-                ));
+                        "Da dat gioi han 5 sinh vat no dich."));
                 return 0;
             }
 
@@ -259,18 +343,15 @@ public final class FogDomainSkills {
             source.sendSuccess(
                     () -> Component.literal(
                             "No dich thanh cong! "
-                                    + slaves.size() + "/5"
-                    ),
-                    false
-            );
+                                    + slaves.size() + "/5"),
+                    false);
 
             return 1;
         }
 
         if (target == null) {
             source.sendFailure(Component.literal(
-                    "Hay nham vao mot sinh vat trong tam 25 block."
-            ));
+                    "Hay nham vao mot sinh vat trong tam 25 block."));
             return 0;
         }
 
@@ -278,20 +359,16 @@ public final class FogDomainSkills {
             startEnergyBeam(player, target);
             source.sendSuccess(
                     () -> Component.literal(
-                            "Skill 1: Tia nang luong!"
-                    ),
-                    false
-            );
+                            "Skill 1: Tia nang luong!"),
+                    false);
             return 1;
         }
 
         startCage(player, target);
         source.sendSuccess(
                 () -> Component.literal(
-                        "Skill 2: Lao giam da kich hoat!"
-                ),
-                false
-        );
+                        "Skill 2: Lao giam da kich hoat!"),
+                false);
         return 1;
     }
 
@@ -358,12 +435,8 @@ public final class FogDomainSkills {
             boolean netheriteArmor,
             float yaw) {
 
-        // FIX: NeoForge 26.2 su dung EntityTypes.ARMOR_STAND.
-        ArmorStand stand =
-                EntityTypes.ARMOR_STAND.create(
-                        level,
-                        EntitySpawnReason.COMMAND
-                );
+        ArmorStand stand = EntityTypes.ARMOR_STAND.create(
+                level, EntitySpawnReason.COMMAND);
 
         if (stand == null) {
             return null;
@@ -447,8 +520,7 @@ public final class FogDomainSkills {
                         COMPANION_TAG,
                         false,
                         true,
-                        player.getYRot()
-                );
+                        player.getYRot());
             }
 
             if (stand != null) {
@@ -468,27 +540,12 @@ public final class FogDomainSkills {
         return stand;
     }
 
+    // Khong tu dong xoa Armor Stand trang tri cua nguoi choi.
+
     private static void removeOtherArmorStands(
             ServerLevel level, ServerPlayer player) {
-
-        List<ArmorStand> stands = level.getEntitiesOfClass(
-                ArmorStand.class,
-                player.getBoundingBox().inflate(RADIUS),
-                stand -> player.distanceToSqr(stand)
-                        <= RADIUS * RADIUS);
-
-        for (ArmorStand stand : stands) {
-            UUID id = stand.getUUID();
-
-            if (COMPANION_STAND_IDS.contains(id)
-                    || TEMP_STAND_IDS.contains(id)) {
-                continue;
-            }
-
-            // Canh bao: xoa ca Armor Stand trang tri
-            // trong pham vi linh vuc.
-            stand.discard();
-        }
+        // Co giu phuong thuc de tuong thich voi ma cu.
+        // Khong xoa Armor Stand nao.
     }
 
     // ---------------- SKILL 1: ENERGY BEAM ----------------
@@ -515,8 +572,7 @@ public final class FogDomainSkills {
                     TEMP_TAG,
                     true,
                     false,
-                    owner.getYRot()
-            );
+                    owner.getYRot());
 
             if (stand != null) {
                 stands.add(stand);
@@ -542,8 +598,7 @@ public final class FogDomainSkills {
             level.sendParticles(
                     ParticleTypes.END_ROD,
                     point.x, point.y, point.z,
-                    1, 0.0D, 0.0D, 0.0D, 0.0D
-            );
+                    1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
     }
 
@@ -588,8 +643,7 @@ public final class FogDomainSkills {
                 if (target.isAlive()) {
                     target.hurt(
                             owner.damageSources().playerAttack(owner),
-                            14.0F
-                    );
+                            14.0F);
                 }
 
                 iterator.remove();
@@ -621,8 +675,7 @@ public final class FogDomainSkills {
                     TEMP_TAG,
                     false,
                     false,
-                    0.0F
-            );
+                    0.0F);
 
             if (stand != null) {
                 stands.add(stand);
@@ -654,8 +707,7 @@ public final class FogDomainSkills {
             if (task.age % 20 == 0 && task.age < 200) {
                 target.hurt(
                         owner.damageSources().playerAttack(owner),
-                        2.0F
-                );
+                        2.0F);
 
                 ServerLevel level = (ServerLevel) owner.level();
 
@@ -663,23 +715,20 @@ public final class FogDomainSkills {
                         ParticleTypes.SMOKE,
                         target.getX(), target.getY() + 1.0D,
                         target.getZ(),
-                        8, 0.4D, 0.5D, 0.4D, 0.02D
-                );
+                        8, 0.4D, 0.5D, 0.4D, 0.02D);
 
                 level.sendParticles(
                         ParticleTypes.WHITE_ASH,
                         target.getX(), target.getY() + 1.0D,
                         target.getZ(),
-                        8, 0.4D, 0.5D, 0.4D, 0.02D
-                );
+                        8, 0.4D, 0.5D, 0.4D, 0.02D);
             }
 
             if (task.age >= 200) {
                 if (target.isAlive()) {
                     target.hurt(
                             owner.damageSources().playerAttack(owner),
-                            target.getHealth() + 100.0F
-                    );
+                            target.getHealth() + 100.0F);
                 }
 
                 removeStands(task.stands);
@@ -736,7 +785,7 @@ public final class FogDomainSkills {
                 }
 
                 if (tickCounter % 20 == 0) {
-                    removeOtherArmorStands(level, player);
+                    // Khong xoa Armor Stand trang tri.
                     tickDomainSeconds(level, player, insideNow);
                 }
 
@@ -807,8 +856,7 @@ public final class FogDomainSkills {
             level.sendParticles(
                     ParticleTypes.FLAME,
                     x, y, z,
-                    1, 0.08D, 0.1D, 0.08D, 0.01D
-            );
+                    1, 0.08D, 0.1D, 0.08D, 0.01D);
         }
 
         for (int i = 0; i < 7; i++) {
@@ -826,14 +874,12 @@ public final class FogDomainSkills {
             level.sendParticles(
                     ParticleTypes.SMOKE,
                     x, y, z,
-                    1, 0.1D, 0.1D, 0.1D, 0.015D
-            );
+                    1, 0.1D, 0.1D, 0.1D, 0.015D);
 
             level.sendParticles(
                     ParticleTypes.WHITE_ASH,
                     x, y, z,
-                    1, 0.1D, 0.1D, 0.1D, 0.015D
-            );
+                    1, 0.1D, 0.1D, 0.1D, 0.015D);
         }
     }
 

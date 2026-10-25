@@ -110,7 +110,7 @@ public final class FogDomainSkills {
     }
 
     // ---------------- COMMANDS ----------------
-
+    
     @SubscribeEvent
     public static void registerCommands(RegisterCommandsEvent event) {
         event.getDispatcher().register(
@@ -124,8 +124,10 @@ public final class FogDomainSkills {
                         .then(Commands.literal("status")
                                 .executes(context ->
                                         showStatus(context.getSource()))
+                )
         );
     }
+
 
     private static ServerPlayer getController(
             CommandSourceStack source)

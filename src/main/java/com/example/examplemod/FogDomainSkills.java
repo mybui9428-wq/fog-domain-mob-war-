@@ -967,18 +967,7 @@ public final class FogDomainSkills {
             orderSlaves(owner, attacker);
         }
     }
-
-        if (victim instanceof ServerPlayer owner
-                && isController(owner)
-                && source instanceof LivingEntity attacker
-                && attacker != owner
-                && !isEnslavedBy(owner.getUUID(), attacker)) {
-
-            ORDERS.put(owner.getUUID(), attacker);
-            orderSlaves(owner, attacker);
-        }
-    }
-
+    
     private static void orderSlaves(
             ServerPlayer owner, LivingEntity target) {
 

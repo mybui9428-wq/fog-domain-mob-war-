@@ -48,11 +48,11 @@ public final class MobWarAI {
 
     private MobWarAI() {
     }
-
-    private static boolean isController(Player player) {
-        return player.getGameProfile().getName()
-                .equalsIgnoreCase("tubi2531");
-    }
+private static boolean isController(Player player) {
+    return player.getName().getString()
+            .equalsIgnoreCase("tubi2531");
+}
+    
 
     private static boolean inDomain(
             ServerLevel level, Entity entity) {

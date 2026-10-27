@@ -7,10 +7,9 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
-import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
-import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.phys.AABB;
 
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -30,7 +29,6 @@ public final class MobWarAI {
     private static final double RADIUS = 30.0D;
     private static final int MAX_FOCUS = 5;
     private static final int SCAN_INTERVAL = 20;
-    private static final int MAX_REGISTER_PER_SCAN = 10;
 
     private static int tickCounter = 0;
 
@@ -61,16 +59,6 @@ public final class MobWarAI {
         return false;
     }
 
-    private static List<LivingEntity> getCandidates(
-            ServerLevel level) {
-        return level.getEntitiesOfClass(
-                LivingEntity.class,
-                level.getWorldBorder().getCollisionShape()
-                        .bounds().inflate(0),
-                entity -> false
-        );
-    }
-
     private static List<LivingEntity> scanEntities(
             ServerLevel level) {
         List<LivingEntity> result = new ArrayList<>();
@@ -80,15 +68,14 @@ public final class MobWarAI {
                 continue;
             }
 
-            List<LivingEntity> nearby =
-                    level.getEntitiesOfClass(
-                            LivingEntity.class,
-                            player.getBoundingBox().inflate(RADIUS),
-                            entity -> entity.isAlive()
-                                    && entity != player
-                                    && !isController(entity)
-                                    && inDomain(level, entity)
-                    );
+            List<LivingEntity> nearby = level.getEntitiesOfClass(
+                    LivingEntity.class,
+                    player.getBoundingBox().inflate(RADIUS),
+                    entity -> entity.isAlive()
+                            && entity != player
+                            && !isController(entity)
+                            && inDomain(level, entity)
+            );
 
             for (LivingEntity entity : nearby) {
                 if (!result.contains(entity)) {
@@ -100,23 +87,18 @@ public final class MobWarAI {
         return result;
     }
 
-    private static boolean isFocused(Entity entity) {
-        return FOCUS.contains(entity.getUUID());
-    }
-
     private static void updateFocus(
-            ServerLevel level, List<LivingEntity> entities) {
+            List<LivingEntity> entities) {
         Set<UUID> alive = new HashSet<>();
 
         for (LivingEntity entity : entities) {
             alive.add(entity.getUUID());
         }
 
-        FOCUS.removeIf(id -> !alive.contains(id));
+        FOCUS.retainAll(alive);
 
         if (entities.size() <= MAX_FOCUS) {
             FOCUS.clear();
-
             for (LivingEntity entity : entities) {
                 FOCUS.add(entity.getUUID());
             }
@@ -138,7 +120,7 @@ public final class MobWarAI {
         }
 
         for (LivingEntity entity : entities) {
-            if (isFocused(entity)) {
+            if (FOCUS.contains(entity.getUUID())) {
                 entity.addEffect(new MobEffectInstance(
                         MobEffects.GLOWING, 60, 0, false, true));
             }
@@ -146,28 +128,18 @@ public final class MobWarAI {
     }
 
     private static boolean validTarget(
-            PathfinderMob attacker,
-            LivingEntity target,
+            Mob attacker, LivingEntity target,
             ServerLevel level) {
-        if (!MobWarCommands.enabled
-                || attacker == target
-                || target == null
-                || !target.isAlive()
-                || attacker.isRemoved()
-                || isController(attacker)
-                || isController(target)
-                || !inDomain(level, attacker)
-                || !inDomain(level, target)) {
-            return false;
-        }
-
-        List<LivingEntity> entities = scanEntities(level);
-
-        if (entities.size() <= MAX_FOCUS) {
-            return true;
-        }
-
-        return isFocused(target);
+        return MobWarCommands.enabled
+                && target != null
+                && target != attacker
+                && target.isAlive()
+                && !isController(attacker)
+                && !isController(target)
+                && inDomain(level, attacker)
+                && inDomain(level, target)
+                && (FOCUS.contains(target.getUUID())
+                    || scanEntities(level).size() <= MAX_FOCUS);
     }
 
     private static void registerMob(PathfinderMob mob) {
@@ -177,27 +149,9 @@ public final class MobWarAI {
 
         REGISTERED.put(mob, Boolean.TRUE);
 
-        mob.targetSelector.addGoal(
-                1,
-                new NearestAttackableTargetGoal<>(
-                        mob,
-                        LivingEntity.class,
-                        10,
-                        true,
-                        false,
-                        target -> {
-                            if (!(mob.level() instanceof ServerLevel level)) {
-                                return false;
-                            }
-                            return validTarget(mob, target, level);
-                        }
-                )
-        );
-
+        // MobWarCombatGoal là goal có sẵn trong dự án.
         mob.goalSelector.addGoal(
-                1,
-                new MeleeAttackGoal(mob, 1.2D, true)
-        );
+                1, new MobWarCombatGoal(mob));
     }
 
     @SubscribeEvent
@@ -215,17 +169,15 @@ public final class MobWarAI {
 
         for (ServerLevel level : event.getServer().getAllLevels()) {
             List<LivingEntity> entities = scanEntities(level);
-
-            updateFocus(level, entities);
+            updateFocus(entities);
 
             int registered = 0;
-
             for (LivingEntity entity : entities) {
                 if (entity instanceof PathfinderMob mob) {
                     registerMob(mob);
                     registered++;
 
-                    if (registered >= MAX_REGISTER_PER_SCAN) {
+                    if (registered >= 10) {
                         break;
                     }
                 }
@@ -235,18 +187,11 @@ public final class MobWarAI {
                 for (LivingEntity entity : entities) {
                     if (entity instanceof Mob mob
                             && !isController(mob)) {
-                        LivingEntity target = null;
-
-                        for (LivingEntity candidate : entities) {
-                            if (candidate != mob
-                                    && candidate.isAlive()) {
-                                target = candidate;
+                        for (LivingEntity target : entities) {
+                            if (validTarget(mob, target, level)) {
+                                mob.setTarget(target);
                                 break;
                             }
-                        }
-
-                        if (target != null) {
-                            mob.setTarget(target);
                         }
                     }
                 }

@@ -1,58 +1,50 @@
 
 package com.example.examplemod;
 
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.level.ExplosionEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.UUID;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class FogDomainProtection {
 
     private static final double RADIUS = 30.0D;
-    private static final double PUSH_DISTANCE = 0.08D;
-    private static final double CHECK_DISTANCE = 31.0D;
+    private static final double RADIUS_SQUARED = RADIUS * RADIUS;
+
+    private static final Map<UUID, Vec3> LAST_INSIDE = new HashMap<>();
 
     private FogDomainProtection() {
     }
 
-    private static boolean isController(Player player) {
-        return player.getName().getString()
-                .equalsIgnoreCase("tubi2531");
-    }
-
-    private static ServerPlayer getController(ServerLevel level) {
+    private static ServerPlayer findController(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (isController(player) && player.isAlive()) {
+            if (player.getName().getString().equalsIgnoreCase("tubi2531")) {
                 return player;
             }
         }
-
         return null;
     }
 
-    private static boolean inDomain(
-            ServerLevel level, Entity entity) {
-
-        ServerPlayer owner = getController(level);
-
-        return owner != null
-                && owner.distanceToSqr(entity)
-                        <= RADIUS * RADIUS;
+    private static boolean insideDomain(ServerPlayer controller, Entity entity) {
+        return controller != null
+                && controller.isAlive()
+                && controller.distanceToSqr(entity) <= RADIUS_SQUARED;
     }
 
     @SubscribeEvent
-    public static void protectExplosion(
-            ExplosionEvent.Detonate event) {
-
+    public static void onExplosionDetonate(ExplosionEvent.Detonate event) {
         if (!MobWarCommands.enabled) {
             return;
         }
@@ -61,84 +53,68 @@ public final class FogDomainProtection {
             return;
         }
 
-        Entity source =
-                event.getExplosion().getIndirectSourceEntity();
-
-        if (source == null) {
-            source = event.getExplosion().getDirectSourceEntity();
+        ServerPlayer controller = findController(level);
+        if (controller == null) {
+            return;
         }
 
-        boolean protect = source != null
-                && inDomain(level, source);
-
-        if (!protect) {
-            Vec3 center = event.getExplosion().center();
-
-            ServerPlayer owner = getController(level);
-
-            if (owner != null
-                    && owner.distanceToSqr(center)
-                            <= RADIUS * RADIUS) {
-                protect = true;
-            }
-        }
-
-        if (protect) {
+        Vec3 explosionPos = event.getExplosion().center();
+        if (controller.distanceToSqr(
+                explosionPos.x,
+                explosionPos.y,
+                explosionPos.z
+        ) <= RADIUS_SQUARED) {
             event.getAffectedBlocks().clear();
         }
     }
 
     @SubscribeEvent
-    public static void pushEntitiesInside(
-            ServerTickEvent.Post event) {
-
+    public static void onServerTick(ServerTickEvent.Post event) {
         if (!MobWarCommands.enabled) {
+            LAST_INSIDE.clear();
             return;
         }
 
-        MinecraftServer server = event.getServer();
+        for (ServerLevel level : event.getServer().getAllLevels()) {
+            ServerPlayer controller = findController(level);
 
-        for (ServerLevel level : server.getAllLevels()) {
-            ServerPlayer owner = getController(level);
-
-            if (owner == null) {
+            if (controller == null) {
                 continue;
             }
 
             for (Entity entity : level.getAllEntities()) {
-                if (!(entity instanceof LivingEntity)
-                        || entity == owner
-                        || entity.isRemoved()) {
+                if (entity == controller || entity.isRemoved()) {
                     continue;
                 }
 
-                double dx = entity.getX() - owner.getX();
-                double dy = entity.getY() - owner.getY();
-                double dz = entity.getZ() - owner.getZ();
+                UUID id = entity.getUUID();
 
-                double distanceSquared =
-                        dx * dx + dy * dy + dz * dz;
-
-                if (distanceSquared <= RADIUS * RADIUS
-                        || distanceSquared
-                                > CHECK_DISTANCE * CHECK_DISTANCE) {
+                if (insideDomain(controller, entity)) {
+                    LAST_INSIDE.put(id, entity.position());
                     continue;
                 }
 
-                double distance = Math.sqrt(distanceSquared);
+                Vec3 lastPosition = LAST_INSIDE.get(id);
 
-                if (distance < 0.001D) {
-                    continue;
+                if (lastPosition != null) {
+                    entity.setPos(
+                            lastPosition.x,
+                            lastPosition.y,
+                            lastPosition.z
+                    );
+                    entity.setDeltaMovement(Vec3.ZERO);
                 }
-
-                double pushX = -dx / distance * PUSH_DISTANCE;
-                double pushY = -dy / distance * PUSH_DISTANCE;
-                double pushZ = -dz / distance * PUSH_DISTANCE;
-
-                entity.setDeltaMovement(
-                        entity.getDeltaMovement().add(
-                                pushX, pushY, pushZ));
             }
         }
+
+        LAST_INSIDE.keySet().removeIf(id -> {
+            for (ServerLevel level : event.getServer().getAllLevels()) {
+                Entity entity = level.getEntity(id);
+                if (entity != null && !entity.isRemoved()) {
+                    return false;
+                }
+            }
+            return true;
+        });
     }
 }

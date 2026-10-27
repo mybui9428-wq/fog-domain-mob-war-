@@ -1,7 +1,6 @@
 
 package com.example.examplemod;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -10,14 +9,22 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.monster.warden.Warden;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
+
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class FogDomainSkills {
@@ -28,6 +35,7 @@ public final class FogDomainSkills {
 
     private static final Map<UUID, List<UUID>> TAMED =
             new HashMap<>();
+
     private static final Map<UUID, Integer> CAGED =
             new HashMap<>();
 
@@ -35,12 +43,6 @@ public final class FogDomainSkills {
             new HashMap<>();
 
     private static final Map<UUID, UUID> LAST_TARGET =
-            new HashMap<>();
-
-    private static final Map<UUID, Integer> CAGE_TIME =
-            new HashMap<>();
-
-    private static final Map<UUID, UUID> UNUSED =
             new HashMap<>();
 
     private static int selectedSkill = 0;
@@ -67,9 +69,10 @@ public final class FogDomainSkills {
     }
 
     private static LivingEntity findTarget(ServerPlayer player) {
-        ServerLevel level = player.serverLevel();
+        ServerLevel level = (ServerLevel) player.level();
 
         HitResult hit = player.pick(RANGE, 0.0F, false);
+
         if (hit instanceof EntityHitResult entityHit) {
             Entity entity = entityHit.getEntity();
 
@@ -154,6 +157,7 @@ public final class FogDomainSkills {
         }
 
         LivingEntity target = findTarget(player);
+
         if (target == null) {
             player.sendSystemMessage(Component.literal(
                     "Không tìm thấy mục tiêu trong phạm vi."));
@@ -163,12 +167,14 @@ public final class FogDomainSkills {
         switch (selectedSkill) {
             case 0 -> {
                 target.hurtServer(
-                        player.serverLevel(),
+                        (ServerLevel) player.level(),
                         player.damageSources().magic(),
                         10.0F);
+
                 player.sendSystemMessage(Component.literal(
                         "Đã bắn tia năng lượng."));
             }
+
             case 1 -> {
                 CAGED.put(target.getUUID(), CAGE_TICKS);
                 CAGE_OWNER.put(target.getUUID(), player.getUUID());
@@ -180,16 +186,23 @@ public final class FogDomainSkills {
                 player.sendSystemMessage(Component.literal(
                         "Đã nhốt mục tiêu trong 10 giây."));
             }
+
             case 2 -> {
                 if (!(target instanceof Mob mob)
                         || target instanceof Warden) {
                     player.sendSystemMessage(Component.literal(
-                            "Chỉ có thể thu phục sinh vật phù hợp; không thể thu phục Warden."));
+                            "Không thể thu phục mục tiêu này."));
                     return 0;
                 }
 
                 List<UUID> list = TAMED.computeIfAbsent(
                         player.getUUID(), k -> new ArrayList<>());
+
+                list.removeIf(id -> {
+                    Entity entity =
+                            ((ServerLevel) player.level()).getEntity(id);
+                    return entity == null || !entity.isAlive();
+                });
 
                 if (list.size() >= MAX_TAMED) {
                     player.sendSystemMessage(Component.literal(
@@ -210,6 +223,7 @@ public final class FogDomainSkills {
                         "Đã thu phục sinh vật. Tổng số: "
                                 + list.size() + "/" + MAX_TAMED));
             }
+
             default -> {
                 return 0;
             }
@@ -226,6 +240,7 @@ public final class FogDomainSkills {
         }
 
         UUID targetId = LAST_TARGET.get(player.getUUID());
+
         if (targetId == null) {
             player.sendSystemMessage(Component.literal(
                     "Bạn chưa chọn sinh vật để hoán đổi."));
@@ -241,7 +256,9 @@ public final class FogDomainSkills {
             return 0;
         }
 
-        Entity entity = player.serverLevel().getEntity(targetId);
+        ServerLevel level = (ServerLevel) player.level();
+        Entity entity = level.getEntity(targetId);
+
         if (!(entity instanceof Mob mob)
                 || !mob.isAlive()
                 || !inDomain(player, mob)) {
@@ -267,8 +284,7 @@ public final class FogDomainSkills {
     }
 
     @SubscribeEvent
-    public static void onServerTick(
-            net.neoforged.neoforge.event.tick.ServerTickEvent.Post event) {
+    public static void onServerTick(ServerTickEvent.Post event) {
         for (ServerLevel level : event.getServer().getAllLevels()) {
             Iterator<Map.Entry<UUID, Integer>> iterator =
                     CAGED.entrySet().iterator();
@@ -279,8 +295,6 @@ public final class FogDomainSkills {
 
                 if (!(entity instanceof LivingEntity living)
                         || !living.isAlive()) {
-                    iterator.remove();
-                    CAGE_OWNER.remove(entry.getKey());
                     continue;
                 }
 

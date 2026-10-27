@@ -1,83 +1,113 @@
 
 package com.example.examplemod;
 
-import java.util.EnumSet;
-
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.AABB;
+
+import java.util.EnumSet;
+import java.util.List;
 
 public class MobWarCombatGoal extends Goal {
 
-    private static final double RADIUS = 30.0D;
     private static final double ATTACK_DISTANCE_SQR = 4.0D;
+    private static final double SEARCH_RADIUS = 30.0D;
+    private static final int ATTACK_COOLDOWN_TICKS = 20;
+    private static final int TARGET_RECHECK_TICKS = 10;
 
     private final PathfinderMob mob;
-    private int attackCooldown = 0;
+
+    private int attackCooldown;
+    private int targetRecheckCooldown;
 
     public MobWarCombatGoal(PathfinderMob mob) {
         this.mob = mob;
         this.setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
     }
 
-    private boolean inDomain(LivingEntity entity) {
-        if (mob.level() != entity.level()) {
+    private boolean validTarget(LivingEntity target) {
+        if (!(mob.level() instanceof ServerLevel level)) {
             return false;
         }
 
-        for (ServerPlayer player : mob.level()
-                .getServer()
-                .getPlayerList()
-                .getPlayers()) {
+        return MobWarAI.isValidCombatTarget(mob, target, level);
+    }
 
-            if (player.getName().getString()
-                    .equalsIgnoreCase("tubi2531")
-                    && player.isAlive()
-                    && player.level() == mob.level()
-                    && player.distanceToSqr(entity) <= RADIUS * RADIUS) {
-                return true;
+    private LivingEntity findTarget() {
+        if (!(mob.level() instanceof ServerLevel level)
+                || !MobWarCommands.enabled
+                || !MobWarAI.inDomain(level, mob)) {
+            return null;
+        }
+
+        AABB area = mob.getBoundingBox().inflate(SEARCH_RADIUS);
+
+        List<LivingEntity> candidates =
+                level.getEntitiesOfClass(
+                        LivingEntity.class,
+                        area,
+                        entity -> entity != mob
+                                && MobWarAI.isValidCombatTarget(
+                                        mob, entity, level)
+                );
+
+        LivingEntity nearest = null;
+        double nearestDistance = Double.MAX_VALUE;
+
+        for (LivingEntity candidate : candidates) {
+            double distance = mob.distanceToSqr(candidate);
+
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearest = candidate;
             }
         }
 
-        return false;
-    }
-
-    private boolean validTarget(LivingEntity target) {
-        if (!MobWarCommands.enabled
-                || target == null
-                || target == mob
-                || !mob.isAlive()
-                || !target.isAlive()
-                || target.isRemoved()
-                || target.level() != mob.level()) {
-            return false;
-        }
-
-        if (!(target instanceof Mob)
-                && !(target instanceof Player)) {
-            return false;
-        }
-
-        if (target instanceof Player player
-                && player.getName().getString()
-                        .equalsIgnoreCase("tubi2531")) {
-            return false;
-        }
-
-        return inDomain(mob) && inDomain(target);
+        return nearest;
     }
 
     @Override
     public boolean canUse() {
-        return validTarget(mob.getTarget());
+        if (!MobWarCommands.enabled || !mob.isAlive()) {
+            return false;
+        }
+
+        LivingEntity current = mob.getTarget();
+
+        if (validTarget(current)) {
+            return true;
+        }
+
+        if (targetRecheckCooldown > 0) {
+            targetRecheckCooldown--;
+            return false;
+        }
+
+        targetRecheckCooldown = TARGET_RECHECK_TICKS;
+
+        LivingEntity target = findTarget();
+
+        if (target == null) {
+            return false;
+        }
+
+        mob.setTarget(target);
+        return true;
     }
 
     @Override
     public boolean canContinueToUse() {
-        return validTarget(mob.getTarget());
+        return MobWarCommands.enabled
+                && mob.isAlive()
+                && validTarget(mob.getTarget());
+    }
+
+    @Override
+    public void start() {
+        attackCooldown = 0;
     }
 
     @Override
@@ -109,7 +139,7 @@ public class MobWarCombatGoal extends Goal {
                     3.0F
             );
 
-            attackCooldown = 20;
+            attackCooldown = ATTACK_COOLDOWN_TICKS;
         }
     }
 

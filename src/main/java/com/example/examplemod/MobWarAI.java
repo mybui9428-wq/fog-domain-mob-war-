@@ -9,7 +9,6 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.phys.AABB;
 
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -20,15 +19,17 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.WeakHashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class MobWarAI {
-    private static final double RADIUS = 30.0D;
+
+    static final double RADIUS = 30.0D;
     private static final int MAX_FOCUS = 5;
     private static final int SCAN_INTERVAL = 20;
+    private static final int MAX_NEW_GOALS_PER_SCAN = 10;
 
     private static int tickCounter = 0;
 
@@ -40,55 +41,57 @@ public final class MobWarAI {
     private MobWarAI() {
     }
 
-    private static boolean isController(Entity entity) {
+    static boolean isController(Entity entity) {
         return entity instanceof ServerPlayer player
                 && player.getGameProfile().name()
                 .equalsIgnoreCase("tubi2531");
     }
 
-    private static boolean inDomain(
-            ServerLevel level, Entity entity) {
+    static ServerPlayer findController(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (isController(player)
-                    && player.isAlive()
-                    && player.distanceToSqr(entity)
-                    <= RADIUS * RADIUS) {
-                return true;
+            if (isController(player) && player.isAlive()) {
+                return player;
             }
         }
-        return false;
+        return null;
     }
 
-    private static List<LivingEntity> scanEntities(
-            ServerLevel level) {
+    static boolean inDomain(ServerLevel level, Entity entity) {
+        ServerPlayer controller = findController(level);
+
+        return controller != null
+                && entity.level() == level
+                && controller.distanceToSqr(entity)
+                <= RADIUS * RADIUS;
+    }
+
+    private static List<LivingEntity> scanEntities(ServerLevel level) {
         List<LivingEntity> result = new ArrayList<>();
+        ServerPlayer controller = findController(level);
 
-        for (ServerPlayer player : level.players()) {
-            if (!isController(player) || !player.isAlive()) {
-                continue;
-            }
+        if (controller == null) {
+            return result;
+        }
 
-            List<LivingEntity> nearby = level.getEntitiesOfClass(
-                    LivingEntity.class,
-                    player.getBoundingBox().inflate(RADIUS),
-                    entity -> entity.isAlive()
-                            && entity != player
-                            && !isController(entity)
-                            && inDomain(level, entity)
-            );
+        for (LivingEntity entity : level.getEntitiesOfClass(
+                LivingEntity.class,
+                controller.getBoundingBox().inflate(RADIUS),
+                e -> e.isAlive()
+                        && !e.isRemoved()
+                        && e != controller
+                        && !isController(e)
+                        && (e instanceof Mob
+                            || e instanceof ServerPlayer)
+                        && controller.distanceToSqr(e)
+                            <= RADIUS * RADIUS)) {
 
-            for (LivingEntity entity : nearby) {
-                if (!result.contains(entity)) {
-                    result.add(entity);
-                }
-            }
+            result.add(entity);
         }
 
         return result;
     }
 
-    private static void updateFocus(
-            List<LivingEntity> entities) {
+    private static void updateFocus(List<LivingEntity> entities) {
         Set<UUID> alive = new HashSet<>();
 
         for (LivingEntity entity : entities) {
@@ -97,49 +100,69 @@ public final class MobWarAI {
 
         FOCUS.retainAll(alive);
 
-        if (entities.size() <= MAX_FOCUS) {
-            FOCUS.clear();
-            for (LivingEntity entity : entities) {
-                FOCUS.add(entity.getUUID());
-            }
-        } else {
-            List<LivingEntity> available = new ArrayList<>();
+        List<LivingEntity> available = new ArrayList<>();
 
-            for (LivingEntity entity : entities) {
-                if (!FOCUS.contains(entity.getUUID())) {
-                    available.add(entity);
-                }
+        for (LivingEntity entity : entities) {
+            if (!FOCUS.contains(entity.getUUID())) {
+                available.add(entity);
             }
+        }
 
-            Collections.shuffle(available);
+        Collections.shuffle(available);
 
-            while (FOCUS.size() < MAX_FOCUS
-                    && !available.isEmpty()) {
-                FOCUS.add(available.remove(0).getUUID());
-            }
+        while (FOCUS.size() < MAX_FOCUS && !available.isEmpty()) {
+            FOCUS.add(available.remove(0).getUUID());
         }
 
         for (LivingEntity entity : entities) {
             if (FOCUS.contains(entity.getUUID())) {
                 entity.addEffect(new MobEffectInstance(
-                        MobEffects.GLOWING, 60, 0, false, true));
+                        MobEffects.GLOWING,
+                        60,
+                        0,
+                        false,
+                        true
+                ));
             }
         }
     }
 
-    private static boolean validTarget(
-            Mob attacker, LivingEntity target,
+    static boolean isFocused(Entity entity) {
+        return entity != null && FOCUS.contains(entity.getUUID());
+    }
+
+    static boolean isValidCombatTarget(
+            Mob attacker,
+            LivingEntity target,
             ServerLevel level) {
-        return MobWarCommands.enabled
-                && target != null
-                && target != attacker
-                && target.isAlive()
-                && !isController(attacker)
-                && !isController(target)
-                && inDomain(level, attacker)
-                && inDomain(level, target)
-                && (FOCUS.contains(target.getUUID())
-                    || scanEntities(level).size() <= MAX_FOCUS);
+
+        if (!MobWarCommands.enabled
+                || attacker == null
+                || target == null
+                || attacker == target
+                || !attacker.isAlive()
+                || !target.isAlive()
+                || target.isRemoved()
+                || attacker.level() != level
+                || target.level() != level
+                || isController(attacker)
+                || isController(target)
+                || !(target instanceof Mob
+                     || target instanceof ServerPlayer)
+                || !inDomain(level, attacker)
+                || !inDomain(level, target)) {
+            return false;
+        }
+
+        List<LivingEntity> entities = scanEntities(level);
+
+        // Nếu còn hơn 5 đối tượng, chỉ nhắm nhóm phát sáng.
+        if (entities.size() > MAX_FOCUS) {
+            return isFocused(target);
+        }
+
+        // Nếu còn tối đa 5 đối tượng, chúng có thể đánh nhau.
+        return entities.contains(target);
     }
 
     private static void registerMob(PathfinderMob mob) {
@@ -148,52 +171,43 @@ public final class MobWarAI {
         }
 
         REGISTERED.put(mob, Boolean.TRUE);
-
-        // MobWarCombatGoal là goal có sẵn trong dự án.
-        mob.goalSelector.addGoal(
-                1, new MobWarCombatGoal(mob));
+        mob.goalSelector.addGoal(1, new MobWarCombatGoal(mob));
     }
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         if (!MobWarCommands.enabled) {
             FOCUS.clear();
+            tickCounter = 0;
             return;
         }
 
         tickCounter++;
+
         if (tickCounter < SCAN_INTERVAL) {
             return;
         }
+
         tickCounter = 0;
 
         for (ServerLevel level : event.getServer().getAllLevels()) {
             List<LivingEntity> entities = scanEntities(level);
+
             updateFocus(entities);
 
-            int registered = 0;
+            int newGoals = 0;
+
             for (LivingEntity entity : entities) {
-                if (entity instanceof PathfinderMob mob) {
-                    registerMob(mob);
-                    registered++;
-
-                    if (registered >= 10) {
-                        break;
-                    }
+                if (!(entity instanceof PathfinderMob mob)
+                        || REGISTERED.containsKey(mob)) {
+                    continue;
                 }
-            }
 
-            if (entities.size() <= MAX_FOCUS) {
-                for (LivingEntity entity : entities) {
-                    if (entity instanceof Mob mob
-                            && !isController(mob)) {
-                        for (LivingEntity target : entities) {
-                            if (validTarget(mob, target, level)) {
-                                mob.setTarget(target);
-                                break;
-                            }
-                        }
-                    }
+                registerMob(mob);
+                newGoals++;
+
+                if (newGoals >= MAX_NEW_GOALS_PER_SCAN) {
+                    break;
                 }
             }
         }

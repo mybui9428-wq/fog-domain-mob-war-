@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
@@ -37,15 +38,11 @@ public final class FogDomainSkills {
     private static final int MAX_TAMED = 5;
     private static final int CAGE_TICKS = 200;
 
-    // Danh sách sinh vật dùng chung với FogDomainTaming.
     static final Map<UUID, List<UUID>> TAMED = new HashMap<>();
 
     private static final Map<UUID, CageData> CAGES = new HashMap<>();
     private static final Map<UUID, BeamData> BEAMS = new HashMap<>();
     private static final Map<UUID, UUID> LAST_TARGET = new HashMap<>();
-
-    // Vị trí sinh vật đang được chọn bằng /fogskill slte.
-    // -1 nghĩa là chưa chọn.
     private static final Map<UUID, Integer> SLTE_INDEX = new HashMap<>();
 
     private static int selectedSkill = 0;
@@ -105,7 +102,6 @@ public final class FogDomainSkills {
                 <= RADIUS * RADIUS;
     }
 
-    // Tìm mục tiêu theo hướng nhìn, dùng cho kỹ năng cast.
     private static LivingEntity findTarget(ServerPlayer player) {
         ServerLevel level = (ServerLevel) player.level();
 
@@ -138,7 +134,6 @@ public final class FogDomainSkills {
             }
 
             Vec3 closestPoint = eye.add(look.scale(projection));
-
             double tolerance = Math.max(
                     0.8D,
                     Math.min(1.5D, entity.getBbWidth() * 0.75D)
@@ -161,30 +156,22 @@ public final class FogDomainSkills {
             ArmorStand stand, boolean netherite) {
 
         if (netherite) {
-            stand.setItemSlot(
-                    EquipmentSlot.HEAD,
+            stand.setItemSlot(EquipmentSlot.HEAD,
                     new ItemStack(Items.NETHERITE_HELMET));
-            stand.setItemSlot(
-                    EquipmentSlot.CHEST,
+            stand.setItemSlot(EquipmentSlot.CHEST,
                     new ItemStack(Items.NETHERITE_CHESTPLATE));
-            stand.setItemSlot(
-                    EquipmentSlot.LEGS,
+            stand.setItemSlot(EquipmentSlot.LEGS,
                     new ItemStack(Items.NETHERITE_LEGGINGS));
-            stand.setItemSlot(
-                    EquipmentSlot.FEET,
+            stand.setItemSlot(EquipmentSlot.FEET,
                     new ItemStack(Items.NETHERITE_BOOTS));
         } else {
-            stand.setItemSlot(
-                    EquipmentSlot.HEAD,
+            stand.setItemSlot(EquipmentSlot.HEAD,
                     new ItemStack(Items.DIAMOND_HELMET));
-            stand.setItemSlot(
-                    EquipmentSlot.CHEST,
+            stand.setItemSlot(EquipmentSlot.CHEST,
                     new ItemStack(Items.DIAMOND_CHESTPLATE));
-            stand.setItemSlot(
-                    EquipmentSlot.LEGS,
+            stand.setItemSlot(EquipmentSlot.LEGS,
                     new ItemStack(Items.DIAMOND_LEGGINGS));
-            stand.setItemSlot(
-                    EquipmentSlot.FEET,
+            stand.setItemSlot(EquipmentSlot.FEET,
                     new ItemStack(Items.DIAMOND_BOOTS));
         }
 
@@ -196,13 +183,11 @@ public final class FogDomainSkills {
     }
 
     private static ArmorStand spawnStand(
-            ServerLevel level,
-            double x, double y, double z,
+            ServerLevel level, double x, double y, double z,
             boolean netherite) {
 
         ArmorStand stand = new ArmorStand(level, x, y, z);
         giveArmor(stand, netherite);
-
         return level.addFreshEntity(stand) ? stand : null;
     }
 
@@ -211,7 +196,6 @@ public final class FogDomainSkills {
 
         for (UUID id : standIds) {
             Entity entity = level.getEntity(id);
-
             if (entity != null) {
                 entity.discard();
             }
@@ -227,7 +211,6 @@ public final class FogDomainSkills {
         UUID targetId = target.getUUID();
 
         CageData old = CAGES.remove(targetId);
-
         if (old != null) {
             removeStands(old.level, old.standIds);
         }
@@ -248,27 +231,19 @@ public final class FogDomainSkills {
         for (double[] pos : positions) {
             ArmorStand stand = spawnStand(
                     level, pos[0], pos[1], pos[2], true);
-
             if (stand != null) {
                 standIds.add(stand.getUUID());
             }
         }
 
-        CAGES.put(
-                targetId,
+        CAGES.put(targetId,
                 new CageData(level, targetId, standIds));
 
         target.setDeltaMovement(Vec3.ZERO);
         target.hurtMarked = true;
-
         target.addEffect(new MobEffectInstance(
                 MobEffects.SLOWNESS,
-                CAGE_TICKS,
-                10,
-                false,
-                true,
-                true
-        ));
+                CAGE_TICKS, 10, false, true, true));
 
         player.sendSystemMessage(Component.literal(
                 "Đã tạo lồng Netherite trong 10 giây."));
@@ -278,57 +253,32 @@ public final class FogDomainSkills {
             ServerPlayer player, LivingEntity target) {
 
         ServerLevel level = (ServerLevel) player.level();
-
         List<UUID> standIds = new ArrayList<>();
 
         Vec3 right = Vec3.directionFromRotation(
                 0.0F, player.getYRot() + 90.0F).normalize();
 
-        Vec3 leftPos =
-                player.position().add(right.scale(-1.25D));
-        Vec3 rightPos =
-                player.position().add(right.scale(1.25D));
+        Vec3 leftPos = player.position().add(right.scale(-1.25D));
+        Vec3 rightPos = player.position().add(right.scale(1.25D));
 
         ArmorStand left = spawnStand(
-                level,
-                leftPos.x, leftPos.y, leftPos.z,
-                false);
-
+                level, leftPos.x, leftPos.y, leftPos.z, false);
         ArmorStand rightStand = spawnStand(
-                level,
-                rightPos.x, rightPos.y, rightPos.z,
-                false);
+                level, rightPos.x, rightPos.y, rightPos.z, false);
 
-        Vec3 back = player.getLookAngle()
-                .normalize().scale(-0.8D);
+        Vec3 back = player.getLookAngle().normalize().scale(-0.8D);
         Vec3 backPos = player.position().add(back);
 
         ArmorStand netherite = spawnStand(
-                level,
-                backPos.x, backPos.y, backPos.z,
-                true);
+                level, backPos.x, backPos.y, backPos.z, true);
 
-        if (left != null) {
-            standIds.add(left.getUUID());
-        }
+        if (left != null) standIds.add(left.getUUID());
+        if (rightStand != null) standIds.add(rightStand.getUUID());
+        if (netherite != null) standIds.add(netherite.getUUID());
 
-        if (rightStand != null) {
-            standIds.add(rightStand.getUUID());
-        }
-
-        if (netherite != null) {
-            standIds.add(netherite.getUUID());
-        }
-
-        BEAMS.put(
-                player.getUUID(),
-                new BeamData(
-                        level,
-                        player.getUUID(),
-                        target.getUUID(),
-                        standIds
-                )
-        );
+        BEAMS.put(player.getUUID(),
+                new BeamData(level, player.getUUID(),
+                        target.getUUID(), standIds));
 
         player.sendSystemMessage(Component.literal(
                 "Đang hợp nhất giá giáp để tích tụ năng lượng."));
@@ -338,7 +288,6 @@ public final class FogDomainSkills {
             ServerPlayer player, LivingEntity target) {
 
         ServerLevel level = (ServerLevel) player.level();
-
         Vec3 start = player.getEyePosition();
         Vec3 end = target.getBoundingBox().getCenter();
         Vec3 delta = end.subtract(start);
@@ -350,22 +299,18 @@ public final class FogDomainSkills {
             for (double d = 0.0D; d < distance; d += 0.3D) {
                 Vec3 point = start.add(direction.scale(d));
 
-                level.sendParticles(
-                        ParticleTypes.END_ROD,
+                level.sendParticles(ParticleTypes.END_ROD,
                         point.x, point.y, point.z,
                         1, 0.0D, 0.0D, 0.0D, 0.0D);
 
-                level.sendParticles(
-                        ParticleTypes.ELECTRIC_SPARK,
+                level.sendParticles(ParticleTypes.ELECTRIC_SPARK,
                         point.x, point.y, point.z,
                         1, 0.02D, 0.02D, 0.02D, 0.0D);
             }
         }
 
         target.hurtServer(
-                level,
-                player.damageSources().magic(),
-                10.0F);
+                level, player.damageSources().magic(), 10.0F);
 
         player.sendSystemMessage(Component.literal(
                 "Đã bắn tia năng lượng."));
@@ -390,7 +335,6 @@ public final class FogDomainSkills {
 
         switch (selectedSkill) {
             case 0 -> startBeam(player, target);
-
             case 1 -> createCage(player, target);
 
             case 2 -> {
@@ -401,15 +345,13 @@ public final class FogDomainSkills {
                 }
 
                 List<UUID> owned = TAMED.computeIfAbsent(
-                        player.getUUID(),
-                        k -> new ArrayList<>());
+                        player.getUUID(), k -> new ArrayList<>());
 
                 ServerLevel level = (ServerLevel) player.level();
 
                 owned.removeIf(id -> {
                     Entity entity = level.getEntity(id);
-                    return !(entity instanceof Mob m)
-                            || !m.isAlive();
+                    return !(entity instanceof Mob m) || !m.isAlive();
                 });
 
                 if (owned.contains(mob.getUUID())) {
@@ -426,17 +368,11 @@ public final class FogDomainSkills {
                 }
 
                 owned.add(mob.getUUID());
-
-                // Chọn sinh vật mới ngay khi nô dịch lần đầu.
-                SLTE_INDEX.put(
-                        player.getUUID(),
-                        owned.size() - 1);
+                SLTE_INDEX.put(player.getUUID(), owned.size() - 1);
 
                 player.sendSystemMessage(Component.literal(
-                        "Đã nô dịch "
-                                + mob.getName().getString()
-                                + ". Tổng số: "
-                                + owned.size()
+                        "Đã nô dịch " + mob.getName().getString()
+                                + ". Tổng số: " + owned.size()
                                 + "/" + MAX_TAMED));
             }
 
@@ -448,7 +384,6 @@ public final class FogDomainSkills {
         return 1;
     }
 
-    // /fogskill slte: chuyển qua sinh vật nô dịch tiếp theo.
     private static int selectTamed(ServerPlayer player) {
         if (!isController(player)) {
             player.sendSystemMessage(Component.literal(
@@ -460,7 +395,6 @@ public final class FogDomainSkills {
 
         if (owned == null || owned.isEmpty()) {
             SLTE_INDEX.remove(player.getUUID());
-
             player.sendSystemMessage(Component.literal(
                     "Bạn chưa có sinh vật nô dịch nào."));
             return 0;
@@ -468,18 +402,14 @@ public final class FogDomainSkills {
 
         ServerLevel level = (ServerLevel) player.level();
 
-        // Loại bỏ sinh vật đã chết hoặc không còn được tìm thấy
-        // trong thế giới hiện tại.
         owned.removeIf(id -> {
             Entity entity = level.getEntity(id);
             return !(entity instanceof Mob mob)
-                    || !mob.isAlive()
-                    || mob.isRemoved();
+                    || !mob.isAlive() || mob.isRemoved();
         });
 
         if (owned.isEmpty()) {
             SLTE_INDEX.remove(player.getUUID());
-
             player.sendSystemMessage(Component.literal(
                     "Không còn sinh vật nô dịch nào đang hoạt động."));
             return 0;
@@ -487,7 +417,6 @@ public final class FogDomainSkills {
 
         int previous = SLTE_INDEX.getOrDefault(
                 player.getUUID(), -1);
-
         int selected = (previous + 1) % owned.size();
 
         SLTE_INDEX.put(player.getUUID(), selected);
@@ -496,29 +425,24 @@ public final class FogDomainSkills {
 
         if (!(entity instanceof Mob mob)) {
             player.sendSystemMessage(Component.literal(
-                    "Không tìm thấy sinh vật được chọn. Hãy dùng /fogskill slte lại."));
+                    "Không tìm thấy sinh vật được chọn."));
             return 0;
         }
 
         player.sendSystemMessage(Component.literal(
                 "========== [ NÔ DỊCH "
-                        + (selected + 1)
-                        + " ] =========="));
+                        + (selected + 1) + " ] =========="));
 
         player.sendSystemMessage(Component.literal(
                 "Sinh vật: " + mob.getName().getString()));
 
         player.sendSystemMessage(Component.literal(
-                "Vị trí chọn: "
-                        + (selected + 1)
-                        + "/" + owned.size()
-                        + " | Dùng /fogskill swap để đổi vị trí."));
+                "Đã chọn " + (selected + 1) + "/" + owned.size()
+                        + ". Dùng /fogskill swap để đổi vị trí."));
 
         return 1;
     }
 
-    // /fogskill swap: đổi vị trí với sinh vật đang được chọn.
-    // Không cần ngắm nhìn sinh vật.
     private static int swap(ServerPlayer player) {
         if (!isController(player)) {
             player.sendSystemMessage(Component.literal(
@@ -539,13 +463,11 @@ public final class FogDomainSkills {
         owned.removeIf(id -> {
             Entity entity = level.getEntity(id);
             return !(entity instanceof Mob mob)
-                    || !mob.isAlive()
-                    || mob.isRemoved();
+                    || !mob.isAlive() || mob.isRemoved();
         });
 
         if (owned.isEmpty()) {
             SLTE_INDEX.remove(player.getUUID());
-
             player.sendSystemMessage(Component.literal(
                     "Không còn sinh vật nô dịch nào đang hoạt động."));
             return 0;
@@ -560,7 +482,6 @@ public final class FogDomainSkills {
             return 0;
         }
 
-        // Đảm bảo chỉ số vẫn hợp lệ nếu danh sách thay đổi.
         selected = Math.floorMod(selected, owned.size());
         SLTE_INDEX.put(player.getUUID(), selected);
 
@@ -568,11 +489,10 @@ public final class FogDomainSkills {
 
         if (!(entity instanceof Mob mob) || !mob.isAlive()) {
             player.sendSystemMessage(Component.literal(
-                    "Sinh vật được chọn không còn tồn tại. Hãy dùng /fogskill slte lại."));
+                    "Sinh vật được chọn không còn tồn tại."));
             return 0;
         }
 
-        // Lưu vị trí và hướng nhìn của cả hai.
         double playerX = player.getX();
         double playerY = player.getY();
         double playerZ = player.getZ();
@@ -585,19 +505,20 @@ public final class FogDomainSkills {
         float mobYaw = mob.getYRot();
         float mobPitch = mob.getXRot();
 
-        // Đổi vị trí hai bên.
+        // Dùng đúng overload có Set<Relative> của NeoForge 26.2.
         player.teleportTo(
-                level, mobX, mobY, mobZ,
-                mobYaw, mobPitch);
+                level,
+                mobX, mobY, mobZ,
+                Set.of(),
+                mobYaw, mobPitch,
+                true
+        );
 
-        mob.teleportTo(
-                playerX, playerY, playerZ);
-
+        mob.teleportTo(playerX, playerY, playerZ);
         mob.setYRot(playerYaw);
         mob.setXRot(playerPitch);
         mob.setYBodyRot(playerYaw);
         mob.setYHeadRot(playerYaw);
-
         mob.setDeltaMovement(Vec3.ZERO);
         mob.hurtMarked = true;
 
@@ -610,9 +531,7 @@ public final class FogDomainSkills {
     }
 
     @SubscribeEvent
-    public static void registerCommands(
-            RegisterCommandsEvent event) {
-
+    public static void registerCommands(RegisterCommandsEvent event) {
         event.getDispatcher().register(
                 Commands.literal("fogskill")
 
@@ -675,27 +594,21 @@ public final class FogDomainSkills {
     }
 
     @SubscribeEvent
-    public static void onServerTick(
-            ServerTickEvent.Post event) {
-
-        // Cập nhật lồng nhốt.
+    public static void onServerTick(ServerTickEvent.Post event) {
         Iterator<Map.Entry<UUID, CageData>> cageIterator =
                 CAGES.entrySet().iterator();
 
         while (cageIterator.hasNext()) {
             Map.Entry<UUID, CageData> entry =
                     cageIterator.next();
-
             CageData cage = entry.getValue();
 
-            Entity entity =
-                    cage.level.getEntity(cage.targetId);
+            Entity entity = cage.level.getEntity(cage.targetId);
 
             if (!(entity instanceof LivingEntity target)
                     || !target.isAlive()
                     || target.isRemoved()
                     || cage.ticks <= 0) {
-
                 removeStands(cage.level, cage.standIds);
                 cageIterator.remove();
                 continue;
@@ -707,14 +620,12 @@ public final class FogDomainSkills {
             cage.ticks--;
             cage.damageTicks++;
 
-            // Gây sát thương theo thời gian nhưng không kết liễu.
             if (cage.damageTicks >= 20) {
                 cage.damageTicks = 0;
 
                 if (target.getHealth() > 1.0F) {
                     float damage = Math.min(
-                            1.0F,
-                            target.getHealth() - 1.0F);
+                            1.0F, target.getHealth() - 1.0F);
 
                     if (damage > 0.0F) {
                         target.hurtServer(
@@ -730,9 +641,7 @@ public final class FogDomainSkills {
                         target.getY()
                                 + target.getBbHeight() * 0.5D,
                         target.getZ(),
-                        4,
-                        0.25D, 0.25D, 0.25D,
-                        0.01D);
+                        4, 0.25D, 0.25D, 0.25D, 0.01D);
             }
 
             if (cage.ticks <= 0) {
@@ -741,19 +650,16 @@ public final class FogDomainSkills {
             }
         }
 
-        // Cập nhật hiệu ứng tích tụ năng lượng.
         Iterator<Map.Entry<UUID, BeamData>> beamIterator =
                 BEAMS.entrySet().iterator();
 
         while (beamIterator.hasNext()) {
             Map.Entry<UUID, BeamData> entry =
                     beamIterator.next();
-
             BeamData beam = entry.getValue();
 
             Entity playerEntity =
                     beam.level.getEntity(beam.playerId);
-
             Entity targetEntity =
                     beam.level.getEntity(beam.targetId);
 
@@ -761,7 +667,6 @@ public final class FogDomainSkills {
                     || !(targetEntity instanceof LivingEntity target)
                     || !player.isAlive()
                     || !target.isAlive()) {
-
                 removeStands(beam.level, beam.standIds);
                 beamIterator.remove();
                 continue;
@@ -771,9 +676,7 @@ public final class FogDomainSkills {
 
             if (beam.ticks <= 0) {
                 removeStands(beam.level, beam.standIds);
-
                 fireBeam(player, target);
-
                 beamIterator.remove();
             }
         }

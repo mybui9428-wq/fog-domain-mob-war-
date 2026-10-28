@@ -1,4 +1,3 @@
-
 package com.example.examplemod;
 
 import net.minecraft.commands.Commands;
@@ -38,15 +37,16 @@ public final class FogDomainSkills {
     private static final int MAX_TAMED = 5;
     private static final int CAGE_TICKS = 200;
 
-    /*
-     * Dùng chung danh sách này với FogDomainTaming.
-     * Không tạo một danh sách thu phục thứ hai.
-     */
+    // Danh sách sinh vật dùng chung với FogDomainTaming.
     static final Map<UUID, List<UUID>> TAMED = new HashMap<>();
 
     private static final Map<UUID, CageData> CAGES = new HashMap<>();
     private static final Map<UUID, BeamData> BEAMS = new HashMap<>();
     private static final Map<UUID, UUID> LAST_TARGET = new HashMap<>();
+
+    // Vị trí sinh vật đang được chọn bằng /fogskill slte.
+    // -1 nghĩa là chưa chọn.
+    private static final Map<UUID, Integer> SLTE_INDEX = new HashMap<>();
 
     private static int selectedSkill = 0;
 
@@ -63,7 +63,8 @@ public final class FogDomainSkills {
         int ticks;
         int damageTicks;
 
-        CageData(ServerLevel level, UUID targetId, List<UUID> standIds) {
+        CageData(ServerLevel level, UUID targetId,
+                 List<UUID> standIds) {
             this.level = level;
             this.targetId = targetId;
             this.standIds = standIds;
@@ -79,8 +80,8 @@ public final class FogDomainSkills {
         final List<UUID> standIds;
         int ticks;
 
-        BeamData(ServerLevel level, UUID playerId, UUID targetId,
-                 List<UUID> standIds) {
+        BeamData(ServerLevel level, UUID playerId,
+                 UUID targetId, List<UUID> standIds) {
             this.level = level;
             this.playerId = playerId;
             this.targetId = targetId;
@@ -93,15 +94,18 @@ public final class FogDomainSkills {
     }
 
     private static boolean isController(ServerPlayer player) {
-        return player.getGameProfile().name()
+        return player.getName().getString()
                 .equalsIgnoreCase("tubi2531");
     }
 
-    private static boolean inDomain(ServerPlayer player, Entity entity) {
+    private static boolean inDomain(
+            ServerPlayer player, Entity entity) {
         return player.level() == entity.level()
-                && player.distanceToSqr(entity) <= RADIUS * RADIUS;
+                && player.distanceToSqr(entity)
+                <= RADIUS * RADIUS;
     }
 
+    // Tìm mục tiêu theo hướng nhìn, dùng cho kỹ năng cast.
     private static LivingEntity findTarget(ServerPlayer player) {
         ServerLevel level = (ServerLevel) player.level();
 
@@ -109,16 +113,17 @@ public final class FogDomainSkills {
         Vec3 look = player.getLookAngle().normalize();
         AABB searchBox = player.getBoundingBox().inflate(RANGE);
 
-        List<LivingEntity> candidates = level.getEntitiesOfClass(
-                LivingEntity.class,
-                searchBox,
-                entity -> entity != player
-                        && entity.isAlive()
-                        && !entity.isRemoved()
-                        && inDomain(player, entity)
-                        && !(entity instanceof ServerPlayer p
-                        && isController(p))
-        );
+        List<LivingEntity> candidates =
+                level.getEntitiesOfClass(
+                        LivingEntity.class,
+                        searchBox,
+                        entity -> entity != player
+                                && entity.isAlive()
+                                && !entity.isRemoved()
+                                && inDomain(player, entity)
+                                && !(entity instanceof ServerPlayer p
+                                && isController(p))
+                );
 
         LivingEntity best = null;
         double bestProjection = Double.MAX_VALUE;
@@ -133,6 +138,7 @@ public final class FogDomainSkills {
             }
 
             Vec3 closestPoint = eye.add(look.scale(projection));
+
             double tolerance = Math.max(
                     0.8D,
                     Math.min(1.5D, entity.getBbWidth() * 0.75D)
@@ -151,24 +157,34 @@ public final class FogDomainSkills {
         return best;
     }
 
-    private static void giveArmor(ArmorStand stand, boolean netherite) {
+    private static void giveArmor(
+            ArmorStand stand, boolean netherite) {
+
         if (netherite) {
-            stand.setItemSlot(EquipmentSlot.HEAD,
+            stand.setItemSlot(
+                    EquipmentSlot.HEAD,
                     new ItemStack(Items.NETHERITE_HELMET));
-            stand.setItemSlot(EquipmentSlot.CHEST,
+            stand.setItemSlot(
+                    EquipmentSlot.CHEST,
                     new ItemStack(Items.NETHERITE_CHESTPLATE));
-            stand.setItemSlot(EquipmentSlot.LEGS,
+            stand.setItemSlot(
+                    EquipmentSlot.LEGS,
                     new ItemStack(Items.NETHERITE_LEGGINGS));
-            stand.setItemSlot(EquipmentSlot.FEET,
+            stand.setItemSlot(
+                    EquipmentSlot.FEET,
                     new ItemStack(Items.NETHERITE_BOOTS));
         } else {
-            stand.setItemSlot(EquipmentSlot.HEAD,
+            stand.setItemSlot(
+                    EquipmentSlot.HEAD,
                     new ItemStack(Items.DIAMOND_HELMET));
-            stand.setItemSlot(EquipmentSlot.CHEST,
+            stand.setItemSlot(
+                    EquipmentSlot.CHEST,
                     new ItemStack(Items.DIAMOND_CHESTPLATE));
-            stand.setItemSlot(EquipmentSlot.LEGS,
+            stand.setItemSlot(
+                    EquipmentSlot.LEGS,
                     new ItemStack(Items.DIAMOND_LEGGINGS));
-            stand.setItemSlot(EquipmentSlot.FEET,
+            stand.setItemSlot(
+                    EquipmentSlot.FEET,
                     new ItemStack(Items.DIAMOND_BOOTS));
         }
 
@@ -180,7 +196,8 @@ public final class FogDomainSkills {
     }
 
     private static ArmorStand spawnStand(
-            ServerLevel level, double x, double y, double z,
+            ServerLevel level,
+            double x, double y, double z,
             boolean netherite) {
 
         ArmorStand stand = new ArmorStand(level, x, y, z);
@@ -194,6 +211,7 @@ public final class FogDomainSkills {
 
         for (UUID id : standIds) {
             Entity entity = level.getEntity(id);
+
             if (entity != null) {
                 entity.discard();
             }
@@ -209,6 +227,7 @@ public final class FogDomainSkills {
         UUID targetId = target.getUUID();
 
         CageData old = CAGES.remove(targetId);
+
         if (old != null) {
             removeStands(old.level, old.standIds);
         }
@@ -217,7 +236,6 @@ public final class FogDomainSkills {
         double y = target.getY();
         double z = target.getZ();
 
-        // Bốn giá cách mục tiêu xa hơn để tạo thành lồng.
         double[][] positions = {
                 {x + 1.8D, y, z},
                 {x - 1.8D, y, z},
@@ -236,12 +254,21 @@ public final class FogDomainSkills {
             }
         }
 
-        CAGES.put(targetId, new CageData(level, targetId, standIds));
+        CAGES.put(
+                targetId,
+                new CageData(level, targetId, standIds));
 
         target.setDeltaMovement(Vec3.ZERO);
         target.hurtMarked = true;
+
         target.addEffect(new MobEffectInstance(
-                MobEffects.SLOWNESS, CAGE_TICKS, 10, false, true, true));
+                MobEffects.SLOWNESS,
+                CAGE_TICKS,
+                10,
+                false,
+                true,
+                true
+        ));
 
         player.sendSystemMessage(Component.literal(
                 "Đã tạo lồng Netherite trong 10 giây."));
@@ -257,34 +284,51 @@ public final class FogDomainSkills {
         Vec3 right = Vec3.directionFromRotation(
                 0.0F, player.getYRot() + 90.0F).normalize();
 
-        // Hai giá kim cương xuất hiện ở hai bên người dùng.
-        Vec3 leftPos = player.position().add(right.scale(-1.25D));
-        Vec3 rightPos = player.position().add(right.scale(1.25D));
+        Vec3 leftPos =
+                player.position().add(right.scale(-1.25D));
+        Vec3 rightPos =
+                player.position().add(right.scale(1.25D));
 
         ArmorStand left = spawnStand(
-                level, leftPos.x, leftPos.y, leftPos.z, false);
-        ArmorStand rightStand = spawnStand(
-                level, rightPos.x, rightPos.y, rightPos.z, false);
+                level,
+                leftPos.x, leftPos.y, leftPos.z,
+                false);
 
-        // Giá Netherite ở phía sau lưng người dùng.
-        Vec3 back = player.getLookAngle().normalize().scale(-0.8D);
+        ArmorStand rightStand = spawnStand(
+                level,
+                rightPos.x, rightPos.y, rightPos.z,
+                false);
+
+        Vec3 back = player.getLookAngle()
+                .normalize().scale(-0.8D);
         Vec3 backPos = player.position().add(back);
 
         ArmorStand netherite = spawnStand(
-                level, backPos.x, backPos.y, backPos.z, true);
+                level,
+                backPos.x, backPos.y, backPos.z,
+                true);
 
         if (left != null) {
             standIds.add(left.getUUID());
         }
+
         if (rightStand != null) {
             standIds.add(rightStand.getUUID());
         }
+
         if (netherite != null) {
             standIds.add(netherite.getUUID());
         }
 
-        BEAMS.put(player.getUUID(), new BeamData(
-                level, player.getUUID(), target.getUUID(), standIds));
+        BEAMS.put(
+                player.getUUID(),
+                new BeamData(
+                        level,
+                        player.getUUID(),
+                        target.getUUID(),
+                        standIds
+                )
+        );
 
         player.sendSystemMessage(Component.literal(
                 "Đang hợp nhất giá giáp để tích tụ năng lượng."));
@@ -319,7 +363,9 @@ public final class FogDomainSkills {
         }
 
         target.hurtServer(
-                level, player.damageSources().magic(), 10.0F);
+                level,
+                player.damageSources().magic(),
+                10.0F);
 
         player.sendSystemMessage(Component.literal(
                 "Đã bắn tia năng lượng."));
@@ -355,7 +401,8 @@ public final class FogDomainSkills {
                 }
 
                 List<UUID> owned = TAMED.computeIfAbsent(
-                        player.getUUID(), k -> new ArrayList<>());
+                        player.getUUID(),
+                        k -> new ArrayList<>());
 
                 ServerLevel level = (ServerLevel) player.level();
 
@@ -374,15 +421,22 @@ public final class FogDomainSkills {
 
                 if (owned.size() >= MAX_TAMED) {
                     player.sendSystemMessage(Component.literal(
-                            "Đã đủ 5 sinh vật. Dùng /fogskill swap khi ngắm sinh vật mới để thay thế."));
+                            "Đã đủ 5 sinh vật. Không thể nô dịch thêm."));
                     return 0;
                 }
 
                 owned.add(mob.getUUID());
 
+                // Chọn sinh vật mới ngay khi nô dịch lần đầu.
+                SLTE_INDEX.put(
+                        player.getUUID(),
+                        owned.size() - 1);
+
                 player.sendSystemMessage(Component.literal(
-                        "Đã nô dịch " + mob.getName().getString()
-                                + ". Tổng số: " + owned.size()
+                        "Đã nô dịch "
+                                + mob.getName().getString()
+                                + ". Tổng số: "
+                                + owned.size()
                                 + "/" + MAX_TAMED));
             }
 
@@ -394,6 +448,77 @@ public final class FogDomainSkills {
         return 1;
     }
 
+    // /fogskill slte: chuyển qua sinh vật nô dịch tiếp theo.
+    private static int selectTamed(ServerPlayer player) {
+        if (!isController(player)) {
+            player.sendSystemMessage(Component.literal(
+                    "Bạn không phải người điều khiển lĩnh vực."));
+            return 0;
+        }
+
+        List<UUID> owned = TAMED.get(player.getUUID());
+
+        if (owned == null || owned.isEmpty()) {
+            SLTE_INDEX.remove(player.getUUID());
+
+            player.sendSystemMessage(Component.literal(
+                    "Bạn chưa có sinh vật nô dịch nào."));
+            return 0;
+        }
+
+        ServerLevel level = (ServerLevel) player.level();
+
+        // Loại bỏ sinh vật đã chết hoặc không còn được tìm thấy
+        // trong thế giới hiện tại.
+        owned.removeIf(id -> {
+            Entity entity = level.getEntity(id);
+            return !(entity instanceof Mob mob)
+                    || !mob.isAlive()
+                    || mob.isRemoved();
+        });
+
+        if (owned.isEmpty()) {
+            SLTE_INDEX.remove(player.getUUID());
+
+            player.sendSystemMessage(Component.literal(
+                    "Không còn sinh vật nô dịch nào đang hoạt động."));
+            return 0;
+        }
+
+        int previous = SLTE_INDEX.getOrDefault(
+                player.getUUID(), -1);
+
+        int selected = (previous + 1) % owned.size();
+
+        SLTE_INDEX.put(player.getUUID(), selected);
+
+        Entity entity = level.getEntity(owned.get(selected));
+
+        if (!(entity instanceof Mob mob)) {
+            player.sendSystemMessage(Component.literal(
+                    "Không tìm thấy sinh vật được chọn. Hãy dùng /fogskill slte lại."));
+            return 0;
+        }
+
+        player.sendSystemMessage(Component.literal(
+                "========== [ NÔ DỊCH "
+                        + (selected + 1)
+                        + " ] =========="));
+
+        player.sendSystemMessage(Component.literal(
+                "Sinh vật: " + mob.getName().getString()));
+
+        player.sendSystemMessage(Component.literal(
+                "Vị trí chọn: "
+                        + (selected + 1)
+                        + "/" + owned.size()
+                        + " | Dùng /fogskill swap để đổi vị trí."));
+
+        return 1;
+    }
+
+    // /fogskill swap: đổi vị trí với sinh vật đang được chọn.
+    // Không cần ngắm nhìn sinh vật.
     private static int swap(ServerPlayer player) {
         if (!isController(player)) {
             player.sendSystemMessage(Component.literal(
@@ -401,110 +526,170 @@ public final class FogDomainSkills {
             return 0;
         }
 
-        LivingEntity target = findTarget(player);
+        List<UUID> owned = TAMED.get(player.getUUID());
 
-        if (!(target instanceof Mob mob)) {
+        if (owned == null || owned.isEmpty()) {
             player.sendSystemMessage(Component.literal(
-                    "Hãy ngắm vào sinh vật muốn nô dịch."));
+                    "Bạn chưa có sinh vật nô dịch nào."));
             return 0;
         }
-
-        List<UUID> owned = TAMED.computeIfAbsent(
-                player.getUUID(), k -> new ArrayList<>());
 
         ServerLevel level = (ServerLevel) player.level();
 
         owned.removeIf(id -> {
             Entity entity = level.getEntity(id);
-            return !(entity instanceof Mob m) || !m.isAlive();
+            return !(entity instanceof Mob mob)
+                    || !mob.isAlive()
+                    || mob.isRemoved();
         });
 
-        if (owned.contains(mob.getUUID())) {
-            owned.remove(mob.getUUID());
-            owned.add(0, mob.getUUID());
+        if (owned.isEmpty()) {
+            SLTE_INDEX.remove(player.getUUID());
 
             player.sendSystemMessage(Component.literal(
-                    "Đã chọn " + mob.getName().getString()
-                            + " làm sinh vật nô dịch ưu tiên."));
-            return 1;
+                    "Không còn sinh vật nô dịch nào đang hoạt động."));
+            return 0;
         }
 
-        if (owned.size() >= MAX_TAMED) {
-            UUID oldId = owned.remove(0);
-            Entity oldEntity = level.getEntity(oldId);
-            owned.add(mob.getUUID());
+        int selected = SLTE_INDEX.getOrDefault(
+                player.getUUID(), -1);
 
+        if (selected < 0) {
             player.sendSystemMessage(Component.literal(
-                    "Đã thay sinh vật cũ"
-                            + (oldEntity != null
-                            ? " (" + oldEntity.getName().getString() + ")" : "")
-                            + " bằng " + mob.getName().getString() + "."));
-        } else {
-            owned.add(mob.getUUID());
-
-            player.sendSystemMessage(Component.literal(
-                    "Đã thêm " + mob.getName().getString()
-                            + " vào danh sách nô dịch."));
+                    "Hãy dùng /fogskill slte để chọn sinh vật trước."));
+            return 0;
         }
 
-        LAST_TARGET.put(player.getUUID(), mob.getUUID());
+        // Đảm bảo chỉ số vẫn hợp lệ nếu danh sách thay đổi.
+        selected = Math.floorMod(selected, owned.size());
+        SLTE_INDEX.put(player.getUUID(), selected);
+
+        Entity entity = level.getEntity(owned.get(selected));
+
+        if (!(entity instanceof Mob mob) || !mob.isAlive()) {
+            player.sendSystemMessage(Component.literal(
+                    "Sinh vật được chọn không còn tồn tại. Hãy dùng /fogskill slte lại."));
+            return 0;
+        }
+
+        // Lưu vị trí và hướng nhìn của cả hai.
+        double playerX = player.getX();
+        double playerY = player.getY();
+        double playerZ = player.getZ();
+        float playerYaw = player.getYRot();
+        float playerPitch = player.getXRot();
+
+        double mobX = mob.getX();
+        double mobY = mob.getY();
+        double mobZ = mob.getZ();
+        float mobYaw = mob.getYRot();
+        float mobPitch = mob.getXRot();
+
+        // Đổi vị trí hai bên.
+        player.teleportTo(
+                level, mobX, mobY, mobZ,
+                mobYaw, mobPitch);
+
+        mob.teleportTo(
+                playerX, playerY, playerZ);
+
+        mob.setYRot(playerYaw);
+        mob.setXRot(playerPitch);
+        mob.setYBodyRot(playerYaw);
+        mob.setYHeadRot(playerYaw);
+
+        mob.setDeltaMovement(Vec3.ZERO);
+        mob.hurtMarked = true;
+
+        player.sendSystemMessage(Component.literal(
+                "Đã đổi vị trí với Nô dịch "
+                        + (selected + 1)
+                        + ": " + mob.getName().getString()));
+
         return 1;
     }
 
     @SubscribeEvent
-    public static void registerCommands(RegisterCommandsEvent event) {
+    public static void registerCommands(
+            RegisterCommandsEvent event) {
+
         event.getDispatcher().register(
                 Commands.literal("fogskill")
+
                         .then(Commands.literal("cycle")
                                 .executes(context -> {
-                                    ServerPlayer player = context.getSource()
-                                            .getPlayerOrException();
+                                    ServerPlayer player =
+                                            context.getSource()
+                                                    .getPlayerOrException();
 
                                     if (!isController(player)) {
-                                        player.sendSystemMessage(Component.literal(
-                                                "Bạn không phải người điều khiển lĩnh vực."));
+                                        player.sendSystemMessage(
+                                                Component.literal(
+                                                        "Bạn không phải người điều khiển lĩnh vực."));
                                         return 0;
                                     }
 
                                     selectedSkill =
-                                            (selectedSkill + 1) % SKILLS.length;
+                                            (selectedSkill + 1)
+                                                    % SKILLS.length;
 
-                                    player.sendSystemMessage(Component.literal(
-                                            "Kỹ năng: " + SKILLS[selectedSkill]));
+                                    player.sendSystemMessage(
+                                            Component.literal(
+                                                    "Kỹ năng: "
+                                                            + SKILLS[selectedSkill]));
                                     return 1;
                                 }))
+
                         .then(Commands.literal("status")
                                 .executes(context -> {
-                                    ServerPlayer player = context.getSource()
-                                            .getPlayerOrException();
+                                    ServerPlayer player =
+                                            context.getSource()
+                                                    .getPlayerOrException();
 
-                                    player.sendSystemMessage(Component.literal(
-                                            "Kỹ năng đang chọn: "
-                                                    + SKILLS[selectedSkill]
-                                                    + " | Phạm vi: " + RANGE
-                                                    + " | Nô dịch tối đa: " + MAX_TAMED));
+                                    player.sendSystemMessage(
+                                            Component.literal(
+                                                    "Kỹ năng đang chọn: "
+                                                            + SKILLS[selectedSkill]
+                                                            + " | Phạm vi: "
+                                                            + RANGE
+                                                            + " | Nô dịch tối đa: "
+                                                            + MAX_TAMED));
                                     return 1;
                                 }))
+
                         .then(Commands.literal("cast")
-                                .executes(context -> cast(
-                                        context.getSource().getPlayerOrException())))
+                                .executes(context ->
+                                        cast(context.getSource()
+                                                .getPlayerOrException())))
+
+                        .then(Commands.literal("slte")
+                                .executes(context ->
+                                        selectTamed(context.getSource()
+                                                .getPlayerOrException())))
+
                         .then(Commands.literal("swap")
-                                .executes(context -> swap(
-                                        context.getSource().getPlayerOrException())))
+                                .executes(context ->
+                                        swap(context.getSource()
+                                                .getPlayerOrException())))
         );
     }
 
     @SubscribeEvent
-    public static void onServerTick(ServerTickEvent.Post event) {
-        // Cập nhật lồng nhốt, mỗi lồng chỉ giảm thời gian một lần mỗi tick.
+    public static void onServerTick(
+            ServerTickEvent.Post event) {
+
+        // Cập nhật lồng nhốt.
         Iterator<Map.Entry<UUID, CageData>> cageIterator =
                 CAGES.entrySet().iterator();
 
         while (cageIterator.hasNext()) {
-            Map.Entry<UUID, CageData> entry = cageIterator.next();
+            Map.Entry<UUID, CageData> entry =
+                    cageIterator.next();
+
             CageData cage = entry.getValue();
 
-            Entity entity = cage.level.getEntity(cage.targetId);
+            Entity entity =
+                    cage.level.getEntity(cage.targetId);
 
             if (!(entity instanceof LivingEntity target)
                     || !target.isAlive()
@@ -522,13 +707,14 @@ public final class FogDomainSkills {
             cage.ticks--;
             cage.damageTicks++;
 
-            // Sát thương theo thời gian, không để kỹ năng này kết liễu mục tiêu.
+            // Gây sát thương theo thời gian nhưng không kết liễu.
             if (cage.damageTicks >= 20) {
                 cage.damageTicks = 0;
 
                 if (target.getHealth() > 1.0F) {
                     float damage = Math.min(
-                            1.0F, target.getHealth() - 1.0F);
+                            1.0F,
+                            target.getHealth() - 1.0F);
 
                     if (damage > 0.0F) {
                         target.hurtServer(
@@ -541,9 +727,12 @@ public final class FogDomainSkills {
                 cage.level.sendParticles(
                         ParticleTypes.SOUL,
                         target.getX(),
-                        target.getY() + target.getBbHeight() * 0.5D,
+                        target.getY()
+                                + target.getBbHeight() * 0.5D,
                         target.getZ(),
-                        4, 0.25D, 0.25D, 0.25D, 0.01D);
+                        4,
+                        0.25D, 0.25D, 0.25D,
+                        0.01D);
             }
 
             if (cage.ticks <= 0) {
@@ -552,21 +741,27 @@ public final class FogDomainSkills {
             }
         }
 
-        // Hiệu ứng hợp nhất giá giáp trước khi bắn tia.
+        // Cập nhật hiệu ứng tích tụ năng lượng.
         Iterator<Map.Entry<UUID, BeamData>> beamIterator =
                 BEAMS.entrySet().iterator();
 
         while (beamIterator.hasNext()) {
-            Map.Entry<UUID, BeamData> entry = beamIterator.next();
+            Map.Entry<UUID, BeamData> entry =
+                    beamIterator.next();
+
             BeamData beam = entry.getValue();
 
-            Entity playerEntity = beam.level.getEntity(beam.playerId);
-            Entity targetEntity = beam.level.getEntity(beam.targetId);
+            Entity playerEntity =
+                    beam.level.getEntity(beam.playerId);
+
+            Entity targetEntity =
+                    beam.level.getEntity(beam.targetId);
 
             if (!(playerEntity instanceof ServerPlayer player)
                     || !(targetEntity instanceof LivingEntity target)
                     || !player.isAlive()
                     || !target.isAlive()) {
+
                 removeStands(beam.level, beam.standIds);
                 beamIterator.remove();
                 continue;
@@ -575,12 +770,12 @@ public final class FogDomainSkills {
             beam.ticks--;
 
             if (beam.ticks <= 0) {
-                // Hai giá kim cương và giá Netherite biến mất cùng lúc
-                // để biểu diễn quá trình dung nhập.
                 removeStands(beam.level, beam.standIds);
+
                 fireBeam(player, target);
+
                 beamIterator.remove();
             }
         }
     }
-}
+    }

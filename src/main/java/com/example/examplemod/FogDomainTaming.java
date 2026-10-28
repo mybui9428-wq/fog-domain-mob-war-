@@ -16,16 +16,23 @@ import java.util.UUID;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class FogDomainTaming {
+
     private static int tickCounter = 0;
 
-    private FogDomainTaming() {}
+    private FogDomainTaming() {
+    }
 
     public static boolean isTamed(Entity entity) {
-        if (entity == null) return false;
+        if (entity == null) {
+            return false;
+        }
 
         for (List<UUID> ids : FogDomainSkills.TAMED.values()) {
-            if (ids.contains(entity.getUUID())) return true;
+            if (ids.contains(entity.getUUID())) {
+                return true;
+            }
         }
+
         return false;
     }
 
@@ -37,15 +44,25 @@ public final class FogDomainTaming {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (++tickCounter < 5) return;
+        if (++tickCounter < 5) {
+            return;
+        }
         tickCounter = 0;
 
         for (ServerLevel level : event.getServer().getAllLevels()) {
             ServerPlayer owner = findOwner(level);
-            if (owner == null || !owner.isAlive()) continue;
 
-            List<UUID> owned = FogDomainSkills.TAMED.get(owner.getUUID());
-            if (owned == null || owned.isEmpty()) continue;
+            if (owner == null || !owner.isAlive()) {
+                continue;
+            }
+
+            List<UUID> owned = FogDomainSkills.TAMED.get(
+                    owner.getUUID()
+            );
+
+            if (owned == null || owned.isEmpty()) {
+                continue;
+            }
 
             List<UUID> remove = new ArrayList<>();
 
@@ -57,24 +74,31 @@ public final class FogDomainTaming {
                     continue;
                 }
 
-                // Never allow a tamed mob to target its owner.
+                // Không bao giờ tấn công chủ nhân.
                 if (mob.getTarget() == owner) {
                     mob.setTarget(null);
                 }
 
+                // Chỉ chọn mục tiêu nếu chủ nhân vừa bị tấn công
+                // hoặc vừa chủ động tấn công mục tiêu đó.
                 LivingEntity target = chooseTarget(owner, mob);
 
                 if (target != null) {
                     mob.setTarget(target);
-                    mob.getLookControl().setLookAt(target, 30.0F, 30.0F);
+                    mob.getLookControl().setLookAt(
+                            target, 30.0F, 30.0F
+                    );
 
                     if (mob.distanceToSqr(target) > 3.0D) {
                         mob.getNavigation().moveTo(target, 1.2D);
+                    } else {
+                        mob.getNavigation().stop();
                     }
                 } else {
-                    // Follow the owner and avoid wandering away.
+                    // Xóa mục tiêu tự chọn của AI thông thường.
                     mob.setTarget(null);
 
+                    // Khi không có mục tiêu, chỉ đi theo chủ nhân.
                     if (mob.distanceToSqr(owner) > 9.0D) {
                         mob.getNavigation().moveTo(owner, 1.2D);
                     } else {
@@ -84,6 +108,7 @@ public final class FogDomainTaming {
             }
 
             owned.removeAll(remove);
+
             if (owned.isEmpty()) {
                 FogDomainSkills.TAMED.remove(owner.getUUID());
             }
@@ -92,19 +117,25 @@ public final class FogDomainTaming {
 
     private static ServerPlayer findOwner(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (isOwner(player)) return player;
+            if (isOwner(player)) {
+                return player;
+            }
         }
         return null;
     }
 
     private static LivingEntity chooseTarget(
-            ServerPlayer owner, Mob companion) {
+            ServerPlayer owner,
+            Mob companion) {
+
+        // Ưu tiên sinh vật vừa tấn công chủ nhân.
         LivingEntity attacker = owner.getLastHurtByMob();
 
         if (isValidTarget(owner, companion, attacker)) {
             return attacker;
         }
 
+        // Tiếp theo là mục tiêu chủ nhân vừa tấn công.
         LivingEntity ownerTarget = owner.getLastHurtMob();
 
         if (isValidTarget(owner, companion, ownerTarget)) {
@@ -115,16 +146,29 @@ public final class FogDomainTaming {
     }
 
     private static boolean isValidTarget(
-            ServerPlayer owner, Mob companion, LivingEntity target) {
-        if (target == null || !target.isAlive()
-                || target == owner || target == companion
+            ServerPlayer owner,
+            Mob companion,
+            LivingEntity target) {
+
+        if (target == null
+                || !target.isAlive()
+                || target.isRemoved()
+                || target == owner
+                || target == companion
                 || target.level() != companion.level()) {
             return false;
         }
 
-        if (isTamed(target)) return false;
+        // Không đánh sinh vật đã được thuần hóa.
+        if (isTamed(target)) {
+            return false;
+        }
 
-        return !(target instanceof ServerPlayer player)
-                || !isOwner(player);
+        // Không bao giờ chọn tubi2531 làm mục tiêu.
+        if (isOwner(target)) {
+            return false;
+        }
+
+        return true;
     }
 }

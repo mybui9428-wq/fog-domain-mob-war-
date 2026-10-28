@@ -65,6 +65,10 @@ public final class MobWarAI {
                 <= RADIUS * RADIUS;
     }
 
+    private static boolean isTamed(Entity entity) {
+        return FogDomainTaming.isTamed(entity);
+    }
+
     private static List<LivingEntity> scanEntities(ServerLevel level) {
         List<LivingEntity> result = new ArrayList<>();
         ServerPlayer controller = findController(level);
@@ -80,6 +84,7 @@ public final class MobWarAI {
                         && !entity.isRemoved()
                         && entity != controller
                         && !isController(entity)
+                        && !isTamed(entity)
                         && (entity instanceof Mob
                             || entity instanceof ServerPlayer)
                         && controller.distanceToSqr(entity)
@@ -96,10 +101,8 @@ public final class MobWarAI {
             alive.add(entity.getUUID());
         }
 
-        // Xóa mục tiêu đã chết hoặc rời khỏi lĩnh vực.
         FOCUS.retainAll(alive);
 
-        // Giữ nhóm hiện tại, chỉ bổ sung khi thiếu thành viên.
         List<LivingEntity> available = new ArrayList<>();
 
         for (LivingEntity entity : entities) {
@@ -114,7 +117,6 @@ public final class MobWarAI {
             FOCUS.add(available.remove(0).getUUID());
         }
 
-        // Làm mới hiệu ứng phát sáng cho nhóm được chọn.
         for (LivingEntity entity : entities) {
             if (FOCUS.contains(entity.getUUID())) {
                 entity.addEffect(new MobEffectInstance(
@@ -149,6 +151,8 @@ public final class MobWarAI {
                 || target.level() != level
                 || isController(attacker)
                 || isController(target)
+                || isTamed(attacker)
+                || isTamed(target)
                 || !(target instanceof Mob
                      || target instanceof ServerPlayer)
                 || !inDomain(level, attacker)
@@ -158,19 +162,15 @@ public final class MobWarAI {
 
         List<LivingEntity> entities = scanEntities(level);
 
-        if (entities.isEmpty()) {
+        if (!entities.contains(attacker) || !entities.contains(target)) {
             return false;
         }
 
         if (entities.size() > MAX_FOCUS) {
-            // Khi có hơn 5 đối tượng:
-            // chỉ sinh vật không phát sáng săn nhóm phát sáng.
             return !isFocused(attacker) && isFocused(target);
         }
 
-        // Khi còn tối đa 5 đối tượng:
-        // sinh vật có thể nhắm những đối tượng còn lại.
-        return entities.contains(target);
+        return true;
     }
 
     private static void registerMob(PathfinderMob mob) {

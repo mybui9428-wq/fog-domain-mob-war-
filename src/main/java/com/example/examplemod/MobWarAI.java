@@ -28,7 +28,7 @@ public final class MobWarAI {
 
     static final double RADIUS = 30.0D;
     private static final int MAX_FOCUS = 5;
-    private static final int SCAN_INTERVAL = 20;
+    private static final int SCAN_INTERVAL = 10;
     private static final int MAX_NEW_GOALS_PER_SCAN = 10;
 
     private static int tickCounter = 0;
@@ -43,7 +43,7 @@ public final class MobWarAI {
 
     static boolean isController(Entity entity) {
         return entity instanceof ServerPlayer player
-                && player.getGameProfile().name()
+                && player.getName().getString()
                 .equalsIgnoreCase("tubi2531");
     }
 
@@ -117,11 +117,12 @@ public final class MobWarAI {
             FOCUS.add(available.remove(0).getUUID());
         }
 
+        // Làm mới phát sáng liên tục cho nhóm được chọn.
         for (LivingEntity entity : entities) {
             if (FOCUS.contains(entity.getUUID())) {
                 entity.addEffect(new MobEffectInstance(
                         MobEffects.GLOWING,
-                        40,
+                        100,
                         0,
                         false,
                         true,

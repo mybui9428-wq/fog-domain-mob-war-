@@ -86,8 +86,8 @@ public final class FogDomainTaming {
 
     private static ServerPlayer findOwner(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (player.getGameProfile().getName()
-                    .equalsIgnoreCase("tubi2531")) {
+            if (player.getName().getString()
+        .equalsIgnoreCase("tubi2531")) {
                 return player;
             }
         }

@@ -18,10 +18,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
-import java.util.Map;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class MobWarAI {
@@ -73,20 +73,18 @@ public final class MobWarAI {
             return result;
         }
 
-        for (LivingEntity entity : level.getEntitiesOfClass(
+        result.addAll(level.getEntitiesOfClass(
                 LivingEntity.class,
                 controller.getBoundingBox().inflate(RADIUS),
-                e -> e.isAlive()
-                        && !e.isRemoved()
-                        && e != controller
-                        && !isController(e)
-                        && (e instanceof Mob
-                            || e instanceof ServerPlayer)
-                        && controller.distanceToSqr(e)
-                            <= RADIUS * RADIUS)) {
-
-            result.add(entity);
-        }
+                entity -> entity.isAlive()
+                        && !entity.isRemoved()
+                        && entity != controller
+                        && !isController(entity)
+                        && (entity instanceof Mob
+                            || entity instanceof ServerPlayer)
+                        && controller.distanceToSqr(entity)
+                        <= RADIUS * RADIUS
+        ));
 
         return result;
     }
@@ -98,8 +96,10 @@ public final class MobWarAI {
             alive.add(entity.getUUID());
         }
 
+        // Xóa mục tiêu đã chết hoặc rời khỏi lĩnh vực.
         FOCUS.retainAll(alive);
 
+        // Giữ nhóm hiện tại, chỉ bổ sung khi thiếu thành viên.
         List<LivingEntity> available = new ArrayList<>();
 
         for (LivingEntity entity : entities) {
@@ -114,13 +114,15 @@ public final class MobWarAI {
             FOCUS.add(available.remove(0).getUUID());
         }
 
+        // Làm mới hiệu ứng phát sáng cho nhóm được chọn.
         for (LivingEntity entity : entities) {
             if (FOCUS.contains(entity.getUUID())) {
                 entity.addEffect(new MobEffectInstance(
                         MobEffects.GLOWING,
-                        60,
+                        40,
                         0,
                         false,
+                        true,
                         true
                 ));
             }
@@ -156,12 +158,18 @@ public final class MobWarAI {
 
         List<LivingEntity> entities = scanEntities(level);
 
-        // Nếu còn hơn 5 đối tượng, chỉ nhắm nhóm phát sáng.
-        if (entities.size() > MAX_FOCUS) {
-            return isFocused(target);
+        if (entities.isEmpty()) {
+            return false;
         }
 
-        // Nếu còn tối đa 5 đối tượng, chúng có thể đánh nhau.
+        if (entities.size() > MAX_FOCUS) {
+            // Khi có hơn 5 đối tượng:
+            // chỉ sinh vật không phát sáng săn nhóm phát sáng.
+            return !isFocused(attacker) && isFocused(target);
+        }
+
+        // Khi còn tối đa 5 đối tượng:
+        // sinh vật có thể nhắm những đối tượng còn lại.
         return entities.contains(target);
     }
 

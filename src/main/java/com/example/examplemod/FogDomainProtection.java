@@ -4,13 +4,14 @@ package com.example.examplemod;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.level.ExplosionEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -30,19 +31,28 @@ public final class FogDomainProtection {
 
     private static ServerPlayer findController(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (player.getName().getString().equalsIgnoreCase("tubi2531")) {
+            if (player.getGameProfile().name()
+                    .equalsIgnoreCase("tubi2531")
+                    && player.isAlive()) {
                 return player;
             }
         }
         return null;
     }
 
-    private static boolean insideDomain(ServerPlayer controller, Entity entity) {
+    private static boolean insideDomain(
+            ServerPlayer controller, Entity entity) {
         return controller != null
                 && controller.isAlive()
+                && controller.level() == entity.level()
                 && controller.distanceToSqr(entity) <= RADIUS_SQUARED;
     }
 
+    /*
+     * Khi lĩnh vực bật, vụ nổ trong phạm vi
+     * không được phá block.
+     * Khi tắt, Minecraft hoạt động bình thường.
+     */
     @SubscribeEvent
     public static void onExplosionDetonate(ExplosionEvent.Detonate event) {
         if (!MobWarCommands.enabled) {
@@ -54,20 +64,60 @@ public final class FogDomainProtection {
         }
 
         ServerPlayer controller = findController(level);
+
         if (controller == null) {
             return;
         }
 
-        Vec3 explosionPos = event.getExplosion().center();
+        Vec3 position = event.getExplosion().center();
+
         if (controller.distanceToSqr(
-                explosionPos.x,
-                explosionPos.y,
-                explosionPos.z
+                position.x,
+                position.y,
+                position.z
         ) <= RADIUS_SQUARED) {
             event.getAffectedBlocks().clear();
         }
     }
 
+    /*
+     * tubi2531 miễn nhiễm sát thương khi ở trong lĩnh vực.
+     * Ra ngoài lĩnh vực hoặc tắt lĩnh vực thì sát thương
+     * được xử lý như bình thường.
+     */
+    @SubscribeEvent
+    public static void onLivingIncomingDamage(
+            LivingIncomingDamageEvent event) {
+
+        if (!MobWarCommands.enabled) {
+            return;
+        }
+
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        if (!player.getGameProfile().name()
+                .equalsIgnoreCase("tubi2531")) {
+            return;
+        }
+
+        if (!(player.level() instanceof ServerLevel level)) {
+            return;
+        }
+
+        ServerPlayer controller = findController(level);
+
+        if (controller == player && insideDomain(controller, player)) {
+            event.setCanceled(true);
+        }
+    }
+
+    /*
+     * Ghi nhớ vị trí bên trong lĩnh vực.
+     * Khi entity cố đi ra ngoài, đưa nó về vị trí gần nhất
+     * đã ghi nhận ở bên trong.
+     */
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
         if (!MobWarCommands.enabled) {
@@ -83,7 +133,9 @@ public final class FogDomainProtection {
             }
 
             for (Entity entity : level.getAllEntities()) {
-                if (entity == controller || entity.isRemoved()) {
+                if (entity == controller
+                        || entity.isRemoved()
+                        || entity.level() != level) {
                     continue;
                 }
 
@@ -97,7 +149,7 @@ public final class FogDomainProtection {
                 Vec3 lastPosition = LAST_INSIDE.get(id);
 
                 if (lastPosition != null) {
-                    entity.setPos(
+                    entity.teleportTo(
                             lastPosition.x,
                             lastPosition.y,
                             lastPosition.z
@@ -107,14 +159,24 @@ public final class FogDomainProtection {
             }
         }
 
-        LAST_INSIDE.keySet().removeIf(id -> {
+        Iterator<UUID> iterator = LAST_INSIDE.keySet().iterator();
+
+        while (iterator.hasNext()) {
+            UUID id = iterator.next();
+            boolean found = false;
+
             for (ServerLevel level : event.getServer().getAllLevels()) {
                 Entity entity = level.getEntity(id);
+
                 if (entity != null && !entity.isRemoved()) {
-                    return false;
+                    found = true;
+                    break;
                 }
             }
-            return true;
-        });
+
+            if (!found) {
+                iterator.remove();
+            }
+        }
     }
 }

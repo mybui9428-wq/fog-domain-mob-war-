@@ -1,13 +1,11 @@
 
 package com.example.examplemod;
 
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -22,34 +20,46 @@ public final class FogDomainTaming {
 
     private FogDomainTaming() {}
 
+    public static boolean isTamed(Entity entity) {
+        if (entity == null) return false;
+
+        for (List<UUID> ids : FogDomainSkills.TAMED.values()) {
+            if (ids.contains(entity.getUUID())) return true;
+        }
+        return false;
+    }
+
+    public static boolean isOwner(Entity entity) {
+        return entity instanceof ServerPlayer player
+                && player.getName().getString()
+                .equalsIgnoreCase("tubi2531");
+    }
+
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (++tickCounter < 10) {
-            return;
-        }
+        if (++tickCounter < 5) return;
         tickCounter = 0;
 
-        MinecraftServer server = event.getServer();
-
-        for (ServerLevel level : server.getAllLevels()) {
+        for (ServerLevel level : event.getServer().getAllLevels()) {
             ServerPlayer owner = findOwner(level);
-            if (owner == null || !owner.isAlive()) {
-                continue;
-            }
+            if (owner == null || !owner.isAlive()) continue;
 
             List<UUID> owned = FogDomainSkills.TAMED.get(owner.getUUID());
-            if (owned == null || owned.isEmpty()) {
-                continue;
-            }
+            if (owned == null || owned.isEmpty()) continue;
 
             List<UUID> remove = new ArrayList<>();
 
-            for (UUID mobId : owned) {
-                Entity entity = level.getEntity(mobId);
+            for (UUID id : owned) {
+                Entity entity = level.getEntity(id);
 
                 if (!(entity instanceof Mob mob) || !mob.isAlive()) {
-                    remove.add(mobId);
+                    remove.add(id);
                     continue;
+                }
+
+                // Never allow a tamed mob to target its owner.
+                if (mob.getTarget() == owner) {
+                    mob.setTarget(null);
                 }
 
                 LivingEntity target = chooseTarget(owner, mob);
@@ -62,22 +72,18 @@ public final class FogDomainTaming {
                         mob.getNavigation().moveTo(target, 1.2D);
                     }
                 } else {
-                    if (mob.getTarget() == owner) {
-                        mob.setTarget(null);
-                    }
+                    // Follow the owner and avoid wandering away.
+                    mob.setTarget(null);
 
-                    double distance = mob.distanceToSqr(owner);
-
-                    if (distance > 25.0D) {
+                    if (mob.distanceToSqr(owner) > 9.0D) {
                         mob.getNavigation().moveTo(owner, 1.2D);
-                    } else if (distance < 9.0D) {
+                    } else {
                         mob.getNavigation().stop();
                     }
                 }
             }
 
             owned.removeAll(remove);
-
             if (owned.isEmpty()) {
                 FogDomainSkills.TAMED.remove(owner.getUUID());
             }
@@ -86,17 +92,13 @@ public final class FogDomainTaming {
 
     private static ServerPlayer findOwner(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (player.getName().getString()
-        .equalsIgnoreCase("tubi2531")) {
-                return player;
-            }
+            if (isOwner(player)) return player;
         }
         return null;
     }
 
     private static LivingEntity chooseTarget(
             ServerPlayer owner, Mob companion) {
-
         LivingEntity attacker = owner.getLastHurtByMob();
 
         if (isValidTarget(owner, companion, attacker)) {
@@ -114,18 +116,15 @@ public final class FogDomainTaming {
 
     private static boolean isValidTarget(
             ServerPlayer owner, Mob companion, LivingEntity target) {
-
         if (target == null || !target.isAlive()
-                || target == owner || target == companion) {
+                || target == owner || target == companion
+                || target.level() != companion.level()) {
             return false;
         }
 
-        if (target.level() != companion.level()) {
-            return false;
-        }
+        if (isTamed(target)) return false;
 
-        List<UUID> owned = FogDomainSkills.TAMED.get(owner.getUUID());
-
-        return owned == null || !owned.contains(target.getUUID());
+        return !(target instanceof ServerPlayer player)
+                || !isOwner(player);
     }
 }

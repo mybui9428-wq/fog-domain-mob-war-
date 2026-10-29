@@ -3,41 +3,34 @@ package com.example.examplemod;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.effect.MobEffects;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Comparator;
 
 public class MobWarCombatGoal extends Goal {
-
-    private static final double ATTACK_DISTANCE_SQR = 4.0D;
     private static final double SEARCH_RADIUS = 30.0D;
+    private static final double ATTACK_DISTANCE_SQR = 4.0D;
     private static final double MOVE_SPEED = 1.1D;
     private static final float ATTACK_DAMAGE = 3.0F;
     private static final int ATTACK_COOLDOWN_TICKS = 20;
-    private static final int TARGET_RECHECK_TICKS = 10;
 
     private final PathfinderMob mob;
-
     private int attackCooldown;
     private int targetRecheckCooldown;
 
     public MobWarCombatGoal(PathfinderMob mob) {
         this.mob = mob;
-
-        setFlags(EnumSet.of(
-                Goal.Flag.MOVE,
-                Goal.Flag.LOOK
-        ));
+        setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
     }
 
     private boolean validTarget(LivingEntity target) {
         return mob.level() instanceof ServerLevel level
-                && MobWarAI.isValidCombatTarget(
-                        mob, target, level
-                );
+                && MobWarAI.isValidCombatTarget(mob, target, level);
     }
 
     private LivingEntity findTarget() {
@@ -48,29 +41,27 @@ public class MobWarCombatGoal extends Goal {
             return null;
         }
 
-        List<LivingEntity> candidates =
-                level.getEntitiesOfClass(
-                        LivingEntity.class,
-                        mob.getBoundingBox().inflate(SEARCH_RADIUS),
-                        entity -> entity != mob
-                                && MobWarAI.isValidCombatTarget(
-                                        mob, entity, level
-                                )
-                );
+        List<LivingEntity> candidates = level.getEntitiesOfClass(
+                LivingEntity.class,
+                mob.getBoundingBox().inflate(SEARCH_RADIUS),
+                entity -> entity != mob
+                        && MobWarAI.isValidCombatTarget(mob, entity, level)
+        );
 
-        LivingEntity best = null;
-        double bestDistance = Double.MAX_VALUE;
-
-        for (LivingEntity candidate : candidates) {
-            double distance = mob.distanceToSqr(candidate);
-
-            if (distance < bestDistance) {
-                bestDistance = distance;
-                best = candidate;
-            }
+        if (candidates.isEmpty()) {
+            return null;
         }
 
-        return best;
+        // Ưu tiên mục tiêu đang phát sáng.
+        candidates.sort(
+                Comparator
+                        .comparing((LivingEntity entity) ->
+                                !entity.hasEffect(MobEffects.GLOWING))
+                        .thenComparingDouble(entity ->
+                                mob.distanceToSqr(entity))
+        );
+
+        return candidates.get(0);
     }
 
     @Override
@@ -86,7 +77,23 @@ public class MobWarCombatGoal extends Goal {
 
         LivingEntity currentTarget = mob.getTarget();
 
+        // Nếu mục tiêu hiện tại không phát sáng nhưng có mục tiêu
+        // phát sáng hợp lệ, tìm lại để ưu tiên mục tiêu phát sáng.
         if (validTarget(currentTarget)) {
+            if (targetRecheckCooldown > 0) {
+                targetRecheckCooldown--;
+                return true;
+            }
+
+            targetRecheckCooldown = 10;
+            LivingEntity preferred = findTarget();
+
+            if (preferred != null
+                    && preferred.hasEffect(MobEffects.GLOWING)
+                    && !currentTarget.hasEffect(MobEffects.GLOWING)) {
+                mob.setTarget(preferred);
+            }
+
             return true;
         }
 
@@ -95,8 +102,7 @@ public class MobWarCombatGoal extends Goal {
             return false;
         }
 
-        targetRecheckCooldown = TARGET_RECHECK_TICKS;
-
+        targetRecheckCooldown = 10;
         LivingEntity target = findTarget();
 
         if (target == null) {
@@ -131,16 +137,10 @@ public class MobWarCombatGoal extends Goal {
             return;
         }
 
-        mob.getLookControl().setLookAt(
-                target, 30.0F, 30.0F
-        );
+        mob.getLookControl().setLookAt(target, 30.0F, 30.0F);
 
-        double distance = mob.distanceToSqr(target);
-
-        if (distance > ATTACK_DISTANCE_SQR) {
-            mob.getNavigation().moveTo(
-                    target, MOVE_SPEED
-            );
+        if (mob.distanceToSqr(target) > ATTACK_DISTANCE_SQR) {
+            mob.getNavigation().moveTo(target, MOVE_SPEED);
             return;
         }
 
@@ -163,11 +163,5 @@ public class MobWarCombatGoal extends Goal {
     @Override
     public void stop() {
         mob.getNavigation().stop();
-
-        LivingEntity target = mob.getTarget();
-
-        if (!validTarget(target)) {
-            mob.setTarget(null);
-        }
     }
 }

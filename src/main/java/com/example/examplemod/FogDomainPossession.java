@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class FogDomainPossession {
     private FogDomainPossession() {}
@@ -56,19 +57,21 @@ public final class FogDomainPossession {
             return false;
         }
 
-        POSSESSED.put(player.getUUID(), target.getUUID());
-        BODY_POSITIONS.put(
-                player.getUUID(),
-                player.position()
-        );
+        UUID playerId = player.getUUID();
+
+        POSSESSED.put(playerId, target.getUUID());
+        BODY_POSITIONS.put(playerId, player.position());
         OLD_INVULNERABLE.put(
-                player.getUUID(),
-                player.isInvulnerable()
-        );
+                playerId, player.isInvulnerable());
 
         player.setInvulnerable(true);
         player.setDeltaMovement(Vec3.ZERO);
         player.setSprinting(false);
+
+        PacketDistributor.sendToPlayer(
+                player,
+                new FogPossessionPayload(1, target.getId())
+        );
 
         return true;
     }
@@ -89,6 +92,11 @@ public final class FogDomainPossession {
         OLD_INVULNERABLE.remove(playerId);
         player.setInvulnerable(wasInvulnerable);
         player.setDeltaMovement(Vec3.ZERO);
+
+        PacketDistributor.sendToPlayer(
+                player,
+                new FogPossessionPayload(0, 0)
+        );
 
         return true;
     }

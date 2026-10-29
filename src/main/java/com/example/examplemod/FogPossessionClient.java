@@ -3,21 +3,21 @@ package com.example.examplemod;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
-@EventBusSubscriber(
-modid = ExampleMod.MODID,
-value = Dist.CLIENT,
-bus = EventBusSubscriber.Bus.MOD
-)
+@Mod(value = ExampleMod.MODID, dist = Dist.CLIENT)
 public final class FogPossessionClient {
 
-private FogPossessionClient() {}
+public FogPossessionClient(IEventBus modEventBus) {
+    modEventBus.addListener(
+            FogPossessionClient::registerPayloadHandlers);
+}
 
-@SubscribeEvent
-public static void registerPayloadHandlers(
+private static void registerPayloadHandlers(
         RegisterPayloadHandlersEvent event) {
 
     event.registrar("1").playToClient(

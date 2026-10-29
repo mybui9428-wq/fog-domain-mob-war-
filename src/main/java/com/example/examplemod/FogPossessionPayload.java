@@ -2,7 +2,6 @@ package com.example.examplemod;
 
 import io.netty.buffer.ByteBuf;
 
-import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.Identifier;
@@ -38,10 +37,18 @@ public Type<? extends CustomPacketPayload> type() {
 public static void register(RegisterPayloadHandlersEvent event) {
     PayloadRegistrar registrar = event.registrar("1");
 
+    // Client -> Server
     registrar.playToServer(
             TYPE,
             STREAM_CODEC,
             FogPossessionPayload::handleServer
+    );
+
+    // Server -> Client
+    registrar.playToClient(
+            TYPE,
+            STREAM_CODEC,
+            FogPossessionPayload::handleClient
     );
 }
 
@@ -58,13 +65,11 @@ private static void handleServer(
             return;
         }
 
-        // Action 0: stop possessing.
         if (payload.action() == 0) {
             FogDomainPossession.stop(player);
             return;
         }
 
-        // Action 1: possess the selected living entity.
         if (payload.action() != 1) {
             return;
         }
@@ -88,4 +93,12 @@ private static void handleServer(
     });
 }
 
-        }
+private static void handleClient(
+        FogPossessionPayload payload,
+        IPayloadContext context) {
+
+    context.enqueueWork(() ->
+            FogPossessionClient.handlePayload(payload));
+}
+
+            }

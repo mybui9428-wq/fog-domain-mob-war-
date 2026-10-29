@@ -37,7 +37,7 @@ public final class FogDomainPossession {
             return null;
         }
 
-        return player.serverLevel().getEntity(targetId);
+        return player.level().getEntity(targetId);
     }
 
     public static boolean start(ServerPlayer player, Entity target) {

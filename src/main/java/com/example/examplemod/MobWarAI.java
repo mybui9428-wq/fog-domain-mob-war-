@@ -44,9 +44,9 @@ public final class MobWarAI {
     private MobWarAI() {}
 
     static boolean isController(Entity entity) {
-        return entity instanceof ServerPlayer player
-                && player.getGameProfile().getName()
-                .equalsIgnoreCase("tubi2531");
+    return entity instanceof ServerPlayer player
+            && player.getName().getString()
+            .equalsIgnoreCase("tubi2531");
     }
 
     static ServerPlayer findController(ServerLevel level) {

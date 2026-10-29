@@ -16,6 +16,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +26,6 @@ import java.util.WeakHashMap;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class MobWarAI {
-
     static final double RADIUS = 30.0D;
 
     private static final int MAX_FOCUS = 5;
@@ -39,12 +39,13 @@ public final class MobWarAI {
 
     private static final Set<UUID> FOCUS = new HashSet<>();
 
-    private MobWarAI() {
-    }
+    private static final Map<UUID, Integer> FOCUS_TICKS = new HashMap<>();
+
+    private MobWarAI() {}
 
     static boolean isController(Entity entity) {
         return entity instanceof ServerPlayer player
-                && player.getName().getString()
+                && player.getGameProfile().getName()
                 .equalsIgnoreCase("tubi2531");
     }
 
@@ -54,46 +55,47 @@ public final class MobWarAI {
                 return player;
             }
         }
-
         return null;
     }
 
     static boolean inDomain(ServerLevel level, Entity entity) {
+        if (entity == null || entity.isRemoved()
+                || entity.level() != level) {
+            return false;
+        }
+
         ServerPlayer controller = findController(level);
 
         return controller != null
-                && entity != null
-                && !entity.isRemoved()
-                && entity.level() == level
-                && controller.distanceToSqr(entity)
-                <= RADIUS * RADIUS;
+                && controller.distanceToSqr(entity) <= RADIUS * RADIUS;
     }
 
     private static boolean isTamed(Entity entity) {
         return FogDomainTaming.isTamed(entity);
     }
 
-    private static List<LivingEntity> scanEntities(
-            ServerLevel level) {
-
+    private static List<LivingEntity> scanEntities(ServerLevel level) {
         List<LivingEntity> result = new ArrayList<>();
+
+        if (!MobWarCommands.enabled) {
+            return result;
+        }
+
         ServerPlayer controller = findController(level);
 
-        if (controller == null || !MobWarCommands.enabled) {
+        if (controller == null) {
             return result;
         }
 
         result.addAll(level.getEntitiesOfClass(
                 LivingEntity.class,
                 controller.getBoundingBox().inflate(RADIUS),
-
                 entity -> entity.isAlive()
                         && !entity.isRemoved()
-                        && entity != controller
                         && !isController(entity)
                         && !isTamed(entity)
                         && (entity instanceof Mob
-                            || entity instanceof ServerPlayer)
+                        || entity instanceof ServerPlayer)
                         && controller.distanceToSqr(entity)
                         <= RADIUS * RADIUS
         ));
@@ -101,34 +103,36 @@ public final class MobWarAI {
         return result;
     }
 
-    private static void updateFocus(
-            ServerLevel level,
-            List<LivingEntity> entities) {
-
-        Set<UUID> validIds = new HashSet<>();
+    private static void updateFocus(List<LivingEntity> entities) {
+        Set<UUID> present = new HashSet<>();
 
         for (LivingEntity entity : entities) {
-            validIds.add(entity.getUUID());
+            present.add(entity.getUUID());
         }
 
-        // Xóa mục tiêu chết, rời lĩnh vực hoặc không còn hợp lệ.
-        FOCUS.removeIf(id -> !validIds.contains(id));
+        // Bỏ mục tiêu đã rời khỏi khu vực hoặc không còn hợp lệ.
+        FOCUS.removeIf(id -> !present.contains(id));
+        FOCUS_TICKS.keySet().removeIf(id -> !present.contains(id));
 
-        // Loại bỏ hiệu ứng phát sáng nếu mục tiêu không còn được chọn.
-        for (LivingEntity entity : level.getEntitiesOfClass(
-                LivingEntity.class,
-                findController(level) == null
-                        ? new net.minecraft.world.phys.AABB(0, 0, 0, 0, 0, 0)
-                        : findController(level).getBoundingBox().inflate(RADIUS),
-                entity -> entity.hasEffect(MobEffects.GLOWING)
-                        && !FOCUS.contains(entity.getUUID()))) {
+        // Giữ hiệu ứng phát sáng cho các mục tiêu đã chọn.
+        for (LivingEntity entity : entities) {
+            UUID id = entity.getUUID();
 
-            if (!isTamed(entity)) {
-                entity.removeEffect(MobEffects.GLOWING);
+            if (FOCUS.contains(id)) {
+                entity.addEffect(new MobEffectInstance(
+                        MobEffects.GLOWING,
+                        SCAN_INTERVAL + 10,
+                        0,
+                        false,
+                        true,
+                        true
+                ));
+
+                FOCUS_TICKS.put(id, FOCUS_TICKS.getOrDefault(id, 0) + 1);
             }
         }
 
-        // Giữ các mục tiêu đang được chọn nếu chúng vẫn hợp lệ.
+        // Chỉ chọn ngẫu nhiên thêm khi chưa đủ 5 mục tiêu.
         List<LivingEntity> available = new ArrayList<>();
 
         for (LivingEntity entity : entities) {
@@ -140,38 +144,29 @@ public final class MobWarAI {
         Collections.shuffle(available);
 
         while (FOCUS.size() < MAX_FOCUS && !available.isEmpty()) {
-            FOCUS.add(available.remove(0).getUUID());
+            LivingEntity chosen = available.remove(0);
+            FOCUS.add(chosen.getUUID());
+            FOCUS_TICKS.put(chosen.getUUID(), 0);
         }
 
-        // Làm mới hiệu ứng phát sáng cho các mục tiêu đã chọn.
-        for (LivingEntity entity : entities) {
-            if (FOCUS.contains(entity.getUUID())) {
-                entity.addEffect(new MobEffectInstance(
-                        MobEffects.GLOWING,
-                        SCAN_INTERVAL + 10,
-                        0,
-                        false,
-                        true,
-                        true
-                ));
-            }
-        }
+        // Nếu một mục tiêu đã chết hoặc biến mất, số lượng sẽ được bổ sung
+        // ở lần quét tiếp theo.
     }
 
     @SubscribeEvent
     public static void onLivingDeath(LivingDeathEvent event) {
-        Entity entity = event.getEntity();
+        UUID id = event.getEntity().getUUID();
 
-        FOCUS.remove(entity.getUUID());
+        FOCUS.remove(id);
+        FOCUS_TICKS.remove(id);
 
-        if (entity instanceof PathfinderMob mob) {
+        if (event.getEntity() instanceof PathfinderMob mob) {
             REGISTERED.remove(mob);
         }
     }
 
     static boolean isFocused(Entity entity) {
-        return entity != null
-                && FOCUS.contains(entity.getUUID());
+        return entity != null && FOCUS.contains(entity.getUUID());
     }
 
     static boolean isValidCombatTarget(
@@ -185,6 +180,7 @@ public final class MobWarAI {
                 || attacker == target
                 || !attacker.isAlive()
                 || !target.isAlive()
+                || attacker.isRemoved()
                 || target.isRemoved()
                 || attacker.level() != level
                 || target.level() != level
@@ -193,28 +189,14 @@ public final class MobWarAI {
                 || isTamed(attacker)
                 || isTamed(target)
                 || !(target instanceof Mob
-                     || target instanceof ServerPlayer)
+                || target instanceof ServerPlayer)
                 || !inDomain(level, attacker)
                 || !inDomain(level, target)) {
-
             return false;
         }
 
-        List<LivingEntity> entities = scanEntities(level);
-
-        if (!entities.contains(attacker)
-                || !entities.contains(target)) {
-            return false;
-        }
-
-        // Nếu có hơn 5 mục tiêu hợp lệ:
-        // chỉ sinh vật không phát sáng săn mục tiêu phát sáng.
-        if (entities.size() > MAX_FOCUS) {
-            return !isFocused(attacker)
-                    && isFocused(target);
-        }
-
-        // Nếu có tối đa 5 sinh vật, chúng vẫn có thể chiến đấu.
+        // Không bắt buộc attacker hoặc target phải phát sáng.
+        // Việc ưu tiên mục tiêu phát sáng được xử lý trong MobWarCombatGoal.
         return true;
     }
 
@@ -229,10 +211,10 @@ public final class MobWarAI {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-
         if (!MobWarCommands.enabled) {
             tickCounter = 0;
             FOCUS.clear();
+            FOCUS_TICKS.clear();
             return;
         }
 
@@ -243,15 +225,13 @@ public final class MobWarAI {
         tickCounter = 0;
 
         for (ServerLevel level : event.getServer().getAllLevels()) {
-
             List<LivingEntity> entities = scanEntities(level);
 
-            updateFocus(level, entities);
+            updateFocus(entities);
 
             int added = 0;
 
             for (LivingEntity entity : entities) {
-
                 if (!(entity instanceof PathfinderMob mob)
                         || REGISTERED.containsKey(mob)) {
                     continue;
@@ -259,9 +239,7 @@ public final class MobWarAI {
 
                 registerMob(mob);
 
-                added++;
-
-                if (added >= MAX_NEW_GOALS_PER_SCAN) {
+                if (++added >= MAX_NEW_GOALS_PER_SCAN) {
                     break;
                 }
             }

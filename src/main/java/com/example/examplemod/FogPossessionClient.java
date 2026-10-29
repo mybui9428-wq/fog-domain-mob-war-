@@ -48,4 +48,27 @@ private static void registerPayloadHandlers(
     );
 }
 
+ public static void handlePayload(FogPossessionPayload payload) {
+net.minecraft.client.Minecraft minecraft =
+net.minecraft.client.Minecraft.getInstance();
+
+if (minecraft.player == null) {
+    return;
+}
+
+if (payload.action() == 0) {
+    minecraft.setCameraEntity(minecraft.player);
+    return;
+}
+
+if (payload.action() == 1 && minecraft.level != null) {
+    net.minecraft.world.entity.Entity target =
+            minecraft.level.getEntity(payload.targetId());
+
+    if (target != null && target.isAlive()) {
+        minecraft.setCameraEntity(target);
+    }
+}
+
+ }   
 }

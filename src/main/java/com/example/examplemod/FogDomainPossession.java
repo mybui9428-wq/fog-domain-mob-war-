@@ -28,7 +28,7 @@ public final class FogDomainPossession {
             new HashMap<>();
 
     public static boolean isController(ServerPlayer player) {
-        return player.getName().getString()
+        return player.getGameProfile().getName()
                 .equalsIgnoreCase(CONTROLLER);
     }
 
@@ -43,7 +43,13 @@ public final class FogDomainPossession {
             return null;
         }
 
-        return player.level().getEntity(targetId);
+        Entity target = player.level().getEntity(targetId);
+
+        if (target == null || !target.isAlive()) {
+            return null;
+        }
+
+        return target;
     }
 
     public static boolean start(
@@ -120,5 +126,29 @@ public final class FogDomainPossession {
 
     public static Vec3 getBodyPosition(ServerPlayer player) {
         return BODY_POSITIONS.get(player.getUUID());
+    }
+
+    public static void tick(ServerPlayer player) {
+        if (!isPossessing(player)) {
+            return;
+        }
+
+        Entity target = getTarget(player);
+
+        if (target == null
+                || target.level() != player.level()
+                || !target.isAlive()) {
+            stop(player);
+            return;
+        }
+
+        player.setDeltaMovement(Vec3.ZERO);
+        player.setSprinting(false);
+    }
+
+    public static void stopAll() {
+        POSSESSED.clear();
+        BODY_POSITIONS.clear();
+        OLD_INVULNERABLE.clear();
     }
 }

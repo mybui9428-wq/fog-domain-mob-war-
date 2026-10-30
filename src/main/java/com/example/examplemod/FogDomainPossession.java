@@ -69,8 +69,9 @@ public final class FogDomainPossession {
         player.setSprinting(false);
 
         PacketDistributor.sendToPlayer(
-                player,
-                new FogPossessionSyncPayload(1, target.getId())
+        player,
+        new FogPossessionSyncPayload(1, target.getId())
+);
 
         return true;
     }
@@ -90,14 +91,11 @@ public final class FogDomainPossession {
 
         OLD_INVULNERABLE.remove(playerId);
         player.setInvulnerable(wasInvulnerable);
-        player.setDeltaMovement(Vec3.ZERO);
 
         PacketDistributor.sendToPlayer(
-                player,
-                new FogPossessionSyncPayload(0, 0)
-
-        return true;
-    }
+        player,
+        new FogPossessionSyncPayload(0, 0)
+);
 
     public static Vec3 getBodyPosition(ServerPlayer player) {
         return BODY_POSITIONS.get(player.getUUID());

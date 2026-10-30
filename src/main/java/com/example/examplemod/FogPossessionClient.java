@@ -23,13 +23,12 @@ public final class FogPossessionClient {
         event.registrar("1").playToClient(
                 FogPossessionSyncPayload.TYPE,
                 FogPossessionSyncPayload.STREAM_CODEC,
-                (payload, context) -> context.enqueueWork(
-                        () -> handlePayload(payload)
-                )
+                (payload, context) ->
+                        context.enqueueWork(() -> handlePayload(payload))
         );
     }
 
-    public static void handlePayload(
+    private static void handlePayload(
             FogPossessionSyncPayload payload
     ) {
         Minecraft minecraft = Minecraft.getInstance();
@@ -38,15 +37,15 @@ public final class FogPossessionClient {
             return;
         }
 
+        // Kết thúc nhập xác: trả camera về người chơi
         if (payload.action() == 0) {
             minecraft.setCameraEntity(minecraft.player);
             return;
         }
 
+        // Bắt đầu nhập xác: chuyển camera sang sinh vật
         if (payload.action() == 1 && minecraft.level != null) {
-            Entity target = minecraft.level.getEntity(
-                    payload.targetId()
-            );
+            Entity target = minecraft.level.getEntity(payload.targetId());
 
             if (target != null && target.isAlive()) {
                 minecraft.setCameraEntity(target);

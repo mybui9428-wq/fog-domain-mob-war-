@@ -12,13 +12,18 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class FogDomainPossession {
+
     private FogDomainPossession() {}
 
     private static final String CONTROLLER = "tubi2531";
     private static final double MAX_RANGE = 25.0D;
 
-    private static final Map<UUID, UUID> POSSESSED = new HashMap<>();
-    private static final Map<UUID, Vec3> BODY_POSITIONS = new HashMap<>();
+    private static final Map<UUID, UUID> POSSESSED =
+            new HashMap<>();
+
+    private static final Map<UUID, Vec3> BODY_POSITIONS =
+            new HashMap<>();
+
     private static final Map<UUID, Boolean> OLD_INVULNERABLE =
             new HashMap<>();
 
@@ -41,7 +46,10 @@ public final class FogDomainPossession {
         return player.level().getEntity(targetId);
     }
 
-    public static boolean start(ServerPlayer player, Entity target) {
+    public static boolean start(
+            ServerPlayer player,
+            Entity target
+    ) {
         if (!isController(player) || isPossessing(player)) {
             return false;
         }
@@ -61,17 +69,23 @@ public final class FogDomainPossession {
 
         POSSESSED.put(playerId, target.getUUID());
         BODY_POSITIONS.put(playerId, player.position());
+
         OLD_INVULNERABLE.put(
-                playerId, player.isInvulnerable());
+                playerId,
+                player.isInvulnerable()
+        );
 
         player.setInvulnerable(true);
         player.setDeltaMovement(Vec3.ZERO);
         player.setSprinting(false);
 
         PacketDistributor.sendToPlayer(
-        player,
-        new FogPossessionSyncPayload(1, target.getId())
-);
+                player,
+                new FogPossessionSyncPayload(
+                        1,
+                        target.getId()
+                )
+        );
 
         return true;
     }
@@ -87,15 +101,22 @@ public final class FogDomainPossession {
         BODY_POSITIONS.remove(playerId);
 
         boolean wasInvulnerable =
-                OLD_INVULNERABLE.getOrDefault(playerId, false);
+                OLD_INVULNERABLE.getOrDefault(
+                        playerId,
+                        false
+                );
 
         OLD_INVULNERABLE.remove(playerId);
+
         player.setInvulnerable(wasInvulnerable);
 
         PacketDistributor.sendToPlayer(
-        player,
-        new FogPossessionSyncPayload(0, 0)
-);
+                player,
+                new FogPossessionSyncPayload(0, 0)
+        );
+
+        return true;
+    }
 
     public static Vec3 getBodyPosition(ServerPlayer player) {
         return BODY_POSITIONS.get(player.getUUID());

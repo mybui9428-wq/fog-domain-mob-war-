@@ -93,7 +93,9 @@ public class ExampleMod {
         // Dang ky payload yeu cau nhap hon tu client den server
         modEventBus.addListener(FogPossessionPayload::register);
 
+        modEventBus.addListener(FogPossessionControlPayload::register);
         BLOCKS.register(modEventBus);
+        
         ITEMS.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
 

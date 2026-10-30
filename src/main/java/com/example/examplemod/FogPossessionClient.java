@@ -3,11 +3,11 @@ package com.example.examplemod;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
+
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.network.ClientPacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import net.neoforged.neoforge.common.NeoForge;
 
 @Mod(value = ExampleMod.MODID, dist = Dist.CLIENT)
@@ -17,10 +17,8 @@ public class FogPossessionClient {
 
     public FogPossessionClient() {
         NeoForge.EVENT_BUS.addListener(
-            FogPossessionClient::onClientTick
+                FogPossessionClient::onClientTick
         );
-
-        ClientPacketDistributor.class.getName();
     }
 
     private static void onClientTick(ClientTickEvent.Post event) {
@@ -38,7 +36,6 @@ public class FogPossessionClient {
 
         tickCounter++;
 
-        // Gửi điều khiển mỗi 2 tick để giảm tải mạng
         if (tickCounter < 2) {
             return;
         }
@@ -71,14 +68,14 @@ public class FogPossessionClient {
         boolean attack = minecraft.options.keyAttack.isDown();
 
         ClientPacketDistributor.sendToServer(
-            new FogPossessionControlPayload(
-                forward,
-                strafe,
-                yaw,
-                pitch,
-                jump,
-                attack
-            )
+                new FogPossessionControlPayload(
+                        forward,
+                        strafe,
+                        yaw,
+                        pitch,
+                        jump,
+                        attack
+                )
         );
     }
 }

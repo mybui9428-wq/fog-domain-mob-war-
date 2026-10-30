@@ -2,11 +2,13 @@
 package com.example.examplemod;
 
 import io.netty.buffer.ByteBuf;
+
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
@@ -20,25 +22,33 @@ public record FogPossessionControlPayload(
 ) implements CustomPacketPayload {
 
     public static final Type<FogPossessionControlPayload> TYPE =
-            new Type<>(Identifier.fromNamespaceAndPath(
-                    ExampleMod.MODID,
-                    "possession_control"
-            ));
+            new Type<>(
+                    Identifier.fromNamespaceAndPath(
+                            ExampleMod.MODID,
+                            "possession_control"
+                    )
+            );
 
     public static final StreamCodec<ByteBuf, FogPossessionControlPayload>
             STREAM_CODEC = StreamCodec.composite(
                     ByteBufCodecs.FLOAT,
                     FogPossessionControlPayload::forward,
+
                     ByteBufCodecs.FLOAT,
                     FogPossessionControlPayload::strafe,
+
                     ByteBufCodecs.FLOAT,
                     FogPossessionControlPayload::yaw,
+
                     ByteBufCodecs.FLOAT,
                     FogPossessionControlPayload::pitch,
+
                     ByteBufCodecs.BOOL,
                     FogPossessionControlPayload::jump,
+
                     ByteBufCodecs.BOOL,
                     FogPossessionControlPayload::attack,
+
                     FogPossessionControlPayload::new
             );
 
@@ -60,12 +70,16 @@ public record FogPossessionControlPayload(
             IPayloadContext context
     ) {
         context.enqueueWork(() -> {
+
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
 
-            if (!FogDomainPossession.isController(player)
-                    || !FogDomainPossession.isPossessing(player)) {
+            if (!FogDomainPossession.isController(player)) {
+                return;
+            }
+
+            if (!FogDomainPossession.isPossessing(player)) {
                 return;
             }
 

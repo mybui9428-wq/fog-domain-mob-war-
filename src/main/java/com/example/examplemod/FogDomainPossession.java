@@ -70,8 +70,7 @@ public final class FogDomainPossession {
 
         PacketDistributor.sendToPlayer(
                 player,
-                new FogPossessionPayload(1, target.getId())
-        );
+                new FogPossessionSyncPayload(1, target.getId())
 
         return true;
     }
@@ -95,8 +94,7 @@ public final class FogDomainPossession {
 
         PacketDistributor.sendToPlayer(
                 player,
-                new FogPossessionPayload(0, 0)
-        );
+                new FogPossessionSyncPayload(0, 0)
 
         return true;
     }

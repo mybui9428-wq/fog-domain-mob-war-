@@ -28,8 +28,8 @@ public final class FogDomainPossession {
             new HashMap<>();
 
     public static boolean isController(ServerPlayer player) {
-        return player.getGameProfile().getName()
-                .equalsIgnoreCase(CONTROLLER);
+    return player.getName().getString()
+            .equalsIgnoreCase(CONTROLLER);
     }
 
     public static boolean isPossessing(ServerPlayer player) {

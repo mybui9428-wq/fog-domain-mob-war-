@@ -7,8 +7,10 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-public record FogPossessionSyncPayload(int action, int targetId)
-        implements CustomPacketPayload {
+public record FogPossessionSyncPayload(
+        int action,
+        int targetId
+) implements CustomPacketPayload {
 
     public static final Type<FogPossessionSyncPayload> TYPE =
             new Type<>(

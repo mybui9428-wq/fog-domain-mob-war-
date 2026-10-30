@@ -4,108 +4,81 @@ package com.example.examplemod;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.network.PacketDistributor;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.network.ClientPacketDistributor;
 import net.neoforged.neoforge.common.NeoForge;
 
 @Mod(value = ExampleMod.MODID, dist = Dist.CLIENT)
-public final class FogPossessionClient {
+public class FogPossessionClient {
 
-    private static boolean lastJump = false;
-    private static boolean lastAttack = false;
-    private static int sendCounter = 0;
+    private static int tickCounter = 0;
 
-    public FogPossessionClient(IEventBus modEventBus) {
-        modEventBus.addListener(
-                FogPossessionClient::registerPayloadHandlers
-        );
-
+    public FogPossessionClient() {
         NeoForge.EVENT_BUS.addListener(
-                FogPossessionClient::onClientTick
+            FogPossessionClient::onClientTick
         );
-    }
 
-    private static void registerPayloadHandlers(
-            RegisterPayloadHandlersEvent event
-    ) {
-        event.registrar("1").playToClient(
-                FogPossessionSyncPayload.TYPE,
-                FogPossessionSyncPayload.STREAM_CODEC,
-                (payload, context) ->
-                        context.enqueueWork(() -> handlePayload(payload))
-        );
-    }
-
-    private static void handlePayload(
-            FogPossessionSyncPayload payload
-    ) {
-        Minecraft minecraft = Minecraft.getInstance();
-
-        if (minecraft.player == null) {
-            return;
-        }
-
-        if (payload.action() == 0) {
-            minecraft.setCameraEntity(minecraft.player);
-            return;
-        }
-
-        if (payload.action() == 1 && minecraft.level != null) {
-            Entity target = minecraft.level.getEntity(payload.targetId());
-
-            if (target != null && target.isAlive()) {
-                minecraft.setCameraEntity(target);
-            }
-        }
+        ClientPacketDistributor.class.getName();
     }
 
     private static void onClientTick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
 
-        if (minecraft.player == null
-                || minecraft.level == null
-                || minecraft.screen != null) {
+        if (minecraft.player == null || minecraft.level == null) {
             return;
         }
 
-        if (minecraft.getCameraEntity() == minecraft.player) {
+        Entity camera = minecraft.getCameraEntity();
+
+        if (camera == null || camera == minecraft.player) {
             return;
         }
 
-        if (++sendCounter < 2) {
+        tickCounter++;
+
+        // Gửi điều khiển mỗi 2 tick để giảm tải mạng
+        if (tickCounter < 2) {
             return;
         }
 
-        sendCounter = 0;
+        tickCounter = 0;
 
         float forward = 0.0F;
         float strafe = 0.0F;
 
-        if (minecraft.options.keyUp.isDown()) forward += 1.0F;
-        if (minecraft.options.keyDown.isDown()) forward -= 1.0F;
-        if (minecraft.options.keyLeft.isDown()) strafe += 1.0F;
-        if (minecraft.options.keyRight.isDown()) strafe -= 1.0F;
+        if (minecraft.options.keyUp.isDown()) {
+            forward += 1.0F;
+        }
 
-        boolean jump = minecraft.options.keyJump.isDown();
-        boolean attack = minecraft.options.keyAttack.isDown();
+        if (minecraft.options.keyDown.isDown()) {
+            forward -= 1.0F;
+        }
 
-        Entity camera = minecraft.getCameraEntity();
+        if (minecraft.options.keyLeft.isDown()) {
+            strafe += 1.0F;
+        }
+
+        if (minecraft.options.keyRight.isDown()) {
+            strafe -= 1.0F;
+        }
 
         float yaw = camera.getYRot();
         float pitch = camera.getXRot();
 
-        PacketDistributor.sendToServer(
-                new FogPossessionControlPayload(
-                        forward,
-                        strafe,
-                        yaw,
-                        pitch,
-                        jump,
-                        attack
-                )
+        boolean jump = minecraft.options.keyJump.isDown();
+        boolean attack = minecraft.options.keyAttack.isDown();
+
+        ClientPacketDistributor.sendToServer(
+            new FogPossessionControlPayload(
+                forward,
+                strafe,
+                yaw,
+                pitch,
+                jump,
+                attack
+            )
         );
     }
 }

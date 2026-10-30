@@ -1,81 +1,97 @@
 
 package com.example.examplemod;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.world.entity.Entity;
+import io.netty.buffer.ByteBuf;
 
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
-import net.neoforged.neoforge.common.NeoForge;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerPlayer;
 
-@Mod(value = ExampleMod.MODID, dist = Dist.CLIENT)
-public class FogPossessionClient {
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-    private static int tickCounter = 0;
+public record FogPossessionControlPayload(
+        float forward,
+        float strafe,
+        float yaw,
+        float pitch,
+        boolean jump,
+        boolean attack
+) implements CustomPacketPayload {
 
-    public FogPossessionClient() {
-        NeoForge.EVENT_BUS.addListener(
-                FogPossessionClient::onClientTick
+    public static final Type<FogPossessionControlPayload> TYPE =
+            new Type<>(
+                    Identifier.fromNamespaceAndPath(
+                            ExampleMod.MODID,
+                            "possession_control"
+                    )
+            );
+
+    public static final StreamCodec<ByteBuf, FogPossessionControlPayload>
+            STREAM_CODEC = StreamCodec.composite(
+                    ByteBufCodecs.FLOAT,
+                    FogPossessionControlPayload::forward,
+
+                    ByteBufCodecs.FLOAT,
+                    FogPossessionControlPayload::strafe,
+
+                    ByteBufCodecs.FLOAT,
+                    FogPossessionControlPayload::yaw,
+
+                    ByteBufCodecs.FLOAT,
+                    FogPossessionControlPayload::pitch,
+
+                    ByteBufCodecs.BOOL,
+                    FogPossessionControlPayload::jump,
+
+                    ByteBufCodecs.BOOL,
+                    FogPossessionControlPayload::attack,
+
+                    FogPossessionControlPayload::new
+            );
+
+    @Override
+    public Type<? extends CustomPacketPayload> type() {
+        return TYPE;
+    }
+
+    public static void register(RegisterPayloadHandlersEvent event) {
+        event.registrar("1").playToServer(
+                TYPE,
+                STREAM_CODEC,
+                FogPossessionControlPayload::handleServer
         );
     }
 
-    private static void onClientTick(ClientTickEvent.Post event) {
-        Minecraft minecraft = Minecraft.getInstance();
+    private static void handleServer(
+            FogPossessionControlPayload payload,
+            IPayloadContext context
+    ) {
+        context.enqueueWork(() -> {
 
-        if (minecraft.player == null || minecraft.level == null) {
-            return;
-        }
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
 
-        Entity camera = minecraft.getCameraEntity();
+            if (!FogDomainPossession.isController(player)) {
+                return;
+            }
 
-        if (camera == null || camera == minecraft.player) {
-            return;
-        }
+            if (!FogDomainPossession.isPossessing(player)) {
+                return;
+            }
 
-        tickCounter++;
-
-        if (tickCounter < 2) {
-            return;
-        }
-
-        tickCounter = 0;
-
-        float forward = 0.0F;
-        float strafe = 0.0F;
-
-        if (minecraft.options.keyUp.isDown()) {
-            forward += 1.0F;
-        }
-
-        if (minecraft.options.keyDown.isDown()) {
-            forward -= 1.0F;
-        }
-
-        if (minecraft.options.keyLeft.isDown()) {
-            strafe += 1.0F;
-        }
-
-        if (minecraft.options.keyRight.isDown()) {
-            strafe -= 1.0F;
-        }
-
-        float yaw = camera.getYRot();
-        float pitch = camera.getXRot();
-
-        boolean jump = minecraft.options.keyJump.isDown();
-        boolean attack = minecraft.options.keyAttack.isDown();
-
-        ClientPacketDistributor.sendToServer(
-                new FogPossessionControlPayload(
-                        forward,
-                        strafe,
-                        yaw,
-                        pitch,
-                        jump,
-                        attack
-                )
-        );
+            FogDomainPossession.control(
+                    player,
+                    payload.forward(),
+                    payload.strafe(),
+                    payload.yaw(),
+                    payload.pitch(),
+                    payload.jump(),
+                    payload.attack()
+            );
+        });
     }
 }

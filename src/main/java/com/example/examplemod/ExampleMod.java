@@ -24,6 +24,7 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -97,6 +98,11 @@ public class ExampleMod {
         CREATIVE_MODE_TABS.register(modEventBus);
 
         NeoForge.EVENT_BUS.register(this);
+
+        // Dang ky lenh /fogpossess start va /fogpossess stop
+        NeoForge.EVENT_BUS.addListener(
+                FogPossessionCommands::register
+        );
 
         modEventBus.addListener(this::addCreative);
 

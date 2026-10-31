@@ -7,13 +7,17 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.world.effect.MobEffects;
+
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
 
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
 
+@EventBusSubscriber(modid = ExampleMod.MODID)
 public class MobWarCombatGoal extends Goal {
 
     private static final double SEARCH_RADIUS = 30.0D;
@@ -23,7 +27,6 @@ public class MobWarCombatGoal extends Goal {
     private static final int ATTACK_COOLDOWN = 20;
 
     private final PathfinderMob mob;
-
     private final boolean customMelee;
 
     private int attackCooldown;
@@ -47,6 +50,44 @@ public class MobWarCombatGoal extends Goal {
             ));
         } else {
             setFlags(EnumSet.noneOf(Goal.Flag.class));
+        }
+    }
+
+    // Chặn AI mặc định chọn tubi2531 hoặc mục tiêu
+    // không hợp lệ trong Mob War.
+    @SubscribeEvent
+    public static void onMobChangeTarget(
+            LivingChangeTargetEvent event) {
+
+        if (!MobWarCommands.enabled) {
+            return;
+        }
+
+        if (!(event.getEntity() instanceof PathfinderMob attacker)) {
+            return;
+        }
+
+        if (!(attacker.level() instanceof ServerLevel level)) {
+            return;
+        }
+
+        if (!MobWarAI.inDomain(level, attacker)) {
+            return;
+        }
+
+        LivingEntity target =
+                event.getNewAboutToBeSetTarget();
+
+        if (target == null) {
+            return;
+        }
+
+        if (!MobWarAI.isValidCombatTarget(
+                attacker,
+                target,
+                level
+        )) {
+            event.setNewAboutToBeSetTarget(null);
         }
     }
 
@@ -174,13 +215,11 @@ public class MobWarCombatGoal extends Goal {
             return;
         }
 
-        // Quái vật có AI riêng:
-        // Không tự di chuyển hoặc gây sát thương.
+        // Quái vật có AI riêng giữ cách chiến đấu gốc.
         if (!customMelee) {
             return;
         }
 
-        // Hỗ trợ sinh vật không có AI tấn công.
         mob.getLookControl().setLookAt(
                 target,
                 30.0F,

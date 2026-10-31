@@ -7,114 +7,121 @@ import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.effect.MobEffects;
 
-import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Comparator;
+import java.util.UUID;
 
 public class MobWarCombatGoal extends Goal {
+
     private static final double SEARCH_RADIUS = 30.0D;
-    private static final double ATTACK_DISTANCE_SQR = 4.0D;
-    private static final double MOVE_SPEED = 1.1D;
-    private static final float ATTACK_DAMAGE = 3.0F;
-    private static final int ATTACK_COOLDOWN_TICKS = 20;
+    private static final int TARGET_RECHECK_TICKS = 10;
 
     private final PathfinderMob mob;
-    private int attackCooldown;
-    private int targetRecheckCooldown;
+
+    private int recheckCooldown = 0;
+
+    // Ghi nhớ mục tiêu do Mob War chọn để có thể bỏ mục tiêu
+    // này khi tắt Mob War mà không xóa mục tiêu vanilla khác.
+    private UUID assignedTarget = null;
 
     public MobWarCombatGoal(PathfinderMob mob) {
         this.mob = mob;
-        setFlags(EnumSet.of(Goal.Flag.MOVE, Goal.Flag.LOOK));
+
+        // Không chiếm quyền di chuyển hoặc nhìn của AI gốc.
+        setFlags(EnumSet.noneOf(Goal.Flag.class));
     }
 
     private boolean validTarget(LivingEntity target) {
         return mob.level() instanceof ServerLevel level
-                && MobWarAI.isValidCombatTarget(mob, target, level);
+                && MobWarAI.isValidCombatTarget(
+                        mob,
+                        target,
+                        level
+                );
     }
 
     private LivingEntity findTarget() {
+
         if (!(mob.level() instanceof ServerLevel level)
                 || !MobWarCommands.enabled
-                || !MobWarAI.inDomain(level, mob)
-                || FogDomainTaming.isTamed(mob)) {
+                || !MobWarAI.inDomain(level, mob)) {
             return null;
         }
 
-        List<LivingEntity> candidates = level.getEntitiesOfClass(
-                LivingEntity.class,
-                mob.getBoundingBox().inflate(SEARCH_RADIUS),
-                entity -> entity != mob
-                        && MobWarAI.isValidCombatTarget(mob, entity, level)
-        );
+        List<LivingEntity> candidates =
+                level.getEntitiesOfClass(
+                        LivingEntity.class,
+                        mob.getBoundingBox().inflate(SEARCH_RADIUS),
+                        entity ->
+                                entity != mob
+                                && MobWarAI.isValidCombatTarget(
+                                        mob,
+                                        entity,
+                                        level
+                                )
+                );
 
         if (candidates.isEmpty()) {
             return null;
         }
 
-        // Ưu tiên mục tiêu đang phát sáng.
+        // Ưu tiên sinh vật phát sáng.
+        // Nếu cùng trạng thái phát sáng thì chọn con gần nhất.
         candidates.sort(
                 Comparator
-                        .comparing((LivingEntity entity) ->
-                                !entity.hasEffect(MobEffects.GLOWING))
-                        .thenComparingDouble(entity ->
-                                mob.distanceToSqr(entity))
+                        .comparing(
+                                (LivingEntity entity) ->
+                                        !MobWarAI.isFocused(entity)
+                        )
+                        .thenComparingDouble(
+                                entity -> mob.distanceToSqr(entity)
+                        )
         );
 
         return candidates.get(0);
     }
 
+    private void assignTarget(LivingEntity target) {
+        if (target == null) {
+            return;
+        }
+
+        mob.setTarget(target);
+        assignedTarget = target.getUUID();
+    }
+
     @Override
     public boolean canUse() {
+
         if (!MobWarCommands.enabled
                 || !mob.isAlive()
                 || mob.isRemoved()
-                || FogDomainTaming.isTamed(mob)
                 || !(mob.level() instanceof ServerLevel level)
-                || !MobWarAI.inDomain(level, mob)) {
+                || !MobWarAI.inDomain(level, mob)
+                || FogDomainTaming.isTamed(mob)) {
             return false;
         }
 
-        LivingEntity currentTarget = mob.getTarget();
+        LivingEntity current = mob.getTarget();
 
-        // Nếu mục tiêu hiện tại không phát sáng nhưng có mục tiêu
-        // phát sáng hợp lệ, tìm lại để ưu tiên mục tiêu phát sáng.
-        if (validTarget(currentTarget)) {
-            if (targetRecheckCooldown > 0) {
-                targetRecheckCooldown--;
-                return true;
-            }
-
-            targetRecheckCooldown = 10;
-            LivingEntity preferred = findTarget();
-
-            if (preferred != null
-                    && preferred.hasEffect(MobEffects.GLOWING)
-                    && !currentTarget.hasEffect(MobEffects.GLOWING)) {
-                mob.setTarget(preferred);
-            }
-
+        if (validTarget(current)) {
             return true;
         }
 
-        if (targetRecheckCooldown > 0) {
-            targetRecheckCooldown--;
-            return false;
-        }
-
-        targetRecheckCooldown = 10;
         LivingEntity target = findTarget();
 
         if (target == null) {
             return false;
         }
 
-        mob.setTarget(target);
+        assignTarget(target);
         return true;
     }
 
     @Override
     public boolean canContinueToUse() {
+
         return MobWarCommands.enabled
                 && mob.isAlive()
                 && !mob.isRemoved()
@@ -124,44 +131,60 @@ public class MobWarCombatGoal extends Goal {
 
     @Override
     public void start() {
-        attackCooldown = 0;
+        recheckCooldown = 0;
     }
 
     @Override
     public void tick() {
-        LivingEntity target = mob.getTarget();
 
-        if (!validTarget(target)) {
-            mob.getNavigation().stop();
-            mob.setTarget(null);
+        if (recheckCooldown > 0) {
+            recheckCooldown--;
             return;
         }
 
-        mob.getLookControl().setLookAt(target, 30.0F, 30.0F);
+        recheckCooldown = TARGET_RECHECK_TICKS;
 
-        if (mob.distanceToSqr(target) > ATTACK_DISTANCE_SQR) {
-            mob.getNavigation().moveTo(target, MOVE_SPEED);
+        LivingEntity current = mob.getTarget();
+
+        if (!validTarget(current)) {
+            LivingEntity replacement = findTarget();
+
+            if (replacement != null) {
+                assignTarget(replacement);
+            } else {
+                mob.setTarget(null);
+                assignedTarget = null;
+            }
+
             return;
         }
 
-        mob.getNavigation().stop();
+        LivingEntity preferred = findTarget();
 
-        if (attackCooldown > 0) {
-            attackCooldown--;
-        }
+        // Chỉ đổi mục tiêu khi tìm thấy mục tiêu phát sáng
+        // tốt hơn mục tiêu hiện tại.
+        if (preferred != null
+                && preferred != current
+                && MobWarAI.isFocused(preferred)
+                && !MobWarAI.isFocused(current)) {
 
-        if (attackCooldown <= 0) {
-            target.hurt(
-                    mob.damageSources().mobAttack(mob),
-                    ATTACK_DAMAGE
-            );
-
-            attackCooldown = ATTACK_COOLDOWN_TICKS;
+            assignTarget(preferred);
         }
     }
 
     @Override
     public void stop() {
-        mob.getNavigation().stop();
+
+        // Chỉ xóa mục tiêu mà chính Mob War đã gán.
+        LivingEntity current = mob.getTarget();
+
+        if (current != null
+                && assignedTarget != null
+                && current.getUUID().equals(assignedTarget)) {
+            mob.setTarget(null);
+        }
+
+        assignedTarget = null;
+        recheckCooldown = 0;
     }
 }

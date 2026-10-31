@@ -1,4 +1,3 @@
-
 package com.example.examplemod;
 
 import net.minecraft.server.level.ServerLevel;
@@ -36,15 +35,15 @@ public final class MobWarAI {
 
     private static int tickCounter = 0;
 
+    // Ghi nhớ trạng thái để chỉ dọn dẹp một lần khi tắt Mob War.
+    private static boolean wasMobWarEnabled = false;
+
     private static final Map<PathfinderMob, Boolean> REGISTERED =
             new WeakHashMap<>();
 
-    // UUID của các sinh vật thuộc nhóm phát sáng hiện tại.
-    // Lưu riêng theo ServerLevel để tránh lẫn giữa các thế giới.
     private static final Map<UUID, ServerLevel> FOCUS =
             new HashMap<>();
 
-    // Chỉ xóa hiệu ứng phát sáng do Mob War cấp.
     private static final Set<UUID> MOD_GLOW =
             new HashSet<>();
 
@@ -155,6 +154,8 @@ public final class MobWarAI {
         removeModGlow(level, id);
     }
 
+    // Không còn duyệt toàn bộ sinh vật trong thế giới.
+    // Chỉ dọn những sinh vật Mob War đã đánh dấu.
     private static void clearLevelFocus(ServerLevel level) {
 
         List<UUID> remove = new ArrayList<>();
@@ -169,14 +170,6 @@ public final class MobWarAI {
 
         for (UUID id : remove) {
             removeFocus(level, id);
-        }
-
-        // Dọn các hiệu ứng còn sót lại do Mob War cấp.
-        for (Entity entity : level.getAllEntities()) {
-            if (entity instanceof LivingEntity living
-                    && MOD_GLOW.remove(entity.getUUID())) {
-                living.removeEffect(MobEffects.GLOWING);
-            }
         }
     }
 
@@ -201,8 +194,6 @@ public final class MobWarAI {
             eligible.add(entity.getUUID());
         }
 
-        // Loại khỏi nhóm những sinh vật đã chết,
-        // rời lĩnh vực, bị thu phục hoặc không còn hợp lệ.
         List<UUID> invalid = new ArrayList<>();
 
         for (Map.Entry<UUID, ServerLevel> entry
@@ -218,7 +209,6 @@ public final class MobWarAI {
             removeFocus(level, id);
         }
 
-        // Làm mới hiệu ứng phát sáng cho nhóm hiện tại.
         boolean hasCurrentFocus = false;
 
         for (LivingEntity entity : entities) {
@@ -229,13 +219,10 @@ public final class MobWarAI {
             }
         }
 
-        // Vẫn còn thành viên trong nhóm cũ:
-        // không chọn nhóm mới.
         if (hasCurrentFocus) {
             return;
         }
 
-        // Chỉ chọn nhóm mới khi nhóm cũ đã hết.
         if (entities.isEmpty()) {
             return;
         }
@@ -316,7 +303,6 @@ public final class MobWarAI {
             return false;
         }
 
-        // Chỉ tấn công mục tiêu đang phát sáng.
         return true;
     }
 
@@ -339,10 +325,22 @@ public final class MobWarAI {
     public static void onServerTick(ServerTickEvent.Post event) {
 
         if (!MobWarCommands.enabled) {
+
             tickCounter = 0;
-            clearAllFocus(event.getServer().getAllLevels());
+
+            // Chỉ dọn một lần khi Mob War chuyển sang tắt.
+            if (wasMobWarEnabled
+                    || !FOCUS.isEmpty()
+                    || !MOD_GLOW.isEmpty()) {
+
+                clearAllFocus(event.getServer().getAllLevels());
+            }
+
+            wasMobWarEnabled = false;
             return;
         }
+
+        wasMobWarEnabled = true;
 
         if (++tickCounter < SCAN_INTERVAL) {
             return;
@@ -381,4 +379,4 @@ public final class MobWarAI {
             }
         }
     }
-}
+                     }

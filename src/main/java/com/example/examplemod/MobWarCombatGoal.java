@@ -214,8 +214,30 @@ public class MobWarCombatGoal extends Goal {
         if (!validTarget(target)) {
             return;
         }
+        
+                // Creeper cần tiến sát mục tiêu để kích hoạt ngòi nổ gốc.
+        if (mob instanceof net.minecraft.world.entity.monster.Creeper) {
 
-        // Quái vật có AI riêng giữ cách chiến đấu gốc.
+            mob.getLookControl().setLookAt(
+                    target,
+                    30.0F,
+                    30.0F
+            );
+
+            if (mob.distanceToSqr(target) > 9.0D) {
+                mob.getNavigation().moveTo(
+                        target,
+                        MOVE_SPEED
+                );
+            } else {
+                // Để AI Creeper gốc tự đếm ngược và phát nổ.
+                mob.getNavigation().stop();
+            }
+
+            return;
+        }
+
+        // Các quái vật MONSTER khác giữ AI chiến đấu gốc.
         if (!customMelee) {
             return;
         }

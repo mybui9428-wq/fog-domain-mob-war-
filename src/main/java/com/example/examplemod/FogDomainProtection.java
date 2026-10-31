@@ -4,12 +4,10 @@ package com.example.examplemod;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.level.ExplosionEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
@@ -24,37 +22,105 @@ public final class FogDomainProtection {
     private static final double RADIUS = 30.0D;
     private static final double RADIUS_SQUARED = RADIUS * RADIUS;
 
-    private static final Map<UUID, Vec3> LAST_INSIDE = new HashMap<>();
+    private static final double PUSH_STRENGTH = 0.12D;
+    private static final int UPDATE_INTERVAL = 5;
+
+    private static int tickCounter = 0;
+
+    // Vị trí gần nhất entity đứng bên trong lĩnh vực.
+    private static final Map<UUID, Vec3> LAST_INSIDE =
+            new HashMap<>();
+
+    // Lưu quyền bay ban đầu của tubi2531.
+    private static final Map<UUID, FlightState> FLIGHT_STATES =
+            new HashMap<>();
+
+    private static final class FlightState {
+        final boolean mayfly;
+        final boolean flying;
+
+        FlightState(boolean mayfly, boolean flying) {
+            this.mayfly = mayfly;
+            this.flying = flying;
+        }
+    }
 
     private FogDomainProtection() {
     }
 
+    private static boolean isController(ServerPlayer player) {
+        return player.getName().getString()
+                .equalsIgnoreCase("tubi2531");
+    }
+
     private static ServerPlayer findController(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            if (player.getGameProfile().name()
-                    .equalsIgnoreCase("tubi2531")
-                    && player.isAlive()) {
+            if (isController(player) && player.isAlive()) {
                 return player;
             }
         }
+
         return null;
     }
 
     private static boolean insideDomain(
-            ServerPlayer controller, Entity entity) {
+            ServerPlayer controller,
+            Entity entity) {
+
         return controller != null
                 && controller.isAlive()
                 && controller.level() == entity.level()
-                && controller.distanceToSqr(entity) <= RADIUS_SQUARED;
+                && controller.distanceToSqr(entity)
+                <= RADIUS_SQUARED;
+    }
+
+    private static void enableFlight(ServerPlayer player) {
+
+        UUID id = player.getUUID();
+
+        if (!FLIGHT_STATES.containsKey(id)) {
+            FLIGHT_STATES.put(
+                    id,
+                    new FlightState(
+                            player.getAbilities().mayfly,
+                            player.getAbilities().flying
+                    )
+            );
+        }
+
+        player.getAbilities().mayfly = true;
+        player.onUpdateAbilities();
+    }
+
+    private static void restoreFlight(ServerPlayer player) {
+
+        FlightState state = FLIGHT_STATES.remove(
+                player.getUUID()
+        );
+
+        if (state == null) {
+            return;
+        }
+
+        player.getAbilities().mayfly = state.mayfly;
+
+        if (!state.mayfly) {
+            player.getAbilities().flying = false;
+        } else {
+            player.getAbilities().flying = state.flying;
+        }
+
+        player.onUpdateAbilities();
     }
 
     /*
-     * Khi lĩnh vực bật, vụ nổ trong phạm vi
-     * không được phá block.
-     * Khi tắt, Minecraft hoạt động bình thường.
+     * Vụ nổ trong lĩnh vực không phá block.
+     * Ngoài lĩnh vực hoặc khi tắt thì bình thường.
      */
     @SubscribeEvent
-    public static void onExplosionDetonate(ExplosionEvent.Detonate event) {
+    public static void onExplosionDetonate(
+            ExplosionEvent.Detonate event) {
+
         if (!MobWarCommands.enabled) {
             return;
         }
@@ -76,96 +142,70 @@ public final class FogDomainProtection {
                 position.y,
                 position.z
         ) <= RADIUS_SQUARED) {
+
             event.getAffectedBlocks().clear();
         }
     }
 
     /*
-     * tubi2531 miễn nhiễm sát thương khi ở trong lĩnh vực.
-     * Ra ngoài lĩnh vực hoặc tắt lĩnh vực thì sát thương
-     * được xử lý như bình thường.
+     * Đẩy nhẹ entity đã ở trong lĩnh vực
+     * khi chúng cố đi ra ngoài.
      */
-    @SubscribeEvent
-    public static void onLivingIncomingDamage(
-            LivingIncomingDamageEvent event) {
+    private static void updateBoundary(
+            ServerLevel level,
+            ServerPlayer controller) {
 
-        if (!MobWarCommands.enabled) {
-            return;
-        }
+        for (Entity entity : level.getEntities(
+                null,
+                controller.getBoundingBox().inflate(RADIUS + 3.0D),
+                candidate -> candidate != controller
+                        && !candidate.isRemoved()
+        )) {
 
-        if (!(event.getEntity() instanceof ServerPlayer player)) {
-            return;
-        }
+            UUID id = entity.getUUID();
 
-        if (!player.getGameProfile().name()
-                .equalsIgnoreCase("tubi2531")) {
-            return;
-        }
-
-        if (!(player.level() instanceof ServerLevel level)) {
-            return;
-        }
-
-        ServerPlayer controller = findController(level);
-
-        if (controller == player && insideDomain(controller, player)) {
-            event.setCanceled(true);
-        }
-    }
-
-    /*
-     * Ghi nhớ vị trí bên trong lĩnh vực.
-     * Khi entity cố đi ra ngoài, đưa nó về vị trí gần nhất
-     * đã ghi nhận ở bên trong.
-     */
-    @SubscribeEvent
-    public static void onServerTick(ServerTickEvent.Post event) {
-        if (!MobWarCommands.enabled) {
-            LAST_INSIDE.clear();
-            return;
-        }
-
-        for (ServerLevel level : event.getServer().getAllLevels()) {
-            ServerPlayer controller = findController(level);
-
-            if (controller == null) {
+            if (insideDomain(controller, entity)) {
+                LAST_INSIDE.put(id, entity.position());
                 continue;
             }
 
-            for (Entity entity : level.getAllEntities()) {
-                if (entity == controller
-                        || entity.isRemoved()
-                        || entity.level() != level) {
-                    continue;
-                }
+            // Chỉ đẩy entity đã từng ở trong lĩnh vực.
+            if (!LAST_INSIDE.containsKey(id)) {
+                continue;
+            }
 
-                UUID id = entity.getUUID();
+            Vec3 direction = controller.position()
+                    .subtract(entity.position());
 
-                if (insideDomain(controller, entity)) {
-                    LAST_INSIDE.put(id, entity.position());
-                    continue;
-                }
+            if (direction.lengthSqr() > 0.0001D) {
 
-                Vec3 lastPosition = LAST_INSIDE.get(id);
+                direction = direction.normalize();
 
-                if (lastPosition != null) {
-                    entity.teleportTo(
-                            lastPosition.x,
-                            lastPosition.y,
-                            lastPosition.z
-                    );
-                    entity.setDeltaMovement(Vec3.ZERO);
-                }
+                Vec3 velocity = entity.getDeltaMovement();
+
+                entity.setDeltaMovement(
+                        velocity.add(
+                                direction.scale(PUSH_STRENGTH)
+                        )
+                );
+
+                entity.hurtMarked = true;
             }
         }
+    }
 
-        Iterator<UUID> iterator = LAST_INSIDE.keySet().iterator();
+    private static void cleanRemovedEntities(
+            net.minecraft.server.MinecraftServer server) {
+
+        Iterator<UUID> iterator =
+                LAST_INSIDE.keySet().iterator();
 
         while (iterator.hasNext()) {
+
             UUID id = iterator.next();
             boolean found = false;
 
-            for (ServerLevel level : event.getServer().getAllLevels()) {
+            for (ServerLevel level : server.getAllLevels()) {
                 Entity entity = level.getEntity(id);
 
                 if (entity != null && !entity.isRemoved()) {
@@ -176,6 +216,43 @@ public final class FogDomainProtection {
 
             if (!found) {
                 iterator.remove();
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onServerTick(ServerTickEvent.Post event) {
+
+        if (!MobWarCommands.enabled) {
+
+            tickCounter = 0;
+            LAST_INSIDE.clear();
+
+            for (ServerLevel level : event.getServer().getAllLevels()) {
+                for (ServerPlayer player : level.players()) {
+                    if (isController(player)) {
+                        restoreFlight(player);
+                    }
+                }
+            }
+
+            return;
+        }
+
+        for (ServerLevel level : event.getServer().getAllLevels()) {
+
+            ServerPlayer controller = findController(level);
+
+            if (controller == null) {
+                continue;
+            }
+
+            enableFlight(controller);
+
+            if (++tickCounter >= UPDATE_INTERVAL) {
+                tickCounter = 0;
+                updateBoundary(level, controller);
+                cleanRemovedEntities(event.getServer());
             }
         }
     }

@@ -1,6 +1,7 @@
 
 package com.example.examplemod;
 
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -27,11 +28,9 @@ public final class FogDomainProtection {
 
     private static int tickCounter = 0;
 
-    // Vị trí gần nhất entity đứng bên trong lĩnh vực.
     private static final Map<UUID, Vec3> LAST_INSIDE =
             new HashMap<>();
 
-    // Lưu quyền bay ban đầu của tubi2531.
     private static final Map<UUID, FlightState> FLIGHT_STATES =
             new HashMap<>();
 
@@ -74,6 +73,7 @@ public final class FogDomainProtection {
                 <= RADIUS_SQUARED;
     }
 
+    // Cấp quyền bay và bật trạng thái bay cho tubi2531.
     private static void enableFlight(ServerPlayer player) {
 
         UUID id = player.getUUID();
@@ -88,10 +88,24 @@ public final class FogDomainProtection {
             );
         }
 
-        player.getAbilities().mayfly = true;
-        player.onUpdateAbilities();
+        boolean changed = false;
+
+        if (!player.getAbilities().mayfly) {
+            player.getAbilities().mayfly = true;
+            changed = true;
+        }
+
+        if (!player.getAbilities().flying) {
+            player.getAbilities().flying = true;
+            changed = true;
+        }
+
+        if (changed) {
+            player.onUpdateAbilities();
+        }
     }
 
+    // Khôi phục quyền bay ban đầu khi tắt lĩnh vực.
     private static void restoreFlight(ServerPlayer player) {
 
         FlightState state = FLIGHT_STATES.remove(
@@ -103,12 +117,8 @@ public final class FogDomainProtection {
         }
 
         player.getAbilities().mayfly = state.mayfly;
-
-        if (!state.mayfly) {
-            player.getAbilities().flying = false;
-        } else {
-            player.getAbilities().flying = state.flying;
-        }
+        player.getAbilities().flying =
+                state.mayfly && state.flying;
 
         player.onUpdateAbilities();
     }
@@ -154,14 +164,14 @@ public final class FogDomainProtection {
     private static void updateBoundary(
             ServerLevel level,
             ServerPlayer controller) {
-        
+
         for (Entity entity : level.getEntitiesOfClass(
-        Entity.class,
-        controller.getBoundingBox().inflate(RADIUS + 3.0D),
-        candidate -> candidate != controller
-                && !candidate.isRemoved()
-)) {
-            
+                Entity.class,
+                controller.getBoundingBox().inflate(RADIUS + 3.0D),
+                candidate -> candidate != controller
+                        && !candidate.isRemoved()
+        )) {
+
             UUID id = entity.getUUID();
 
             if (insideDomain(controller, entity)) {
@@ -169,7 +179,6 @@ public final class FogDomainProtection {
                 continue;
             }
 
-            // Chỉ đẩy entity đã từng ở trong lĩnh vực.
             if (!LAST_INSIDE.containsKey(id)) {
                 continue;
             }
@@ -195,7 +204,7 @@ public final class FogDomainProtection {
     }
 
     private static void cleanRemovedEntities(
-            net.minecraft.server.MinecraftServer server) {
+            MinecraftServer server) {
 
         Iterator<UUID> iterator =
                 LAST_INSIDE.keySet().iterator();
@@ -223,12 +232,14 @@ public final class FogDomainProtection {
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
 
+        MinecraftServer server = event.getServer();
+
         if (!MobWarCommands.enabled) {
 
             tickCounter = 0;
             LAST_INSIDE.clear();
 
-            for (ServerLevel level : event.getServer().getAllLevels()) {
+            for (ServerLevel level : server.getAllLevels()) {
                 for (ServerPlayer player : level.players()) {
                     if (isController(player)) {
                         restoreFlight(player);
@@ -239,21 +250,34 @@ public final class FogDomainProtection {
             return;
         }
 
-        for (ServerLevel level : event.getServer().getAllLevels()) {
+        // Cập nhật quyền bay mỗi tick.
+        for (ServerLevel level : server.getAllLevels()) {
 
             ServerPlayer controller = findController(level);
 
-            if (controller == null) {
-                continue;
-            }
-
-            enableFlight(controller);
-
-            if (++tickCounter >= UPDATE_INTERVAL) {
-                tickCounter = 0;
-                updateBoundary(level, controller);
-                cleanRemovedEntities(event.getServer());
+            if (controller != null) {
+                enableFlight(controller);
             }
         }
+
+        // Cập nhật ranh giới mỗi 5 tick.
+        tickCounter++;
+
+        if (tickCounter < UPDATE_INTERVAL) {
+            return;
+        }
+
+        tickCounter = 0;
+
+        for (ServerLevel level : server.getAllLevels()) {
+
+            ServerPlayer controller = findController(level);
+
+            if (controller != null) {
+                updateBoundary(level, controller);
+            }
+        }
+
+        cleanRemovedEntities(server);
     }
 }

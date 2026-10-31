@@ -8,7 +8,10 @@ import java.util.UUID;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.EntityHitResult;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class FogDomainPossession {
@@ -27,9 +30,12 @@ public final class FogDomainPossession {
     private static final Map<UUID, Boolean> OLD_INVULNERABLE =
             new HashMap<>();
 
+    private static final Map<UUID, Long> LAST_ATTACK =
+            new HashMap<>();
+
     public static boolean isController(ServerPlayer player) {
-    return player.getName().getString()
-            .equalsIgnoreCase(CONTROLLER);
+        return player.getName().getString()
+                .equalsIgnoreCase(CONTROLLER);
     }
 
     public static boolean isPossessing(ServerPlayer player) {
@@ -51,65 +57,53 @@ public final class FogDomainPossession {
 
         return target;
     }
- 
-  public static boolean start(
-        ServerPlayer player,
-        Entity target
-) {
-    if (!isController(player)) {
-        return false;
-    }
 
-    if (!(target instanceof Mob)) {
-        return false;
-    }
+    public static boolean start(
+            ServerPlayer player,
+            Entity target
+    ) {
+        if (!isController(player)) {
+            return false;
+        }
 
-    if (!target.isAlive()
-            || target.level() != player.level()
-            || player.distanceTo(target) > MAX_RANGE + 2.0D) {
-        return false;
-    }
+        if (!(target instanceof Mob)) {
+            return false;
+        }
 
-    UUID playerId = player.getUUID();
+        if (!target.isAlive()
+                || target.level() != player.level()
+                || player.distanceTo(target) > MAX_RANGE + 2.0D) {
+            return false;
+        }
 
-    // Xóa trạng thái nhập xác cũ nếu còn sót
-    if (POSSESSED.containsKey(playerId)) {
-        boolean oldInvulnerable = OLD_INVULNERABLE.getOrDefault(
+        if (isPossessing(player)) {
+            stop(player);
+        }
+
+        UUID playerId = player.getUUID();
+
+        POSSESSED.put(playerId, target.getUUID());
+        BODY_POSITIONS.put(playerId, player.position());
+
+        OLD_INVULNERABLE.put(
                 playerId,
-                false
+                player.isInvulnerable()
         );
 
-        POSSESSED.remove(playerId);
-        BODY_POSITIONS.remove(playerId);
-        OLD_INVULNERABLE.remove(playerId);
+        player.setInvulnerable(true);
+        player.setDeltaMovement(Vec3.ZERO);
+        player.setSprinting(false);
 
-        player.setInvulnerable(oldInvulnerable);
+        PacketDistributor.sendToPlayer(
+                player,
+                new FogPossessionSyncPayload(
+                        1,
+                        target.getId()
+                )
+        );
+
+        return true;
     }
-
-    // Lưu trạng thái người chơi trước khi nhập xác
-    POSSESSED.put(playerId, target.getUUID());
-    BODY_POSITIONS.put(playerId, player.position());
-
-    OLD_INVULNERABLE.put(
-            playerId,
-            player.isInvulnerable()
-    );
-
-    player.setInvulnerable(true);
-    player.setDeltaMovement(Vec3.ZERO);
-    player.setSprinting(false);
-
-    // Chuyển camera sang sinh vật
-    PacketDistributor.sendToPlayer(
-            player,
-            new FogPossessionSyncPayload(
-                    1,
-                    target.getId()
-            )
-    );
-
-    return true;
-}
 
     public static boolean stop(ServerPlayer player) {
         UUID playerId = player.getUUID();
@@ -120,6 +114,7 @@ public final class FogDomainPossession {
 
         POSSESSED.remove(playerId);
         BODY_POSITIONS.remove(playerId);
+        LAST_ATTACK.remove(playerId);
 
         boolean wasInvulnerable =
                 OLD_INVULNERABLE.getOrDefault(
@@ -130,6 +125,7 @@ public final class FogDomainPossession {
         OLD_INVULNERABLE.remove(playerId);
 
         player.setInvulnerable(wasInvulnerable);
+        player.setDeltaMovement(Vec3.ZERO);
 
         PacketDistributor.sendToPlayer(
                 player,
@@ -165,8 +161,9 @@ public final class FogDomainPossession {
         POSSESSED.clear();
         BODY_POSITIONS.clear();
         OLD_INVULNERABLE.clear();
+        LAST_ATTACK.clear();
     }
-    
+
     public static void control(
             ServerPlayer player,
             float forward,
@@ -187,71 +184,104 @@ public final class FogDomainPossession {
             return;
         }
 
-        // Giới hạn dữ liệu điều khiển từ client
+        // Giới hạn dữ liệu điều khiển
         forward = Math.max(-1.0F, Math.min(1.0F, forward));
         strafe = Math.max(-1.0F, Math.min(1.0F, strafe));
         pitch = Math.max(-90.0F, Math.min(90.0F, pitch));
 
-        // Xoay sinh vật theo hướng camera
+        // Xoay sinh vật theo camera
         mob.setYRot(yaw);
         mob.setYHeadRot(yaw);
         mob.setXRot(pitch);
         mob.yRotO = yaw;
         mob.xRotO = pitch;
 
-        // Tính hướng di chuyển theo camera
-        float radians = yaw * ((float) Math.PI / 180.0F);
+        // Tính hướng nhìn theo camera
+        double yawRad = Math.toRadians(yaw);
+        double pitchRad = Math.toRadians(pitch);
 
-        double sin = Math.sin(radians);
-        double cos = Math.cos(radians);
+        double cosPitch = Math.cos(pitchRad);
 
-        double motionX = (-sin * forward) + (cos * strafe);
-        double motionZ = (cos * forward) + (sin * strafe);
+        double lookX = -Math.sin(yawRad) * cosPitch;
+        double lookY = -Math.sin(pitchRad);
+        double lookZ = Math.cos(yawRad) * cosPitch;
 
-        Vec3 movement = new Vec3(
-                motionX,
-                0.0D,
-                motionZ
-        );
+        // Hướng sang trái/phải
+        double sideX = Math.cos(yawRad);
+        double sideZ = Math.sin(yawRad);
+
+        double moveX = lookX * forward + sideX * strafe;
+        double moveZ = lookZ * forward + sideZ * strafe;
+
+        boolean canMoveVertically =
+                mob.isNoGravity() || mob.isInWater();
+
+        double moveY = canMoveVertically
+                ? lookY * forward
+                : 0.0D;
+
+        Vec3 movement = new Vec3(moveX, moveY, moveZ);
 
         if (movement.lengthSqr() > 1.0D) {
             movement = movement.normalize();
         }
 
-        // Di chuyển sinh vật
-        mob.setDeltaMovement(
-                movement.x * 0.25D,
-                mob.getDeltaMovement().y,
-                movement.z * 0.25D
-        );
+        // Điều khiển bằng MoveControl của sinh vật
+        if (movement.lengthSqr() > 0.001D) {
+            double distance = 3.0D;
 
-        mob.setSpeed(0.25F);
-        mob.hurtMarked = true;
+            mob.getMoveControl().setWantedPosition(
+                    mob.getX() + movement.x * distance,
+                    mob.getY() + movement.y * distance,
+                    mob.getZ() + movement.z * distance,
+                    1.0D
+            );
+        } else {
+            mob.getNavigation().stop();
+        }
 
         // Nhảy
         if (jump && mob.onGround()) {
             mob.jumpFromGround();
         }
 
-        // Tấn công mục tiêu phía trước
+        // Tấn công có thời gian hồi
         if (attack) {
-            Entity target = mob.pick(
-                    4.0D,
-                    0.0F,
-                    false
-            ).getType() == net.minecraft.world.phys.HitResult.Type.ENTITY
-                    ? ((net.minecraft.world.phys.EntityHitResult) mob.pick(
-                            4.0D,
-                            0.0F,
-                            false
-                    )).getEntity()
-                    : null;
+            long gameTime = player.level().getGameTime();
 
-            if (target instanceof net.minecraft.world.entity.LivingEntity living
-                    && living != mob
-                    && living != player
-                    && living.isAlive()) {
-                mob.doHurtTarget(player.level(), living);
+            long lastAttack = LAST_ATTACK.getOrDefault(
+                    player.getUUID(),
+                    0L
+            );
+
+            if (gameTime - lastAttack >= 10L) {
+                HitResult hit = mob.pick(
+                        4.0D,
+                        0.0F,
+                        false
+                );
+
+                if (hit.getType() == HitResult.Type.ENTITY
+                        && hit instanceof EntityHitResult entityHit) {
+
+                    Entity victim = entityHit.getEntity();
+
+                    if (victim instanceof LivingEntity living
+                            && victim != mob
+                            && victim != player
+                            && victim.isAlive()) {
+
+                        mob.doHurtTarget(
+                                player.level(),
+                                living
+                        );
+
+                        LAST_ATTACK.put(
+                                player.getUUID(),
+                                gameTime
+                        );
+                    }
+                }
             }
         }
     }

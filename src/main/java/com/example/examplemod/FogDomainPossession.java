@@ -52,7 +52,7 @@ public final class FogDomainPossession {
         return target;
     }
  
-public static boolean start(
+  public static boolean start(
         ServerPlayer player,
         Entity target
 ) {
@@ -60,44 +60,33 @@ public static boolean start(
         return false;
     }
 
-    // Nếu còn trạng thái nhập xác cũ, kiểm tra và dọn trạng thái lỗi
-    if (isPossessing(player)) {
-        Entity oldTarget = getTarget(player);
-
-        if (oldTarget != null && oldTarget.isAlive()) {
-            return false;
-        }
-
-        UUID playerId = player.getUUID();
-        POSSESSED.remove(playerId);
-        BODY_POSITIONS.remove(playerId);
-
-        boolean oldInvulnerable = OLD_INVULNERABLE.getOrDefault(
-                playerId,
-                false
-        );
-
-        OLD_INVULNERABLE.remove(playerId);
-        player.setInvulnerable(oldInvulnerable);
-    }
-
     if (!(target instanceof Mob)) {
         return false;
     }
 
-    if (!target.isAlive() || target.level() != player.level()) {
-        return false;
-    }
-
-    // Kiểm tra khoảng cách với dung sai nhỏ
-    double distance = player.distanceTo(target);
-
-    if (distance > MAX_RANGE + 2.0D) {
+    if (!target.isAlive()
+            || target.level() != player.level()
+            || player.distanceTo(target) > MAX_RANGE + 2.0D) {
         return false;
     }
 
     UUID playerId = player.getUUID();
 
+    // Xóa trạng thái nhập xác cũ nếu còn sót
+    if (POSSESSED.containsKey(playerId)) {
+        boolean oldInvulnerable = OLD_INVULNERABLE.getOrDefault(
+                playerId,
+                false
+        );
+
+        POSSESSED.remove(playerId);
+        BODY_POSITIONS.remove(playerId);
+        OLD_INVULNERABLE.remove(playerId);
+
+        player.setInvulnerable(oldInvulnerable);
+    }
+
+    // Lưu trạng thái người chơi trước khi nhập xác
     POSSESSED.put(playerId, target.getUUID());
     BODY_POSITIONS.put(playerId, player.position());
 
@@ -110,6 +99,7 @@ public static boolean start(
     player.setDeltaMovement(Vec3.ZERO);
     player.setSprinting(false);
 
+    // Chuyển camera sang sinh vật
     PacketDistributor.sendToPlayer(
             player,
             new FogPossessionSyncPayload(

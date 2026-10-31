@@ -51,50 +51,75 @@ public final class FogDomainPossession {
 
         return target;
     }
+ 
+public static boolean start(
+        ServerPlayer player,
+        Entity target
+) {
+    if (!isController(player)) {
+        return false;
+    }
 
-    public static boolean start(
-            ServerPlayer player,
-            Entity target
-    ) {
-        if (!isController(player) || isPossessing(player)) {
-            return false;
-        }
+    // Nếu còn trạng thái nhập xác cũ, kiểm tra và dọn trạng thái lỗi
+    if (isPossessing(player)) {
+        Entity oldTarget = getTarget(player);
 
-        if (!(target instanceof Mob)) {
-            return false;
-        }
-
-        if (!target.isAlive()
-                || target.level() != player.level()
-                || player.distanceToSqr(target)
-                        > MAX_RANGE * MAX_RANGE) {
+        if (oldTarget != null && oldTarget.isAlive()) {
             return false;
         }
 
         UUID playerId = player.getUUID();
+        POSSESSED.remove(playerId);
+        BODY_POSITIONS.remove(playerId);
 
-        POSSESSED.put(playerId, target.getUUID());
-        BODY_POSITIONS.put(playerId, player.position());
-
-        OLD_INVULNERABLE.put(
+        boolean oldInvulnerable = OLD_INVULNERABLE.getOrDefault(
                 playerId,
-                player.isInvulnerable()
+                false
         );
 
-        player.setInvulnerable(true);
-        player.setDeltaMovement(Vec3.ZERO);
-        player.setSprinting(false);
-
-        PacketDistributor.sendToPlayer(
-                player,
-                new FogPossessionSyncPayload(
-                        1,
-                        target.getId()
-                )
-        );
-
-        return true;
+        OLD_INVULNERABLE.remove(playerId);
+        player.setInvulnerable(oldInvulnerable);
     }
+
+    if (!(target instanceof Mob)) {
+        return false;
+    }
+
+    if (!target.isAlive() || target.level() != player.level()) {
+        return false;
+    }
+
+    // Kiểm tra khoảng cách với dung sai nhỏ
+    double distance = player.distanceTo(target);
+
+    if (distance > MAX_RANGE + 2.0D) {
+        return false;
+    }
+
+    UUID playerId = player.getUUID();
+
+    POSSESSED.put(playerId, target.getUUID());
+    BODY_POSITIONS.put(playerId, player.position());
+
+    OLD_INVULNERABLE.put(
+            playerId,
+            player.isInvulnerable()
+    );
+
+    player.setInvulnerable(true);
+    player.setDeltaMovement(Vec3.ZERO);
+    player.setSprinting(false);
+
+    PacketDistributor.sendToPlayer(
+            player,
+            new FogPossessionSyncPayload(
+                    1,
+                    target.getId()
+            )
+    );
+
+    return true;
+}
 
     public static boolean stop(ServerPlayer player) {
         UUID playerId = player.getUUID();

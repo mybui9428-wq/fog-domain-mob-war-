@@ -18,12 +18,11 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.Map;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class MobWarAI {
@@ -39,14 +38,8 @@ public final class MobWarAI {
     private static final Map<PathfinderMob, Boolean> REGISTERED =
             new WeakHashMap<>();
 
-    // Mỗi thế giới có một đợt chiến đấu riêng.
-    private static final Map<ServerLevel, WaveState> WAVES =
-            new IdentityHashMap<>();
-
-    private static final class WaveState {
-        final Set<UUID> members = new HashSet<>();
-        final Set<UUID> focus = new HashSet<>();
-    }
+    // Danh sách sinh vật phát sáng trong đợt hiện tại.
+    private static final Set<UUID> FOCUS = new HashSet<>();
 
     private MobWarAI() {}
 
@@ -62,6 +55,7 @@ public final class MobWarAI {
                 return player;
             }
         }
+
         return null;
     }
 
@@ -75,7 +69,8 @@ public final class MobWarAI {
         ServerPlayer controller = findController(level);
 
         return controller != null
-                && controller.distanceToSqr(entity) <= RADIUS * RADIUS;
+                && controller.distanceToSqr(entity)
+                <= RADIUS * RADIUS;
     }
 
     private static boolean isTamed(Entity entity) {
@@ -83,6 +78,7 @@ public final class MobWarAI {
     }
 
     private static List<LivingEntity> scanEntities(ServerLevel level) {
+
         List<LivingEntity> result = new ArrayList<>();
 
         if (!MobWarCommands.enabled) {
@@ -98,7 +94,9 @@ public final class MobWarAI {
         result.addAll(level.getEntitiesOfClass(
                 LivingEntity.class,
                 controller.getBoundingBox().inflate(RADIUS),
-                entity -> entity.isAlive()
+
+                entity ->
+                        entity.isAlive()
                         && !entity.isRemoved()
                         && !isController(entity)
                         && !isTamed(entity)
@@ -111,108 +109,78 @@ public final class MobWarAI {
         return result;
     }
 
-    // Bắt đầu một đợt mới.
-    // Chỉ gọi khi chưa có thành viên nào của đợt trước còn lại.
-    private static void beginWave(
-            WaveState state,
-            List<LivingEntity> entities) {
+    private static void updateFocus(List<LivingEntity> entities) {
 
-        state.members.clear();
-        state.focus.clear();
+        // QUAN TRỌNG:
+        // Không bổ sung mục tiêu khi vẫn còn ít nhất một
+        // sinh vật của đợt phát sáng hiện tại.
 
-        List<LivingEntity> shuffled = new ArrayList<>(entities);
-
-        Collections.shuffle(shuffled);
-
-        // Ghi nhận toàn bộ sinh vật/người chơi của đợt.
-        for (LivingEntity entity : shuffled) {
-            state.members.add(entity.getUUID());
-        }
-
-        // Chọn tối đa 5 mục tiêu phát sáng.
-        int count = Math.min(MAX_FOCUS, shuffled.size());
-
-        for (int i = 0; i < count; i++) {
-            LivingEntity chosen = shuffled.get(i);
-            state.focus.add(chosen.getUUID());
-        }
-    }
-
-    private static void updateWave(
-            ServerLevel level,
-            List<LivingEntity> entities) {
-
-        WaveState state = WAVES.computeIfAbsent(
-                level,
-                ignored -> new WaveState()
-        );
-
-        Set<UUID> currentlyPresent = new HashSet<>();
-
-        for (LivingEntity entity : entities) {
-            currentlyPresent.add(entity.getUUID());
-        }
-
-        // Thành viên chết, biến mất hoặc rời khỏi lĩnh vực
-        // sẽ được loại khỏi đợt hiện tại.
-        state.members.removeIf(
-                id -> !currentlyPresent.contains(id)
-        );
-
-        state.focus.removeIf(
-                id -> !state.members.contains(id)
-        );
-
-        // Chỉ bắt đầu đợt mới khi toàn bộ thành viên
-        // của đợt trước đã không còn trong lĩnh vực.
-        if (state.members.isEmpty() && !entities.isEmpty()) {
-            beginWave(state, entities);
-        }
-
-        // Cấp hiệu ứng phát sáng cho nhóm đã chọn.
-        // Không chọn người thay thế khi một thành viên chết.
-        for (LivingEntity entity : entities) {
-            if (state.focus.contains(entity.getUUID())) {
-                entity.addEffect(new MobEffectInstance(
-                        MobEffects.GLOWING,
-                        SCAN_INTERVAL + 10,
-                        0,
-                        false,
-                        true,
-                        true
-                ));
+        if (!FOCUS.isEmpty()) {
+            for (LivingEntity entity : entities) {
+                if (FOCUS.contains(entity.getUUID())) {
+                    entity.addEffect(new MobEffectInstance(
+                            MobEffects.GLOWING,
+                            SCAN_INTERVAL + 10,
+                            0,
+                            false,
+                            true,
+                            true
+                    ));
+                }
             }
+
+            return;
+        }
+
+        // Chỉ đến đây khi toàn bộ mục tiêu phát sáng
+        // của đợt trước đã chết.
+
+        if (entities.isEmpty()) {
+            return;
+        }
+
+        List<LivingEntity> available =
+                new ArrayList<>(entities);
+
+        Collections.shuffle(available);
+
+        int amount = Math.min(MAX_FOCUS, available.size());
+
+        for (int i = 0; i < amount; i++) {
+
+            LivingEntity chosen = available.get(i);
+
+            FOCUS.add(chosen.getUUID());
+
+            chosen.addEffect(new MobEffectInstance(
+                    MobEffects.GLOWING,
+                    SCAN_INTERVAL + 10,
+                    0,
+                    false,
+                    true,
+                    true
+            ));
         }
     }
 
     @SubscribeEvent
     public static void onLivingDeath(LivingDeathEvent event) {
-        Entity entity = event.getEntity();
 
-        if (entity.level() instanceof ServerLevel level) {
-            WaveState state = WAVES.get(level);
+        UUID id = event.getEntity().getUUID();
 
-            if (state != null) {
-                state.members.remove(entity.getUUID());
-                state.focus.remove(entity.getUUID());
-            }
-        }
+        // Chỉ xóa từng mục tiêu đã chết.
+        // Không chọn mục tiêu thay thế ngay tại đây.
+        // Đợi lần quét tiếp theo khi cả nhóm đã chết hết.
+        FOCUS.remove(id);
 
-        if (entity instanceof PathfinderMob mob) {
+        if (event.getEntity() instanceof PathfinderMob mob) {
             REGISTERED.remove(mob);
         }
     }
 
     static boolean isFocused(Entity entity) {
-        if (entity == null
-                || !(entity.level() instanceof ServerLevel level)) {
-            return false;
-        }
-
-        WaveState state = WAVES.get(level);
-
-        return state != null
-                && state.focus.contains(entity.getUUID());
+        return entity != null
+                && FOCUS.contains(entity.getUUID());
     }
 
     static boolean isValidCombatTarget(
@@ -238,23 +206,19 @@ public final class MobWarAI {
                 || target instanceof ServerPlayer)
                 || !inDomain(level, attacker)
                 || !inDomain(level, target)) {
+
             return false;
         }
 
-        WaveState state = WAVES.get(level);
-
-        if (state == null) {
-            return false;
-        }
-
-        // Chỉ thành viên của đợt hiện tại mới được chiến đấu.
-        // Sinh vật mới xuất hiện phải chờ đợt sau.
-        return state.members.contains(attacker.getUUID())
-                && state.members.contains(target.getUUID());
+        // Cho phép cả sinh vật phát sáng và không phát sáng
+        // chiến đấu với nhau.
+        return true;
     }
 
     private static void registerMob(PathfinderMob mob) {
-        if (mob.isRemoved() || REGISTERED.containsKey(mob)) {
+
+        if (mob.isRemoved()
+                || REGISTERED.containsKey(mob)) {
             return;
         }
 
@@ -271,7 +235,7 @@ public final class MobWarAI {
 
         if (!MobWarCommands.enabled) {
             tickCounter = 0;
-            WAVES.clear();
+            FOCUS.clear();
             return;
         }
 
@@ -283,10 +247,10 @@ public final class MobWarAI {
 
         for (ServerLevel level : event.getServer().getAllLevels()) {
 
-            List<LivingEntity> entities = scanEntities(level);
+            List<LivingEntity> entities =
+                    scanEntities(level);
 
-            // Cập nhật đợt chiến đấu.
-            updateWave(level, entities);
+            updateFocus(entities);
 
             int added = 0;
 
@@ -299,7 +263,9 @@ public final class MobWarAI {
 
                 registerMob(mob);
 
-                if (++added >= MAX_NEW_GOALS_PER_SCAN) {
+                added++;
+
+                if (added >= MAX_NEW_GOALS_PER_SCAN) {
                     break;
                 }
             }

@@ -1,24 +1,29 @@
-
 package com.example.examplemod;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 import net.neoforged.neoforge.common.NeoForge;
 
-@Mod(value = ExampleMod.MODID, dist = Dist.CLIENT)
-public class FogPossessionClient {
+@EventBusSubscriber(
+        modid = ExampleMod.MODID,
+        value = Dist.CLIENT
+)
+public final class FogPossessionClient {
 
     private static int tickCounter = 0;
 
-    public FogPossessionClient() {
+    static {
         NeoForge.EVENT_BUS.addListener(
                 FogPossessionClient::onClientTick
         );
+    }
+
+    private FogPossessionClient() {
     }
 
     private static void onClientTick(ClientTickEvent.Post event) {
@@ -54,11 +59,11 @@ public class FogPossessionClient {
         }
 
         if (minecraft.options.keyLeft.isDown()) {
-            strafe += 1.0F;
+            strafe -= 1.0F;
         }
 
         if (minecraft.options.keyRight.isDown()) {
-            strafe -= 1.0F;
+            strafe += 1.0F;
         }
 
         float yaw = camera.getYRot();

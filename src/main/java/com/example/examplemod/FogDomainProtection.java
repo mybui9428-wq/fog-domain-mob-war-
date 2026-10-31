@@ -154,14 +154,14 @@ public final class FogDomainProtection {
     private static void updateBoundary(
             ServerLevel level,
             ServerPlayer controller) {
-
-        for (Entity entity : level.getEntities(
-                null,
-                controller.getBoundingBox().inflate(RADIUS + 3.0D),
-                candidate -> candidate != controller
-                        && !candidate.isRemoved()
-        )) {
-
+        
+        for (Entity entity : level.getEntitiesOfClass(
+        Entity.class,
+        controller.getBoundingBox().inflate(RADIUS + 3.0D),
+        candidate -> candidate != controller
+                && !candidate.isRemoved()
+)) {
+            
             UUID id = entity.getUUID();
 
             if (insideDomain(controller, entity)) {

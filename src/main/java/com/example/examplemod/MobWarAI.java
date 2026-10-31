@@ -183,37 +183,37 @@ public final class MobWarAI {
                 && FOCUS.contains(entity.getUUID());
     }
 
-    static boolean isValidCombatTarget(
-            Mob attacker,
-            LivingEntity target,
-            ServerLevel level) {
+static boolean isValidCombatTarget(
+        Mob attacker,
+        LivingEntity target,
+        ServerLevel level) {
 
-        if (!MobWarCommands.enabled
-                || attacker == null
-                || target == null
-                || attacker == target
-                || !attacker.isAlive()
-                || !target.isAlive()
-                || attacker.isRemoved()
-                || target.isRemoved()
-                || attacker.level() != level
-                || target.level() != level
-                || isController(attacker)
-                || isController(target)
-                || isTamed(attacker)
-                || isTamed(target)
-                || !(target instanceof Mob
-                || target instanceof ServerPlayer)
-                || !inDomain(level, attacker)
-                || !inDomain(level, target)) {
+    if (!MobWarCommands.enabled
+            || attacker == null
+            || target == null
+            || attacker == target
+            || !attacker.isAlive()
+            || !target.isAlive()
+            || attacker.isRemoved()
+            || target.isRemoved()
+            || attacker.level() != level
+            || target.level() != level
+            || isController(attacker)
+            || isController(target)
+            || isTamed(attacker)
+            || isTamed(target)
+            || !(target instanceof Mob
+            || target instanceof ServerPlayer)
+            || !inDomain(level, attacker)
+            || !inDomain(level, target)
+            || !isFocused(target)) {
 
-            return false;
-        }
-
-        // Cho phép cả sinh vật phát sáng và không phát sáng
-        // chiến đấu với nhau.
-        return true;
+        return false;
     }
+
+    // Chỉ được tấn công sinh vật phát sáng.
+    return true;
+}
 
     private static void registerMob(PathfinderMob mob) {
 

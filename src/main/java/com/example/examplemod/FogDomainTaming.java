@@ -6,6 +6,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.Creeper;
+
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -44,12 +46,15 @@ public final class FogDomainTaming {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (++tickCounter < 5) {
+
+        if (++tickCounter < 2) {
             return;
         }
+
         tickCounter = 0;
 
         for (ServerLevel level : event.getServer().getAllLevels()) {
+
             ServerPlayer owner = findOwner(level);
 
             if (owner == null || !owner.isAlive()) {
@@ -67,40 +72,59 @@ public final class FogDomainTaming {
             List<UUID> remove = new ArrayList<>();
 
             for (UUID id : owned) {
+
                 Entity entity = level.getEntity(id);
 
-                if (!(entity instanceof Mob mob) || !mob.isAlive()) {
+                if (!(entity instanceof Mob mob)
+                        || !mob.isAlive()
+                        || mob.isRemoved()) {
                     remove.add(id);
                     continue;
                 }
 
-                // Không bao giờ tấn công chủ nhân.
+                // Creeper đã thu phục không được tự phát nổ.
+                if (mob instanceof Creeper creeper) {
+                    creeper.setSwellDir(-1);
+                }
+
+                // Không bao giờ cho phép tấn công chủ nhân.
                 if (mob.getTarget() == owner) {
                     mob.setTarget(null);
                 }
 
-                // Chỉ chọn mục tiêu nếu chủ nhân vừa bị tấn công
-                // hoặc vừa chủ động tấn công mục tiêu đó.
                 LivingEntity target = chooseTarget(owner, mob);
 
                 if (target != null) {
+
+                    // Chỉ bảo vệ chủ nhân trước mục tiêu hợp lệ.
                     mob.setTarget(target);
+
                     mob.getLookControl().setLookAt(
-                            target, 30.0F, 30.0F
+                            target,
+                            30.0F,
+                            30.0F
                     );
 
                     if (mob.distanceToSqr(target) > 3.0D) {
-                        mob.getNavigation().moveTo(target, 1.2D);
+                        mob.getNavigation().moveTo(
+                                target,
+                                1.2D
+                        );
                     } else {
                         mob.getNavigation().stop();
                     }
+
                 } else {
-                    // Xóa mục tiêu tự chọn của AI thông thường.
+
+                    // Không có mục tiêu được chủ nhân cho phép.
                     mob.setTarget(null);
 
-                    // Khi không có mục tiêu, chỉ đi theo chủ nhân.
+                    // Đi theo chủ nhân.
                     if (mob.distanceToSqr(owner) > 9.0D) {
-                        mob.getNavigation().moveTo(owner, 1.2D);
+                        mob.getNavigation().moveTo(
+                                owner,
+                                1.2D
+                        );
                     } else {
                         mob.getNavigation().stop();
                     }
@@ -116,11 +140,13 @@ public final class FogDomainTaming {
     }
 
     private static ServerPlayer findOwner(ServerLevel level) {
+
         for (ServerPlayer player : level.players()) {
-            if (isOwner(player)) {
+            if (isOwner(player) && player.isAlive()) {
                 return player;
             }
         }
+
         return null;
     }
 
@@ -159,12 +185,12 @@ public final class FogDomainTaming {
             return false;
         }
 
-        // Không đánh sinh vật đã được thuần hóa.
+        // Không tấn công sinh vật đã thu phục.
         if (isTamed(target)) {
             return false;
         }
 
-        // Không bao giờ chọn tubi2531 làm mục tiêu.
+        // Không bao giờ chọn tubi2531.
         if (isOwner(target)) {
             return false;
         }

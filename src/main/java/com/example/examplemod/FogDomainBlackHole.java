@@ -7,7 +7,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -26,10 +28,13 @@ import java.util.UUID;
 public final class FogDomainBlackHole {
 
     private static final int DURATION = 40;
-    private static final double MASS_RADIUS = 10.0D;
 
-    private static final Map<UUID, HoleData> ACTIVE =
-            new HashMap<>();
+    // Tầm hút phía trước người chơi.
+    private static final double ABSORB_RANGE = 25.0D;
+
+    private static final double CONE_DOT = 0.35D;
+
+    private static final Map<UUID, HoleData> ACTIVE = new HashMap<>();
 
     private static final class HoleData {
         final ServerLevel level;
@@ -42,8 +47,8 @@ public final class FogDomainBlackHole {
                 ServerLevel level,
                 UUID playerId,
                 Vec3 center,
-                List<UUID> targets) {
-
+                List<UUID> targets
+        ) {
             this.level = level;
             this.playerId = playerId;
             this.center = center;
@@ -55,10 +60,11 @@ public final class FogDomainBlackHole {
     private FogDomainBlackHole() {
     }
 
-    public static boolean startSingle(
-            ServerPlayer player,
-            Mob target) {
-
+    /**
+     * Hút một sinh vật đơn lẻ.
+     * Giữ lại hàm này để tương thích với mã cũ.
+     */
+    public static boolean startSingle(ServerPlayer player, Mob target) {
         if (player == null || target == null
                 || !player.isAlive() || !target.isAlive()
                 || player.level() != target.level()) {
@@ -78,51 +84,75 @@ public final class FogDomainBlackHole {
         return true;
     }
 
+    /**
+     * Thôn Phệ Vạn Vật:
+     * Hút sinh vật và người chơi ở phía trước tubi2531.
+     */
     public static boolean startMass(ServerPlayer player) {
-
         if (player == null || !player.isAlive()) {
             return false;
         }
 
         ServerLevel level = (ServerLevel) player.level();
 
-        AABB area = player.getBoundingBox().inflate(MASS_RADIUS);
+        Vec3 look = player.getLookAngle().normalize();
+        Vec3 origin = player.position().add(0.0D, 1.0D, 0.0D);
 
-        List<Mob> nearby = level.getEntitiesOfClass(
-                Mob.class,
+        AABB area = player.getBoundingBox().inflate(ABSORB_RANGE);
+
+        List<LivingEntity> nearby = level.getEntitiesOfClass(
+                LivingEntity.class,
                 area,
-                mob -> mob.isAlive()
-                        && !mob.isRemoved()
-                        && mob.distanceToSqr(player)
-                        <= MASS_RADIUS * MASS_RADIUS
+                entity -> entity.isAlive()
+                        && !entity.isRemoved()
+                        && entity != player
+                        && !(entity instanceof ArmorStand)
+                        && entity.distanceToSqr(player)
+                                <= ABSORB_RANGE * ABSORB_RANGE
+                        && isInFront(origin, look, entity)
         );
 
         if (nearby.isEmpty()) {
             player.sendSystemMessage(Component.literal(
-                    "Không có sinh vật nào trong bán kính 10 block."));
+                    "Không có sinh vật hoặc người chơi phía trước để hấp thụ."));
             return false;
         }
 
         List<UUID> targets = new ArrayList<>();
 
-        for (Mob mob : nearby) {
-            targets.add(mob.getUUID());
+        for (LivingEntity entity : nearby) {
+            targets.add(entity.getUUID());
         }
 
         startHole(player, level, targets);
 
         player.sendSystemMessage(Component.literal(
-                "Hố đen đã xuất hiện! Đang hút "
-                        + targets.size() + " sinh vật..."));
+                "Thôn Phệ Vạn Vật đã kích hoạt! Đang hút "
+                        + targets.size() + " mục tiêu."));
 
         return true;
+    }
+
+    private static boolean isInFront(
+            Vec3 origin,
+            Vec3 look,
+            LivingEntity target
+    ) {
+        Vec3 targetPosition = target.getBoundingBox().getCenter();
+        Vec3 direction = targetPosition.subtract(origin);
+
+        if (direction.lengthSqr() < 0.01D) {
+            return true;
+        }
+
+        return look.dot(direction.normalize()) >= CONE_DOT;
     }
 
     private static void startHole(
             ServerPlayer player,
             ServerLevel level,
-            List<UUID> targets) {
-
+            List<UUID> targets
+    ) {
         ACTIVE.put(
                 player.getUUID(),
                 new HoleData(
@@ -160,25 +190,33 @@ public final class FogDomainBlackHole {
 
     private static void absorb(
             HoleData hole,
-            Mob mob) {
+            LivingEntity target
+    ) {
+        if (target == null || !target.isAlive() || target.isRemoved()) {
+            return;
+        }
 
         String typeId = BuiltInRegistries.ENTITY_TYPE
-                .getKey(mob.getType())
+                .getKey(target.getType())
                 .toString();
 
         FogDomainAbilityData data =
                 FogDomainAbilityData.get(hole.level.getServer());
 
-        boolean added = data.addAbility(
-                hole.playerId,
-                typeId
-        );
+        Entity owner = hole.level.getEntity(hole.playerId);
+
+        if (!(owner instanceof ServerPlayer player)
+                || !player.isAlive()) {
+            return;
+        }
+
+        data.initializePower(player.getUUID(), true);
 
         hole.level.sendParticles(
                 ParticleTypes.SOUL,
-                mob.getX(),
-                mob.getY() + mob.getBbHeight() * 0.5D,
-                mob.getZ(),
+                target.getX(),
+                target.getY() + target.getBbHeight() * 0.5D,
+                target.getZ(),
                 25,
                 0.4D,
                 0.6D,
@@ -186,23 +224,52 @@ public final class FogDomainBlackHole {
                 0.15D
         );
 
-        mob.discard();
+        if (target instanceof ServerPlayer absorbedPlayer) {
 
-        Entity owner = hole.level.getEntity(hole.playerId);
+            // Người chơi giữ lại 50%, chủ nhân nhận 50%.
+            data.transferPlayerPowers(
+                    player.getUUID(),
+                    absorbedPlayer.getUUID()
+            );
 
-        if (owner instanceof ServerPlayer player) {
-            if (added) {
-                player.sendSystemMessage(Component.literal(
-                        "Đã hấp thụ năng lực: " + typeId
-                                + " | Tổng năng lực: "
-                                + data.getAbilityCount(hole.playerId)));
-            } else {
-                player.sendSystemMessage(Component.literal(
-                        "Đã hấp thụ sinh vật "
-                                + typeId
-                                + ", nhưng năng lực này đã được lưu trước đó."));
-            }
+            // Người chơi bị hấp thụ chết theo cơ chế Minecraft
+            // và vẫn có thể hồi sinh bình thường.
+            absorbedPlayer.hurtServer(
+                    hole.level,
+                    hole.level.damageSources().generic(),
+                    100000.0F
+            );
+
+            player.sendSystemMessage(Component.literal(
+                    "Đã hấp thụ người chơi "
+                            + absorbedPlayer.getName().getString()
+                            + ". Người đó giữ 50% sức mạnh, bạn nhận 50%."));
+
+        } else if (target instanceof Mob mob) {
+
+            // Sinh vật chuyển toàn bộ sức mạnh cho tubi2531.
+            data.initializePower(mob.getUUID(), false);
+
+            data.transferCreaturePowers(
+                    player.getUUID(),
+                    mob.getUUID()
+            );
+
+            data.addAbility(player.getUUID(), typeId);
+
+            // Sinh vật bị hấp thụ chết thật.
+            mob.discard();
+
+            player.sendSystemMessage(Component.literal(
+                    "Đã hấp thụ sinh vật: " + typeId
+                            + " | Tổng năng lực: "
+                            + data.getAbilityCount(player.getUUID())));
         }
+
+        // Hồi máu cho tubi2531.
+        player.setHealth(player.getMaxHealth());
+
+        player.getFoodData().setFoodLevel(20);
     }
 
     @SubscribeEvent
@@ -212,9 +279,8 @@ public final class FogDomainBlackHole {
                 ACTIVE.entrySet().iterator();
 
         while (iterator.hasNext()) {
-            Map.Entry<UUID, HoleData> entry =
-                    iterator.next();
 
+            Map.Entry<UUID, HoleData> entry = iterator.next();
             HoleData hole = entry.getValue();
 
             Entity owner = hole.level.getEntity(hole.playerId);
@@ -228,43 +294,43 @@ public final class FogDomainBlackHole {
 
             hole.ticks--;
 
-            Iterator<UUID> targetIterator =
-                    hole.targets.iterator();
+            Iterator<UUID> targetIterator = hole.targets.iterator();
 
             while (targetIterator.hasNext()) {
+
                 UUID targetId = targetIterator.next();
 
                 Entity entity = hole.level.getEntity(targetId);
 
-                if (!(entity instanceof Mob mob)
-                        || !mob.isAlive()
-                        || mob.isRemoved()) {
+                if (!(entity instanceof LivingEntity target)
+                        || !target.isAlive()
+                        || target.isRemoved()) {
                     targetIterator.remove();
                     continue;
                 }
 
-                Vec3 targetPoint =
-                        mob.getBoundingBox().getCenter();
-
-                Vec3 direction =
-                        hole.center.subtract(targetPoint);
+                Vec3 targetPoint = target.getBoundingBox().getCenter();
+                Vec3 direction = hole.center.subtract(targetPoint);
 
                 double distance = direction.length();
 
                 if (distance > 0.0D) {
-                    Vec3 pull = direction.normalize()
-                            .scale(Math.min(0.8D,
-                                    0.12D + distance * 0.08D));
 
-                    mob.setDeltaMovement(pull);
-                    mob.hurtMarked = true;
+                    Vec3 pull = direction.normalize()
+                            .scale(Math.min(
+                                    0.8D,
+                                    0.12D + distance * 0.08D
+                            ));
+
+                    target.setDeltaMovement(pull);
+                    target.hurtMarked = true;
                 }
 
                 hole.level.sendParticles(
                         ParticleTypes.PORTAL,
-                        mob.getX(),
-                        mob.getY() + mob.getBbHeight() * 0.5D,
-                        mob.getZ(),
+                        target.getX(),
+                        target.getY() + target.getBbHeight() * 0.5D,
+                        target.getZ(),
                         3,
                         0.2D,
                         0.3D,
@@ -273,7 +339,7 @@ public final class FogDomainBlackHole {
                 );
 
                 if (hole.ticks <= 0 || distance < 1.2D) {
-                    absorb(hole, mob);
+                    absorb(hole, target);
                     targetIterator.remove();
                 }
             }
@@ -291,10 +357,11 @@ public final class FogDomainBlackHole {
             );
 
             if (hole.ticks <= 0 || hole.targets.isEmpty()) {
+
                 iterator.remove();
 
                 player.sendSystemMessage(Component.literal(
-                        "Hố đen đã đóng. Đã lưu năng lực đã hấp thụ."));
+                        "Hố đen đã đóng. Đã xử lý các mục tiêu."));
             }
         }
     }

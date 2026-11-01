@@ -164,7 +164,7 @@ public final class FogDomainTaming {
         AttributeInstance maxHealth = mob.getAttribute(Attributes.MAX_HEALTH);
 
         if (maxHealth != null
-                && !mob.getPersistentData().getBoolean("fog_tamed_strength")) {
+                && !mob.getPersistentData().getBoolean("fog_tamed_strength").orElse(false)) {
 
             double health = maxHealth.getBaseValue();
 

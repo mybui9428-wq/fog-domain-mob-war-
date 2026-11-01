@@ -557,7 +557,7 @@ public final class FogDomainSkills {
         }
 
         FogDomainAbilityData data =
-                FogDomainAbilityData.get(player.serverLevel().getServer());
+                FogDomainAbilityData.get(((net.minecraft.server.level.ServerLevel) player.level()).getServer());
                 List<String> abilities =
                 data.getAbilities(player.getUUID());
 

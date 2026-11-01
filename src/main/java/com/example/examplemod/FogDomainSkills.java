@@ -557,9 +557,8 @@ public final class FogDomainSkills {
         }
 
         FogDomainAbilityData data =
-                FogDomainAbilityData.get(player.getServer());
-
-        List<String> abilities =
+                FogDomainAbilityData.get(player.serverLevel().getServer());
+                List<String> abilities =
                 data.getAbilities(player.getUUID());
 
         player.sendSystemMessage(Component.literal(

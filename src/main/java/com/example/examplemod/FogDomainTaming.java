@@ -9,9 +9,8 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Creeper;
-import net.minecraft.world.entity.monster.Warden;
+import net.minecraft.world.entity.monster.warden.Warden;
 import net.minecraft.world.entity.ai.goal.target.TargetGoal;
-
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;

@@ -1,3 +1,4 @@
+
 package com.example.examplemod;
 
 import net.minecraft.commands.Commands;
@@ -50,7 +51,9 @@ public final class FogDomainSkills {
     private static final String[] SKILLS = {
             "Tia năng lượng",
             "Lồng nhốt",
-            "Thu phục sinh vật"
+            "Thu phục sinh vật",
+            "Hố đen nhập hồn",
+            "Hố đen hấp thụ"
     };
 
     private static final class CageData {
@@ -323,6 +326,11 @@ public final class FogDomainSkills {
             return 0;
         }
 
+        // Skill 5: hút tất cả sinh vật trong bán kính 10 block.
+        if (selectedSkill == 4) {
+            return FogDomainBlackHole.startMass(player) ? 1 : 0;
+        }
+
         LivingEntity target = findTarget(player);
 
         if (target == null) {
@@ -335,6 +343,7 @@ public final class FogDomainSkills {
 
         switch (selectedSkill) {
             case 0 -> startBeam(player, target);
+
             case 1 -> createCage(player, target);
 
             case 2 -> {
@@ -374,6 +383,17 @@ public final class FogDomainSkills {
                         "Đã nô dịch " + mob.getName().getString()
                                 + ". Tổng số: " + owned.size()
                                 + "/" + MAX_TAMED));
+            }
+
+            // Skill 4: hút và hấp thụ một sinh vật được ngắm.
+            case 3 -> {
+                if (!(target instanceof Mob mob)) {
+                    player.sendSystemMessage(Component.literal(
+                            "Skill 4 chỉ có thể nhập hồn sinh vật."));
+                    return 0;
+                }
+
+                return FogDomainBlackHole.startSingle(player, mob) ? 1 : 0;
             }
 
             default -> {
@@ -505,7 +525,6 @@ public final class FogDomainSkills {
         float mobYaw = mob.getYRot();
         float mobPitch = mob.getXRot();
 
-        // Dùng đúng overload có Set<Relative> của NeoForge 26.2.
         player.teleportTo(
                 level,
                 mobX, mobY, mobZ,
@@ -526,6 +545,38 @@ public final class FogDomainSkills {
                 "Đã đổi vị trí với Nô dịch "
                         + (selected + 1)
                         + ": " + mob.getName().getString()));
+
+        return 1;
+    }
+
+    private static int showAbilities(ServerPlayer player) {
+        if (!isController(player)) {
+            player.sendSystemMessage(Component.literal(
+                    "Bạn không phải người điều khiển lĩnh vực."));
+            return 0;
+        }
+
+        FogDomainAbilityData data =
+                FogDomainAbilityData.get(player.getServer());
+
+        List<String> abilities =
+                data.getAbilities(player.getUUID());
+
+        player.sendSystemMessage(Component.literal(
+                "===== NĂNG LỰC ĐÃ HẤP THỤ ====="));
+
+        if (abilities.isEmpty()) {
+            player.sendSystemMessage(Component.literal(
+                    "Bạn chưa hấp thụ năng lực nào."));
+        } else {
+            for (String ability : abilities) {
+                player.sendSystemMessage(
+                        Component.literal("- " + ability));
+            }
+        }
+
+        player.sendSystemMessage(Component.literal(
+                "Tổng năng lực: " + abilities.size()));
 
         return 1;
     }
@@ -590,6 +641,12 @@ public final class FogDomainSkills {
                                 .executes(context ->
                                         swap(context.getSource()
                                                 .getPlayerOrException())))
+
+                        .then(Commands.literal("abilities")
+                                .executes(context ->
+                                        showAbilities(context.getSource()
+                                                .getPlayerOrException()))
+                        )
         );
     }
 
@@ -681,4 +738,4 @@ public final class FogDomainSkills {
             }
         }
     }
-    }
+}

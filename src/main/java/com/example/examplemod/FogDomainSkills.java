@@ -49,12 +49,11 @@ public final class FogDomainSkills {
     private static int selectedSkill = 0;
 
     private static final String[] SKILLS = {
-            "Tia năng lượng",
-            "Lồng nhốt",
-            "Thu phục sinh vật",
-            "Hố đen nhập hồn",
-            "Hố đen hấp thụ"
-    };
+        "Tia năng lượng",
+        "Lồng nhốt",
+        "Thu phục sinh vật",
+        "Thôn Phệ Vạn Vật"
+};
 
     private static final class CageData {
         final ServerLevel level;
@@ -319,90 +318,80 @@ public final class FogDomainSkills {
                 "Đã bắn tia năng lượng."));
     }
 
-    private static int cast(ServerPlayer player) {
-        if (!isController(player)) {
-            player.sendSystemMessage(Component.literal(
-                    "Bạn không phải người điều khiển lĩnh vực."));
-            return 0;
-        }
+private static int cast(ServerPlayer player) {
+    if (!isController(player)) {
+        player.sendSystemMessage(Component.literal(
+                "Bạn không phải người điều khiển lĩnh vực."));
+        return 0;
+    }
 
-        // Skill 5: hút tất cả sinh vật trong bán kính 10 block.
-        if (selectedSkill == 4) {
-            return FogDomainBlackHole.startMass(player) ? 1 : 0;
-        }
+    // Kỹ năng thứ 4: Thôn Phệ Vạn Vật.
+    // Hút tất cả sinh vật và người chơi phía trước.
+    if (selectedSkill == 3) {
+        return FogDomainBlackHole.startMass(player) ? 1 : 0;
+    }
 
-        LivingEntity target = findTarget(player);
+    LivingEntity target = findTarget(player);
 
-        if (target == null) {
-            player.sendSystemMessage(Component.literal(
-                    "Hãy ngắm chính xác vào mục tiêu trong phạm vi 25 block."));
-            return 0;
-        }
+    if (target == null) {
+        player.sendSystemMessage(Component.literal(
+                "Hãy ngắm chính xác vào mục tiêu trong phạm vi 25 block."));
+        return 0;
+    }
 
-        LAST_TARGET.put(player.getUUID(), target.getUUID());
+    LAST_TARGET.put(player.getUUID(), target.getUUID());
 
-        switch (selectedSkill) {
-            case 0 -> startBeam(player, target);
+    switch (selectedSkill) {
+        case 0 -> startBeam(player, target);
 
-            case 1 -> createCage(player, target);
+        case 1 -> createCage(player, target);
 
-            case 2 -> {
-                if (!(target instanceof Mob mob)) {
-                    player.sendSystemMessage(Component.literal(
-                            "Kỹ năng nô dịch chỉ nhận sinh vật, không nhận người chơi."));
-                    return 0;
-                }
-
-                List<UUID> owned = TAMED.computeIfAbsent(
-                        player.getUUID(), k -> new ArrayList<>());
-
-                ServerLevel level = (ServerLevel) player.level();
-
-                owned.removeIf(id -> {
-                    Entity entity = level.getEntity(id);
-                    return !(entity instanceof Mob m) || !m.isAlive();
-                });
-
-                if (owned.contains(mob.getUUID())) {
-                    player.sendSystemMessage(Component.literal(
-                            mob.getName().getString()
-                                    + " đã thuộc quyền nô dịch của bạn."));
-                    return 1;
-                }
-
-                if (owned.size() >= MAX_TAMED) {
-                    player.sendSystemMessage(Component.literal(
-                            "Đã đủ 5 sinh vật. Không thể nô dịch thêm."));
-                    return 0;
-                }
-
-                owned.add(mob.getUUID());
-                SLTE_INDEX.put(player.getUUID(), owned.size() - 1);
-
+        case 2 -> {
+            if (!(target instanceof Mob mob)) {
                 player.sendSystemMessage(Component.literal(
-                        "Đã nô dịch " + mob.getName().getString()
-                                + ". Tổng số: " + owned.size()
-                                + "/" + MAX_TAMED));
-            }
-
-            // Skill 4: hút và hấp thụ một sinh vật được ngắm.
-            case 3 -> {
-                if (!(target instanceof Mob mob)) {
-                    player.sendSystemMessage(Component.literal(
-                            "Skill 4 chỉ có thể nhập hồn sinh vật."));
-                    return 0;
-                }
-
-                return FogDomainBlackHole.startSingle(player, mob) ? 1 : 0;
-            }
-
-            default -> {
+                        "Kỹ năng nô dịch chỉ nhận sinh vật, không nhận người chơi."));
                 return 0;
             }
+
+            List<UUID> owned = TAMED.computeIfAbsent(
+                    player.getUUID(), k -> new ArrayList<>());
+
+            ServerLevel level = (ServerLevel) player.level();
+
+            owned.removeIf(id -> {
+                Entity entity = level.getEntity(id);
+                return !(entity instanceof Mob m) || !m.isAlive();
+            });
+
+            if (owned.contains(mob.getUUID())) {
+                player.sendSystemMessage(Component.literal(
+                        mob.getName().getString()
+                                + " đã thuộc quyền nô dịch của bạn."));
+                return 1;
+            }
+
+            if (owned.size() >= MAX_TAMED) {
+                player.sendSystemMessage(Component.literal(
+                        "Đã đủ 5 sinh vật. Không thể nô dịch thêm."));
+                return 0;
+            }
+
+            owned.add(mob.getUUID());
+            SLTE_INDEX.put(player.getUUID(), owned.size() - 1);
+
+            player.sendSystemMessage(Component.literal(
+                    "Đã nô dịch " + mob.getName().getString()
+                            + ". Tổng số: " + owned.size()
+                            + "/" + MAX_TAMED));
         }
 
-        return 1;
+        default -> {
+            return 0;
+        }
     }
+
+    return 1;
+}
 
     private static int selectTamed(ServerPlayer player) {
         if (!isController(player)) {

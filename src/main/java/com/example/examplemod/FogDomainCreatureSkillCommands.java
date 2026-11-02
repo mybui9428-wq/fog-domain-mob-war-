@@ -281,11 +281,11 @@ public final class FogDomainCreatureSkillCommands {
             }
 
             case FogDomainCreatureSkills.ENDER_DRAGON_BREATH -> {
-                coneDamage(player, 8, 18);
-                particles(level, ParticleTypes.DRAGON_BREATH,
-                        player.position().add(look.scale(4)).add(0, 1, 0),
-                        80, 1.5, 1, 1.5);
-                return true;
+    coneDamage(player, 8, 18);
+    particles(level, ParticleTypes.PORTAL,
+            player.position().add(look.scale(4)).add(0, 1, 0),
+            80, 1.5, 1, 1.5);
+    return true;
             }
 
             case FogDomainCreatureSkills.WITHER_STORM -> {

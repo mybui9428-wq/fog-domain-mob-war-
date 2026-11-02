@@ -39,17 +39,13 @@ public final class FogDomainCreatureSkillCommands {
     }
 
     private static int showList(ServerPlayer player) {
-        if (!isController(player)) {
-            return 0;
-        }
+        if (!isController(player)) return 0;
 
         FogDomainAbilityData data = getData(player);
         List<String> skills = data.getCreatureSkills(player.getUUID());
         String selected = data.getSelectedCreatureSkill(player.getUUID());
 
-        player.sendSystemMessage(Component.literal(
-                "===== KỸ NĂNG SINH VẬT ====="
-        ));
+        player.sendSystemMessage(Component.literal("===== KỸ NĂNG SINH VẬT ====="));
 
         if (skills.isEmpty()) {
             player.sendSystemMessage(Component.literal(
@@ -60,40 +56,32 @@ public final class FogDomainCreatureSkillCommands {
 
         for (int i = 0; i < skills.size(); i++) {
             String id = skills.get(i);
-            boolean isSelected = id.equals(selected);
-
             player.sendSystemMessage(Component.literal(
                     (i + 1) + ". "
                             + FogDomainCreatureSkills.getSkillName(id)
-                            + (isSelected ? " [ĐANG CHỌN]" : "")
+                            + (id.equals(selected) ? " [ĐANG CHỌN]" : "")
             ));
         }
 
         player.sendSystemMessage(Component.literal(
-                "Dùng /fogskill created để đổi kỹ năng."
+                "Đổi kỹ năng: /fogskill created"
         ));
-
         player.sendSystemMessage(Component.literal(
-                "Dùng /fogskill creaturecast để sử dụng kỹ năng đang chọn."
+                "Dùng kỹ năng: /fogskill creaturecast"
         ));
-
         player.sendSystemMessage(Component.literal(
-                "Hoặc dùng /fogskill creatureuse <số>."
+                "Chọn theo số: /fogskill creatureuse <số>"
         ));
 
         return 1;
     }
 
     private static int cycleSkill(ServerPlayer player) {
-        if (!isController(player)) {
-            return 0;
-        }
+        if (!isController(player)) return 0;
 
-        FogDomainAbilityData data = getData(player);
+        String next = getData(player).cycleCreatureSkill(player.getUUID());
 
-        String nextSkill = data.cycleCreatureSkill(player.getUUID());
-
-        if (nextSkill == null) {
+        if (next == null) {
             player.sendSystemMessage(Component.literal(
                     "Bạn chưa mở khóa kỹ năng sinh vật nào."
             ));
@@ -101,21 +89,17 @@ public final class FogDomainCreatureSkillCommands {
         }
 
         player.sendSystemMessage(Component.literal(
-                "Đã đổi sang: "
-                        + FogDomainCreatureSkills.getSkillName(nextSkill)
+                "Đã đổi sang: " + FogDomainCreatureSkills.getSkillName(next)
         ));
-
         return 1;
     }
 
     private static int useSelectedSkill(ServerPlayer player) {
-        if (!isController(player)) {
-            return 0;
-        }
+        if (!isController(player)) return 0;
 
-        FogDomainAbilityData data = getData(player);
-
-        String selected = data.getSelectedCreatureSkill(player.getUUID());
+        String selected = getData(player).getSelectedCreatureSkill(
+                player.getUUID()
+        );
 
         if (selected == null) {
             player.sendSystemMessage(Component.literal(
@@ -128,15 +112,11 @@ public final class FogDomainCreatureSkillCommands {
     }
 
     private static int useSkillByNumber(ServerPlayer player, int number) {
-        if (!isController(player)) {
-            return 0;
-        }
+        if (!isController(player)) return 0;
 
         FogDomainAbilityData data = getData(player);
-
         String skillId = data.getCreatureSkillAt(
-                player.getUUID(),
-                number - 1
+                player.getUUID(), number - 1
         );
 
         if (skillId == null) {
@@ -147,34 +127,27 @@ public final class FogDomainCreatureSkillCommands {
         }
 
         data.setSelectedCreatureSkill(player.getUUID(), skillId);
-
         return useSkill(player, skillId);
     }
 
     private static int useSkill(ServerPlayer player, String skillId) {
         ServerLevel level = (ServerLevel) player.level();
         FogDomainAbilityData data = getData(player);
-
         long gameTime = level.getGameTime();
 
         long remaining = data.getCooldownRemaining(
-                player.getUUID(),
-                skillId,
-                gameTime
+                player.getUUID(), skillId, gameTime
         );
 
         if (remaining > 0L) {
             player.sendSystemMessage(Component.literal(
                     "Kỹ năng còn hồi chiêu "
-                            + ((remaining + 19L) / 20L)
-                            + " giây."
+                            + ((remaining + 19L) / 20L) + " giây."
             ));
             return 0;
         }
 
-        boolean success = executeSkill(player, skillId);
-
-        if (!success) {
+        if (!executeSkill(player, skillId)) {
             player.sendSystemMessage(Component.literal(
                     "Không thể sử dụng kỹ năng lúc này."
             ));
@@ -182,10 +155,7 @@ public final class FogDomainCreatureSkillCommands {
         }
 
         data.startCooldown(
-                player.getUUID(),
-                skillId,
-                gameTime,
-                getCooldown(skillId)
+                player.getUUID(), skillId, gameTime, getCooldown(skillId)
         );
 
         player.sendSystemMessage(Component.literal(
@@ -196,203 +166,354 @@ public final class FogDomainCreatureSkillCommands {
         return 1;
     }
 
-    private static long getCooldown(String skillId) {
-        return switch (skillId) {
-            case FogDomainCreatureSkills.CREEPER_EXPLOSION -> 20L * 30L;
-            case FogDomainCreatureSkills.ENDERMAN_TELEPORT -> 20L * 10L;
-            case FogDomainCreatureSkills.WARDEN_SONIC_BOOM -> 20L * 25L;
-            case FogDomainCreatureSkills.WARDEN_SONAR -> 20L * 15L;
-            case FogDomainCreatureSkills.IRON_GOLEM_SMASH -> 20L * 15L;
-            case FogDomainCreatureSkills.WITCH_POTION -> 20L * 20L;
-            case FogDomainCreatureSkills.BLAZE_FIREBALL -> 20L * 12L;
-            case FogDomainCreatureSkills.GHAST_FIREBALL -> 20L * 20L;
-            case FogDomainCreatureSkills.SPIDER_WEB -> 20L * 15L;
-            case FogDomainCreatureSkills.ENDER_DRAGON_BREATH -> 20L * 40L;
+    private static long getCooldown(String id) {
+        return switch (id) {
+            case FogDomainCreatureSkills.CREEPER_EXPLOSION -> 600L;
+            case FogDomainCreatureSkills.ENDERMAN_TELEPORT -> 200L;
+            case FogDomainCreatureSkills.WARDEN_SONIC_BOOM -> 500L;
+            case FogDomainCreatureSkills.ENDER_DRAGON_BREATH -> 800L;
+            case FogDomainCreatureSkills.WITHER_STORM -> 800L;
+            case FogDomainCreatureSkills.ZOMBIE_HORDE -> 600L;
+            case FogDomainCreatureSkills.BEE_STING -> 240L;
+            case FogDomainCreatureSkills.SLIME_BOUNCE -> 240L;
+            case FogDomainCreatureSkills.DROWNED_TIDAL -> 400L;
             default -> DEFAULT_COOLDOWN;
         };
     }
 
     private static boolean executeSkill(
             ServerPlayer player,
-            String skillId
+            String id
     ) {
         ServerLevel level = (ServerLevel) player.level();
-
         Vec3 look = player.getLookAngle().normalize();
         LivingEntity target = findTarget(player, 25.0D);
 
-        switch (skillId) {
+        switch (id) {
 
+            // Kỹ năng cũ
             case FogDomainCreatureSkills.CREEPER_EXPLOSION -> {
-                areaDamage(player, 4.0D, 12.0F, 3.0D);
-
-                level.sendParticles(
-                        ParticleTypes.EXPLOSION,
-                        player.getX() + look.x * 2.0D,
-                        player.getY() + 1.0D + look.y * 2.0D,
-                        player.getZ() + look.z * 2.0D,
-                        1, 0.2D, 0.2D, 0.2D, 0.0D
-                );
+                areaDamage(player, 4, 12, 3);
+                particles(level, ParticleTypes.EXPLOSION,
+                        player.position().add(look.scale(2)).add(0, 1, 0),
+                        1, 0.2, 0.2, 0.2);
                 return true;
             }
 
             case FogDomainCreatureSkills.ENDERMAN_TELEPORT -> {
-                Vec3 destination = player.position().add(
-                        look.scale(8.0D)
-                );
-
+                Vec3 destination = player.position().add(look.scale(8));
                 player.teleportTo(
-                        level,
-                        destination.x,
-                        destination.y,
-                        destination.z,
-                        java.util.Set.of(),
-                        player.getYRot(),
-                        player.getXRot(),
-                        true
+                        level, destination.x, destination.y, destination.z,
+                        java.util.Set.of(), player.getYRot(),
+                        player.getXRot(), true
                 );
-
-                level.sendParticles(
-                        ParticleTypes.PORTAL,
-                        destination.x,
-                        destination.y + 1.0D,
-                        destination.z,
-                        50, 0.5D, 1.0D, 0.5D, 0.2D
-                );
+                particles(level, ParticleTypes.PORTAL,
+                        destination.add(0, 1, 0), 50, 0.5, 1, 0.5);
                 return true;
             }
 
             case FogDomainCreatureSkills.WARDEN_SONIC_BOOM -> {
                 if (target == null) return false;
-
-                target.hurtServer(
-                        level,
-                        player.damageSources().magic(),
-                        20.0F
-                );
-
-                level.sendParticles(
-                        ParticleTypes.SONIC_BOOM,
-                        target.getX(),
-                        target.getY() + 1.0D,
-                        target.getZ(),
-                        1, 0.0D, 0.0D, 0.0D, 0.0D
-                );
+                damage(player, target, 20);
+                particles(level, ParticleTypes.SONIC_BOOM,
+                        target.position().add(0, 1, 0),
+                        1, 0, 0, 0);
                 return true;
             }
 
             case FogDomainCreatureSkills.WARDEN_SONAR -> {
-                areaDamage(player, 12.0D, 4.0F, 1.0D);
-
-                level.sendParticles(
-                        ParticleTypes.SCULK_SOUL,
-                        player.getX(),
-                        player.getY() + 1.0D,
-                        player.getZ(),
-                        70, 5.0D, 3.0D, 5.0D, 0.1D
-                );
+                particles(level, ParticleTypes.SCULK_SOUL,
+                        player.position().add(0, 1, 0),
+                        70, 5, 3, 5);
                 return true;
             }
 
             case FogDomainCreatureSkills.IRON_GOLEM_SMASH -> {
-                areaDamage(player, 5.0D, 15.0F, 2.5D);
-
-                level.sendParticles(
-                        ParticleTypes.CRIT,
-                        player.getX(),
-                        player.getY() + 1.0D,
-                        player.getZ(),
-                        35, 2.0D, 0.5D, 2.0D, 0.2D
-                );
+                areaDamage(player, 5, 15, 2.5);
+                particles(level, ParticleTypes.CRIT,
+                        player.position().add(0, 1, 0),
+                        35, 2, 0.5, 2);
                 return true;
             }
 
             case FogDomainCreatureSkills.WITCH_POTION -> {
                 if (target == null) return false;
-
-                target.addEffect(new MobEffectInstance(
-                        MobEffects.POISON, 20 * 8, 1
-                ));
-
-                target.addEffect(new MobEffectInstance(
-                        MobEffects.SLOWNESS, 20 * 8, 1
-                ));
-
-                level.sendParticles(
-                        ParticleTypes.WITCH,
-                        target.getX(),
-                        target.getY() + 1.0D,
-                        target.getZ(),
-                        30, 0.4D, 0.5D, 0.4D, 0.1D
-                );
+                effect(target, MobEffects.POISON, 8, 1);
+                effect(target, MobEffects.SLOWNESS, 8, 1);
+                particles(level, ParticleTypes.WITCH,
+                        target.position().add(0, 1, 0),
+                        30, 0.4, 0.5, 0.4);
                 return true;
             }
 
             case FogDomainCreatureSkills.BLAZE_FIREBALL -> {
                 if (target == null) return false;
-
-                target.hurtServer(
-                        level,
-                        player.damageSources().onFire(),
-                        10.0F
-                );
-
-                target.igniteForSeconds(5.0F);
+                damage(player, target, 10);
+                target.igniteForSeconds(5);
+                particles(level, ParticleTypes.FLAME,
+                        target.position().add(0, 1, 0),
+                        25, 0.4, 0.4, 0.4);
                 return true;
             }
 
             case FogDomainCreatureSkills.GHAST_FIREBALL -> {
                 if (target == null) return false;
-
-                target.hurtServer(
-                        level,
-                        player.damageSources().magic(),
-                        18.0F
-                );
-
-                target.igniteForSeconds(5.0F);
-
-                level.sendParticles(
-                        ParticleTypes.FLAME,
-                        target.getX(),
-                        target.getY() + 1.0D,
-                        target.getZ(),
-                        35, 0.5D, 0.5D, 0.5D, 0.1D
-                );
+                damage(player, target, 18);
+                target.igniteForSeconds(5);
+                particles(level, ParticleTypes.FLAME,
+                        target.position().add(0, 1, 0),
+                        35, 0.5, 0.5, 0.5);
                 return true;
             }
 
-            case FogDomainCreatureSkills.SPIDER_WEB -> {
+            case FogDomainCreatureSkills.SPIDER_WEB,
+                 FogDomainCreatureSkills.CAVE_SPIDER_POISON -> {
                 if (target == null) return false;
-
-                target.addEffect(new MobEffectInstance(
-                        MobEffects.SLOWNESS, 20 * 10, 5
-                ));
-
-                target.addEffect(new MobEffectInstance(
-                        MobEffects.JUMP_BOOST, 20 * 10, 128
-                ));
-
-                level.sendParticles(
-                        ParticleTypes.ITEM_SNOWBALL,
-                        target.getX(),
-                        target.getY() + 1.0D,
-                        target.getZ(),
-                        25, 0.5D, 0.7D, 0.5D, 0.1D
-                );
+                effect(target, MobEffects.SLOWNESS, 10, 5);
+                if (id.equals(FogDomainCreatureSkills.CAVE_SPIDER_POISON)) {
+                    effect(target, MobEffects.POISON, 8, 1);
+                }
+                particles(level, ParticleTypes.ITEM_SNOWBALL,
+                        target.position().add(0, 1, 0),
+                        30, 0.5, 0.7, 0.5);
                 return true;
             }
 
             case FogDomainCreatureSkills.ENDER_DRAGON_BREATH -> {
-                areaDamage(player, 8.0D, 18.0F, 2.0D);
+                coneDamage(player, 8, 18);
+                particles(level, ParticleTypes.DRAGON_BREATH,
+                        player.position().add(look.scale(4)).add(0, 1, 0),
+                        80, 1.5, 1, 1.5);
+                return true;
+            }
 
-                level.sendParticles(
-                        ParticleTypes.PORTAL,
-                        player.getX() + look.x * 3.0D,
-                        player.getY() + 1.0D + look.y * 3.0D,
-                        player.getZ() + look.z * 3.0D,
-                        100, 2.0D, 1.0D, 2.0D, 0.05D
-                );
+            // Wither
+            case FogDomainCreatureSkills.WITHER_STORM -> {
+                areaDamage(player, 9, 12, 2);
+                for (LivingEntity e : nearby(player, 9)) {
+                    effect(e, MobEffects.WITHER, 6, 1);
+                }
+                particles(level, ParticleTypes.SOUL,
+                        player.position().add(0, 1, 0),
+                        100, 4, 2, 4);
+                return true;
+            }
+
+            // Wither Skeleton
+            case FogDomainCreatureSkills.WITHER_SKELETON_SLASH -> {
+                if (target == null) return false;
+                damage(player, target, 12);
+                effect(target, MobEffects.WITHER, 6, 1);
+                knockback(player, target, 1.8);
+                particles(level, ParticleTypes.SWEEP_ATTACK,
+                        target.position().add(0, 1, 0),
+                        8, 0.5, 0.5, 0.5);
+                return true;
+            }
+
+            // Skeleton
+            case FogDomainCreatureSkills.SKELETON_ARROW,
+                 FogDomainCreatureSkills.BOGGED_ARROW,
+                 FogDomainCreatureSkills.PILLAGER_CROSSBOW,
+                 FogDomainCreatureSkills.STRAY_FROST -> {
+                if (target == null) return false;
+                damage(player, target, 9);
+                if (id.equals(FogDomainCreatureSkills.BOGGED_ARROW)) {
+                    effect(target, MobEffects.POISON, 5, 1);
+                }
+                if (id.equals(FogDomainCreatureSkills.STRAY_FROST)) {
+                    effect(target, MobEffects.SLOWNESS, 6, 2);
+                }
+                particles(level, ParticleTypes.CRIT,
+                        target.position().add(0, 1, 0),
+                        15, 0.3, 0.3, 0.3);
+                return true;
+            }
+
+            // Zombie và biến thể
+            case FogDomainCreatureSkills.ZOMBIE_HORDE,
+                 FogDomainCreatureSkills.ZOMBIE_VILLAGER_CALL -> {
+                areaDamage(player, 6, 7, 1.2);
+                for (LivingEntity e : nearby(player, 6)) {
+                    effect(e, MobEffects.WEAKNESS, 5, 0);
+                }
+                particles(level, ParticleTypes.ANGRY_VILLAGER,
+                        player.position().add(0, 1, 0),
+                        35, 2, 1, 2);
+                return true;
+            }
+
+            case FogDomainCreatureSkills.HUSK_SAND -> {
+                areaDamage(player, 7, 8, 1);
+                for (LivingEntity e : nearby(player, 7)) {
+                    effect(e, MobEffects.BLINDNESS, 3, 0);
+                }
+                particles(level, ParticleTypes.POOF,
+                        player.position().add(0, 1, 0),
+                        50, 2, 1, 2);
+                return true;
+            }
+
+            // Drowned
+            case FogDomainCreatureSkills.DROWNED_TIDAL -> {
+                areaDamage(player, 8, 8, 1.5);
+                for (LivingEntity e : nearby(player, 8)) {
+                    effect(e, MobEffects.SLOWNESS, 4, 1);
+                    e.push(0, 0.8, 0);
+                    e.hurtMarked = true;
+                }
+                particles(level, ParticleTypes.SPLASH,
+                        player.position().add(0, 1, 0),
+                        100, 3, 2, 3);
+                return true;
+            }
+
+            // Slime
+            case FogDomainCreatureSkills.SLIME_BOUNCE,
+                 FogDomainCreatureSkills.MAGMA_CUBE_BURN,
+                 FogDomainCreatureSkills.SULFUR_CUBE_BLAST -> {
+                areaDamage(player, 5, 8, 1);
+                player.push(0, 1.1, 0);
+                player.hurtMarked = true;
+                if (!id.equals(FogDomainCreatureSkills.SLIME_BOUNCE)) {
+                    for (LivingEntity e : nearby(player, 5)) {
+                        e.igniteForSeconds(3);
+                    }
+                }
+                particles(level, ParticleTypes.ITEM_SLIME,
+                        player.position().add(0, 1, 0),
+                        45, 1.5, 0.5, 1.5);
+                return true;
+            }
+
+            // Bee
+            case FogDomainCreatureSkills.BEE_STING -> {
+                if (target == null) return false;
+                damage(player, target, 5);
+                effect(target, MobEffects.POISON, 8, 1);
+                effect(target, MobEffects.SLOWNESS, 3, 1);
+                particles(level, ParticleTypes.ANGRY_VILLAGER,
+                        target.position().add(0, 1, 0),
+                        20, 0.4, 0.5, 0.4);
+                return true;
+            }
+
+            // Kỹ năng lao tới / cận chiến
+            case FogDomainCreatureSkills.GOAT_RAM,
+                 FogDomainCreatureSkills.HOGLIN_CHARGE,
+                 FogDomainCreatureSkills.RAVAGER_RAM,
+                 FogDomainCreatureSkills.ZOGLIN_CHARGE,
+                 FogDomainCreatureSkills.HORSE_CHARGE,
+                 FogDomainCreatureSkills.COW_RUSH,
+                 FogDomainCreatureSkills.PIG_CHARGE,
+                 FogDomainCreatureSkills.CAMEL_STOMP,
+                 FogDomainCreatureSkills.POLAR_BEAR_SMASH,
+                 FogDomainCreatureSkills.PIGLIN_BRUTE_SMASH,
+                 FogDomainCreatureSkills.VINDICATOR_AXE,
+                 FogDomainCreatureSkills.WOLF_BITE,
+                 FogDomainCreatureSkills.CAT_SCRATCH,
+                 FogDomainCreatureSkills.DONKEY_KICK,
+                 FogDomainCreatureSkills.MULE_KICK -> {
+                if (target == null) return false;
+                damage(player, target, 10);
+                knockback(player, target, 2.2);
+                particles(level, ParticleTypes.CRIT,
+                        target.position().add(0, 1, 0),
+                        20, 0.5, 0.5, 0.5);
+                return true;
+            }
+
+            // Kỹ năng khống chế
+            case FogDomainCreatureSkills.EVOKER_FANGS,
+                 FogDomainCreatureSkills.SHULKER_PROJECTILE,
+                 FogDomainCreatureSkills.GUARDIAN_LASER,
+                 FogDomainCreatureSkills.ELDER_GUARDIAN_LASER,
+                 FogDomainCreatureSkills.GHAST_FIREBALL -> {
+                if (target == null) return false;
+                damage(player, target, 13);
+                effect(target, MobEffects.SLOWNESS, 3, 1);
+                particles(level, ParticleTypes.CRIT,
+                        target.position().add(0, 1, 0),
+                        25, 0.5, 0.5, 0.5);
+                return true;
+            }
+
+            // Kỹ năng dịch chuyển / lao nhanh
+            case FogDomainCreatureSkills.DOLPHIN_DASH,
+                 FogDomainCreatureSkills.PHANTOM_DIVE,
+                 FogDomainCreatureSkills.VEX_DASH,
+                 FogDomainCreatureSkills.RABBIT_JUMP,
+                 FogDomainCreatureSkills.OCELOT_STEALTH -> {
+                player.push(look.x * 1.8, 0.45, look.z * 1.8);
+                player.hurtMarked = true;
+                particles(level, ParticleTypes.CLOUD,
+                        player.position().add(0, 1, 0),
+                        30, 0.6, 0.5, 0.6);
+                return true;
+            }
+
+            // Hỗ trợ / phòng thủ
+            case FogDomainCreatureSkills.AXolotl_REGEN -> {
+                effect(player, MobEffects.REGENERATION, 8, 1);
+                particles(level, ParticleTypes.HEART,
+                        player.position().add(0, 1, 0),
+                        15, 0.5, 0.8, 0.5);
+                return true;
+            }
+
+            case FogDomainCreatureSkills.ARMADILLO_ROLL,
+                 FogDomainCreatureSkills.TURTLE_SHELL,
+                 FogDomainCreatureSkills.PANDA_ROLL -> {
+                effect(player, MobEffects.RESISTANCE, 8, 2);
+                particles(level, ParticleTypes.CRIT,
+                        player.position().add(0, 1, 0),
+                        30, 1, 0.5, 1);
+                return true;
+            }
+
+            case FogDomainCreatureSkills.ALLAY_SUPPORT,
+                 FogDomainCreatureSkills.SNIFFER_SCENT,
+                 FogDomainCreatureSkills.VILLAGER_TRADE,
+                 FogDomainCreatureSkills.WANDERING_TRADER_POTION -> {
+                effect(player, MobEffects.REGENERATION, 5, 0);
+                effect(player, MobEffects.SPEED, 8, 1);
+                particles(level, ParticleTypes.HAPPY_VILLAGER,
+                        player.position().add(0, 1, 0),
+                        30, 1, 1, 1);
+                return true;
+            }
+
+            // Các kỹ năng nguyên tố / sinh vật nhỏ
+            case FogDomainCreatureSkills.LLAMA_SPIT,
+                 FogDomainCreatureSkills.PUFFERFISH_POISON,
+                 FogDomainCreatureSkills.FROG_TONGUE,
+                 FogDomainCreatureSkills.PARROT_SONIC,
+                 FogDomainCreatureSkills.SALMON_SPLASH,
+                 FogDomainCreatureSkills.SQUID_INK,
+                 FogDomainCreatureSkills.GLOW_SQUID_BLIND,
+                 FogDomainCreatureSkills.BAT_SONAR,
+                 FogDomainCreatureSkills.MOOSHROOM_SPORES,
+                 FogDomainCreatureSkills.CHICKEN_FLUTTER,
+                 FogDomainCreatureSkills.SHEEP_WOOL,
+                 FogDomainCreatureSkills.STRIDER_LAVA,
+                 FogDomainCreatureSkills.SNOW_GOLEM_SNOW,
+                 FogDomainCreatureSkills.HAPPY_GHAST_WIND,
+                 FogDomainCreatureSkills.NAUTILUS_WATER,
+                 FogDomainCreatureSkills.ZOMBIE_NAUTILUS_TIDE,
+                 FogDomainCreatureSkills.FOX_AMBUSH,
+                 FogDomainCreatureSkills.PIGLIN_GOLD,
+                 FogDomainCreatureSkills.COPPER_GOLEM_SPIN,
+                 FogDomainCreatureSkills.CREAKING_STRIKE,
+                 FogDomainCreatureSkills.SILVERFISH_SWARM -> {
+                if (target != null) {
+                    damage(player, target, 7);
+                    effect(target, MobEffects.SLOWNESS, 3, 0);
+                } else {
+                    effect(player, MobEffects.SPEED, 5, 1);
+                }
+                particles(level, ParticleTypes.CRIT,
+                        player.position().add(look.scale(2)).add(0, 1, 0),
+                        25, 0.8, 0.8, 0.8);
                 return true;
             }
         }
@@ -400,12 +521,109 @@ public final class FogDomainCreatureSkillCommands {
         return false;
     }
 
+    private static void damage(
+            ServerPlayer player,
+            LivingEntity target,
+            float amount
+    ) {
+        target.hurtServer(
+                (ServerLevel) player.level(),
+                player.damageSources().magic(),
+                amount
+        );
+    }
+
+    private static void effect(
+            LivingEntity target,
+            net.minecraft.world.effect.MobEffect effect,
+            int seconds,
+            int amplifier
+    ) {
+        target.addEffect(new MobEffectInstance(
+                effect, seconds * 20, amplifier
+        ));
+    }
+
+    private static void knockback(
+            ServerPlayer player,
+            LivingEntity target,
+            double strength
+    ) {
+        Vec3 direction = target.position().subtract(player.position());
+        if (direction.lengthSqr() < 0.01) return;
+
+        direction = direction.normalize();
+        target.push(direction.x * strength, 0.35, direction.z * strength);
+        target.hurtMarked = true;
+    }
+
+    private static List<LivingEntity> nearby(
+            ServerPlayer player,
+            double radius
+    ) {
+        ServerLevel level = (ServerLevel) player.level();
+
+        return level.getEntitiesOfClass(
+                LivingEntity.class,
+                player.getBoundingBox().inflate(radius),
+                entity -> entity != player
+                        && entity.isAlive()
+                        && !(entity instanceof ServerPlayer p && isController(p))
+        );
+    }
+
+    private static void areaDamage(
+            ServerPlayer player,
+            double radius,
+            float damage,
+            double knockback
+    ) {
+        for (LivingEntity target : nearby(player, radius)) {
+            damage(player, target, damage);
+            knockback(player, target, knockback);
+        }
+    }
+
+    private static void coneDamage(
+            ServerPlayer player,
+            double range,
+            float damage
+    ) {
+        Vec3 look = player.getLookAngle().normalize();
+
+        for (LivingEntity target : nearby(player, range)) {
+            Vec3 delta = target.getBoundingBox().getCenter()
+                    .subtract(player.getEyePosition());
+
+            if (delta.lengthSqr() > range * range) continue;
+
+            if (delta.normalize().dot(look) > 0.55) {
+                damage(player, target, damage);
+            }
+        }
+    }
+
+    private static void particles(
+            ServerLevel level,
+            net.minecraft.core.particles.ParticleOptions particle,
+            Vec3 position,
+            int count,
+            double x,
+            double y,
+            double z
+    ) {
+        level.sendParticles(
+                particle,
+                position.x, position.y, position.z,
+                count, x, y, z, 0.08
+        );
+    }
+
     private static LivingEntity findTarget(
             ServerPlayer player,
             double range
     ) {
         ServerLevel level = (ServerLevel) player.level();
-
         Vec3 eye = player.getEyePosition();
         Vec3 look = player.getLookAngle().normalize();
 
@@ -417,27 +635,21 @@ public final class FogDomainCreatureSkillCommands {
                 entity -> entity != player
                         && entity.isAlive()
                         && !entity.isRemoved()
-                        && !(entity instanceof ServerPlayer p
-                        && isController(p))
+                        && !(entity instanceof ServerPlayer p && isController(p))
         );
 
         LivingEntity best = null;
         double bestDistance = range;
 
         for (LivingEntity entity : entities) {
-            Vec3 delta = entity.getBoundingBox()
-                    .getCenter().subtract(eye);
-
+            Vec3 delta = entity.getBoundingBox().getCenter().subtract(eye);
             double projection = delta.dot(look);
 
-            if (projection < 0.0D || projection > range) {
-                continue;
-            }
+            if (projection < 0 || projection > range) continue;
 
             Vec3 closest = eye.add(look.scale(projection));
 
-            if (entity.getBoundingBox().getCenter()
-                    .distanceTo(closest) > 1.5D) {
+            if (entity.getBoundingBox().getCenter().distanceTo(closest) > 1.5) {
                 continue;
             }
 
@@ -450,96 +662,41 @@ public final class FogDomainCreatureSkillCommands {
         return best;
     }
 
-    private static void areaDamage(
-            ServerPlayer player,
-            double radius,
-            float damage,
-            double knockback
-    ) {
-        ServerLevel level = (ServerLevel) player.level();
-
-        AABB area = player.getBoundingBox().inflate(radius);
-
-        List<LivingEntity> entities = level.getEntitiesOfClass(
-                LivingEntity.class,
-                area,
-                entity -> entity != player
-                        && entity.isAlive()
-                        && !(entity instanceof ServerPlayer p
-                        && isController(p))
-        );
-
-        for (LivingEntity target : entities) {
-            target.hurtServer(
-                    level,
-                    player.damageSources().magic(),
-                    damage
-            );
-
-            Vec3 direction = target.position()
-                    .subtract(player.position());
-
-            if (direction.lengthSqr() > 0.01D) {
-                Vec3 normalized = direction.normalize();
-
-                target.push(
-                        normalized.x * knockback,
-                        0.35D,
-                        normalized.z * knockback
-                );
-
-                target.hurtMarked = true;
-            }
-        }
-    }
-
     @SubscribeEvent
     public static void registerCommands(RegisterCommandsEvent event) {
         event.getDispatcher().register(
                 Commands.literal("fogskill")
-
                         .then(Commands.literal("created")
                                 .executes(context ->
-                                        cycleSkill(
-                                                context.getSource()
-                                                        .getPlayerOrException()
-                                        )
+                                        cycleSkill(context.getSource()
+                                                .getPlayerOrException())
                                 )
                         )
-
                         .then(Commands.literal("creaturelist")
                                 .executes(context ->
-                                        showList(
-                                                context.getSource()
-                                                        .getPlayerOrException()
-                                        )
+                                        showList(context.getSource()
+                                                .getPlayerOrException())
                                 )
                         )
-
                         .then(Commands.literal("creaturecast")
                                 .executes(context ->
-                                        useSelectedSkill(
-                                                context.getSource()
-                                                        .getPlayerOrException()
-                                        )
+                                        useSelectedSkill(context.getSource()
+                                                .getPlayerOrException())
                                 )
                         )
-
                         .then(Commands.literal("creatureuse")
                                 .then(Commands.argument(
                                         "number",
                                         IntegerArgumentType.integer(1)
-                                )
-                                        .executes(context ->
-                                                useSkillByNumber(
-                                                        context.getSource()
-                                                                .getPlayerOrException(),
-                                                        IntegerArgumentType.getInteger(
-                                                                context, "number"
-                                                        )
+                                ).executes(context ->
+                                        useSkillByNumber(
+                                                context.getSource()
+                                                        .getPlayerOrException(),
+                                                IntegerArgumentType.getInteger(
+                                                        context, "number"
                                                 )
                                         )
-                                )
+                                ))
                         )
         );
     }

@@ -191,144 +191,144 @@ public final class FogDomainBlackHole {
      *
      * Trả về true nếu loài đó thuộc nhóm này.
      */
-    private static boolean absorbFriendly(
-            ServerPlayer player,
-            Mob mob,
-            String typeId
-    ) {
-        switch (typeId) {
+    
+private static boolean absorbFriendly(
+        ServerPlayer player,
+        Mob mob,
+        String typeId
+) {
+    switch (typeId) {
 
-            // Hồi phục
-            case "minecraft:axolotl":
-            case "minecraft:mooshroom":
-            case "minecraft:sniffer":
-                player.addEffect(new MobEffectInstance(
-                        MobEffects.REGENERATION,
-                        EFFECT_DURATION,
-                        1
-                ));
-                break;
+        // Hồi phục
+        case "minecraft:axolotl":
+        case "minecraft:mooshroom":
+        case "minecraft:sniffer":
+            player.addEffect(new MobEffectInstance(
+                    MobEffects.REGENERATION,
+                    EFFECT_DURATION,
+                    1
+            ));
+            break;
 
-            // Tốc độ
-            case "minecraft:bee":
-            case "minecraft:dolphin":
-            case "minecraft:horse":
-            case "minecraft:donkey":
-            case "minecraft:mule":
-            case "minecraft:ocelot":
-            case "minecraft:cat":
-            case "minecraft:rabbit":
-                player.addEffect(new MobEffectInstance(
-                        MobEffects.SPEED,
-                        EFFECT_DURATION,
-                        1
-                ));
-                break;
+        // Tốc độ
+        case "minecraft:bee":
+        case "minecraft:dolphin":
+        case "minecraft:horse":
+        case "minecraft:donkey":
+        case "minecraft:mule":
+        case "minecraft:ocelot":
+        case "minecraft:cat":
+        case "minecraft:rabbit":
+            player.addEffect(new MobEffectInstance(
+                    MobEffects.SPEED,
+                    EFFECT_DURATION,
+                    1
+            ));
+            break;
 
-            // Sức mạnh
-            case "minecraft:wolf":
-            case "minecraft:polar_bear":
-            case "minecraft:goat":
-            case "minecraft:llama":
-            case "minecraft:panda":
-                player.addEffect(new MobEffectInstance(
-                        MobEffects.STRENGTH,
-                        EFFECT_DURATION,
-                        1
-                ));
-                break;
+        // Sức mạnh
+        case "minecraft:wolf":
+        case "minecraft:polar_bear":
+        case "minecraft:goat":
+        case "minecraft:llama":
+        case "minecraft:panda":
+            player.addEffect(new MobEffectInstance(
+                    MobEffects.STRENGTH,
+                    EFFECT_DURATION,
+                    1
+            ));
+            break;
 
-            // Kháng sát thương
-            case "minecraft:turtle":
-            case "minecraft:armadillo":
-            case "minecraft:camel":
-            case "minecraft:iron_golem":
-            case "minecraft:snow_golem":
-                player.addEffect(new MobEffectInstance(
-                        MobEffects.RESISTANCE,
-                        EFFECT_DURATION,
-                        1
-                ));
-                break;
+        // Kháng sát thương
+        case "minecraft:turtle":
+        case "minecraft:armadillo":
+        case "minecraft:camel":
+        case "minecraft:iron_golem":
+        case "minecraft:snow_golem":
+            player.addEffect(new MobEffectInstance(
+                    MobEffects.RESISTANCE,
+                    EFFECT_DURATION,
+                    1
+            ));
+            break;
 
-            // Hơi thở dưới nước
-            case "minecraft:axolotl":
-            case "minecraft:squid":
-            case "minecraft:glow_squid":
-            case "minecraft:salmon":
-            case "minecraft:cod":
-            case "minecraft:tropical_fish":
-            case "minecraft:pufferfish":
-            case "minecraft:nautilus":
-                player.addEffect(new MobEffectInstance(
-                        MobEffects.WATER_BREATHING,
-                        EFFECT_DURATION,
-                        0
-                ));
-                break;
+        // Hơi thở dưới nước
+        case "minecraft:squid":
+        case "minecraft:glow_squid":
+        case "minecraft:salmon":
+        case "minecraft:cod":
+        case "minecraft:tropical_fish":
+        case "minecraft:pufferfish":
+        case "minecraft:nautilus":
+            player.addEffect(new MobEffectInstance(
+                    MobEffects.WATER_BREATHING,
+                    EFFECT_DURATION,
+                    0
+            ));
+            break;
 
-            // Kháng lửa
-            case "minecraft:strider":
-                player.addEffect(new MobEffectInstance(
-                        MobEffects.FIRE_RESISTANCE,
-                        EFFECT_DURATION,
-                        0
-                ));
-                break;
+        // Kháng lửa
+        case "minecraft:strider":
+            player.addEffect(new MobEffectInstance(
+                    MobEffects.FIRE_RESISTANCE,
+                    EFFECT_DURATION,
+                    0
+            ));
+            break;
 
-            // Nhảy cao
-            case "minecraft:frog":
-            case "minecraft:chicken":
-            case "minecraft:parrot":
-                player.addEffect(new MobEffectInstance(
-                        MobEffects.JUMP_BOOST,
-                        EFFECT_DURATION,
-                        1
-                ));
-                break;
+        // Nhảy cao
+        case "minecraft:frog":
+        case "minecraft:chicken":
+        case "minecraft:parrot":
+            player.addEffect(new MobEffectInstance(
+                    MobEffects.JUMP_BOOST,
+                    EFFECT_DURATION,
+                    1
+            ));
+            break;
 
-            // Sinh vật hỗ trợ: tăng máu hấp thụ
-            case "minecraft:allay":
-            case "minecraft:bat":
-            case "minecraft:villager":
-            case "minecraft:wandering_trader":
-            case "minecraft:happy_ghast":
-            case "minecraft:cow":
-            case "minecraft:sheep":
-            case "minecraft:pig":
-            case "minecraft:goat":
-            case "minecraft:fox":
-            case "minecraft:parrot":
-                player.addEffect(new MobEffectInstance(
-                        MobEffects.ABSORPTION,
-                        EFFECT_DURATION,
-                        1
-                ));
-                break;
+        // Hấp thụ sát thương
+        case "minecraft:allay":
+        case "minecraft:bat":
+        case "minecraft:villager":
+        case "minecraft:wandering_trader":
+        case "minecraft:happy_ghast":
+        case "minecraft:cow":
+        case "minecraft:sheep":
+        case "minecraft:pig":
+        case "minecraft:fox":
+            player.addEffect(new MobEffectInstance(
+                    MobEffects.ABSORPTION,
+                    EFFECT_DURATION,
+                    1
+            ));
+            break;
 
-            // Nhện được tính là trung lập theo thiết kế của bạn.
-            case "minecraft:spider":
-            case "minecraft:cave_spider":
-                player.addEffect(new MobEffectInstance(
-                        MobEffects.NIGHT_VISION,
-                        EFFECT_DURATION,
-                        0
-                ));
-                break;
+        // Cảm nhận trong bóng tối
+        case "minecraft:spider":
+        case "minecraft:cave_spider":
+            player.addEffect(new MobEffectInstance(
+                    MobEffects.NIGHT_VISION,
+                    EFFECT_DURATION,
+                    0
+            ));
+            break;
 
-            default:
-                return false;
-        }
-
-        mob.discard();
-
-        player.sendSystemMessage(Component.literal(
-                "Đã hấp thụ sinh vật thân thiện/trung lập: "
-                        + typeId
-                        + ". Bạn nhận được hiệu ứng có lợi."));
-
-        return true;
+        default:
+            return false;
     }
+
+    // Sinh vật biến mất sau khi trao hiệu ứng.
+    mob.discard();
+
+    player.sendSystemMessage(Component.literal(
+            "Đã hấp thụ sinh vật: "
+                    + typeId
+                    + ". Bạn nhận được hiệu ứng có lợi."
+    ));
+
+    return true;
+}
 
     private static void absorb(
             HoleData hole,

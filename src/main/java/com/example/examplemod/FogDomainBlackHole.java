@@ -6,6 +6,8 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -28,11 +30,10 @@ import java.util.UUID;
 public final class FogDomainBlackHole {
 
     private static final int DURATION = 40;
-
-    // Tầm hút phía trước người chơi.
     private static final double ABSORB_RANGE = 25.0D;
-
     private static final double CONE_DOT = 0.35D;
+
+    private static final int EFFECT_DURATION = 20 * 60;
 
     private static final Map<UUID, HoleData> ACTIVE = new HashMap<>();
 
@@ -60,10 +61,6 @@ public final class FogDomainBlackHole {
     private FogDomainBlackHole() {
     }
 
-    /**
-     * Hút một sinh vật đơn lẻ.
-     * Giữ lại hàm này để tương thích với mã cũ.
-     */
     public static boolean startSingle(ServerPlayer player, Mob target) {
         if (player == null || target == null
                 || !player.isAlive() || !target.isAlive()
@@ -86,7 +83,7 @@ public final class FogDomainBlackHole {
 
     /**
      * Thôn Phệ Vạn Vật:
-     * Hút sinh vật và người chơi ở phía trước tubi2531.
+     * Hút sinh vật và người chơi phía trước trong phạm vi 25 khối.
      */
     public static boolean startMass(ServerPlayer player) {
         if (player == null || !player.isAlive()) {
@@ -188,6 +185,151 @@ public final class FogDomainBlackHole {
         );
     }
 
+    /**
+     * Sinh vật thân thiện hoặc trung lập:
+     * biến mất và trao hiệu ứng có lợi cho người hấp thụ.
+     *
+     * Trả về true nếu loài đó thuộc nhóm này.
+     */
+    private static boolean absorbFriendly(
+            ServerPlayer player,
+            Mob mob,
+            String typeId
+    ) {
+        switch (typeId) {
+
+            // Hồi phục
+            case "minecraft:axolotl":
+            case "minecraft:mooshroom":
+            case "minecraft:sniffer":
+                player.addEffect(new MobEffectInstance(
+                        MobEffects.REGENERATION,
+                        EFFECT_DURATION,
+                        1
+                ));
+                break;
+
+            // Tốc độ
+            case "minecraft:bee":
+            case "minecraft:dolphin":
+            case "minecraft:horse":
+            case "minecraft:donkey":
+            case "minecraft:mule":
+            case "minecraft:ocelot":
+            case "minecraft:cat":
+            case "minecraft:rabbit":
+                player.addEffect(new MobEffectInstance(
+                        MobEffects.SPEED,
+                        EFFECT_DURATION,
+                        1
+                ));
+                break;
+
+            // Sức mạnh
+            case "minecraft:wolf":
+            case "minecraft:polar_bear":
+            case "minecraft:goat":
+            case "minecraft:llama":
+            case "minecraft:panda":
+                player.addEffect(new MobEffectInstance(
+                        MobEffects.STRENGTH,
+                        EFFECT_DURATION,
+                        1
+                ));
+                break;
+
+            // Kháng sát thương
+            case "minecraft:turtle":
+            case "minecraft:armadillo":
+            case "minecraft:camel":
+            case "minecraft:iron_golem":
+            case "minecraft:snow_golem":
+                player.addEffect(new MobEffectInstance(
+                        MobEffects.RESISTANCE,
+                        EFFECT_DURATION,
+                        1
+                ));
+                break;
+
+            // Hơi thở dưới nước
+            case "minecraft:axolotl":
+            case "minecraft:squid":
+            case "minecraft:glow_squid":
+            case "minecraft:salmon":
+            case "minecraft:cod":
+            case "minecraft:tropical_fish":
+            case "minecraft:pufferfish":
+            case "minecraft:nautilus":
+                player.addEffect(new MobEffectInstance(
+                        MobEffects.WATER_BREATHING,
+                        EFFECT_DURATION,
+                        0
+                ));
+                break;
+
+            // Kháng lửa
+            case "minecraft:strider":
+                player.addEffect(new MobEffectInstance(
+                        MobEffects.FIRE_RESISTANCE,
+                        EFFECT_DURATION,
+                        0
+                ));
+                break;
+
+            // Nhảy cao
+            case "minecraft:frog":
+            case "minecraft:chicken":
+            case "minecraft:parrot":
+                player.addEffect(new MobEffectInstance(
+                        MobEffects.JUMP_BOOST,
+                        EFFECT_DURATION,
+                        1
+                ));
+                break;
+
+            // Sinh vật hỗ trợ: tăng máu hấp thụ
+            case "minecraft:allay":
+            case "minecraft:bat":
+            case "minecraft:villager":
+            case "minecraft:wandering_trader":
+            case "minecraft:happy_ghast":
+            case "minecraft:cow":
+            case "minecraft:sheep":
+            case "minecraft:pig":
+            case "minecraft:goat":
+            case "minecraft:fox":
+            case "minecraft:parrot":
+                player.addEffect(new MobEffectInstance(
+                        MobEffects.ABSORPTION,
+                        EFFECT_DURATION,
+                        1
+                ));
+                break;
+
+            // Nhện được tính là trung lập theo thiết kế của bạn.
+            case "minecraft:spider":
+            case "minecraft:cave_spider":
+                player.addEffect(new MobEffectInstance(
+                        MobEffects.NIGHT_VISION,
+                        EFFECT_DURATION,
+                        0
+                ));
+                break;
+
+            default:
+                return false;
+        }
+
+        mob.discard();
+
+        player.sendSystemMessage(Component.literal(
+                "Đã hấp thụ sinh vật thân thiện/trung lập: "
+                        + typeId
+                        + ". Bạn nhận được hiệu ứng có lợi."));
+
+        return true;
+    }
+
     private static void absorb(
             HoleData hole,
             LivingEntity target
@@ -226,14 +368,15 @@ public final class FogDomainBlackHole {
 
         if (target instanceof ServerPlayer absorbedPlayer) {
 
-            // Người chơi giữ lại 50%, chủ nhân nhận 50%.
+            if (absorbedPlayer == player) {
+                return;
+            }
+
             data.transferPlayerPowers(
                     player.getUUID(),
                     absorbedPlayer.getUUID()
             );
 
-            // Người chơi bị hấp thụ chết theo cơ chế Minecraft
-            // và vẫn có thể hồi sinh bình thường.
             absorbedPlayer.hurtServer(
                     hole.level,
                     hole.level.damageSources().generic(),
@@ -247,7 +390,14 @@ public final class FogDomainBlackHole {
 
         } else if (target instanceof Mob mob) {
 
-            // Sinh vật chuyển toàn bộ sức mạnh cho tubi2531.
+            // Sinh vật thân thiện/trung lập: nhận hiệu ứng rồi biến mất.
+            if (absorbFriendly(player, mob, typeId)) {
+                player.setHealth(player.getMaxHealth());
+                player.getFoodData().setFoodLevel(20);
+                return;
+            }
+
+            // Sinh vật thù địch: chuyển toàn bộ sức mạnh.
             data.initializePower(mob.getUUID(), false);
 
             data.transferCreaturePowers(
@@ -257,24 +407,23 @@ public final class FogDomainBlackHole {
 
             data.addAbility(player.getUUID(), typeId);
 
-        // Mở khóa các kỹ năng riêng của sinh vật.
-        int unlockedSkills = data.unlockCreatureSkills(
-        player.getUUID(),
-        typeId
-);
+            int unlockedSkills = data.unlockCreatureSkills(
+                    player.getUUID(),
+                    typeId
+            );
 
-        // Sinh vật bị hấp thụ chết thật.
-        mob.discard();
+            mob.discard();
 
             player.sendSystemMessage(Component.literal(
-                    "Đã hấp thụ sinh vật: " + typeId
+                    "Đã hấp thụ sinh vật thù địch: "
+                            + typeId
+                            + " | Kỹ năng mới: "
+                            + unlockedSkills
                             + " | Tổng năng lực: "
                             + data.getAbilityCount(player.getUUID())));
         }
 
-        // Hồi máu cho tubi2531.
         player.setHealth(player.getMaxHealth());
-
         player.getFoodData().setFoodLevel(20);
     }
 

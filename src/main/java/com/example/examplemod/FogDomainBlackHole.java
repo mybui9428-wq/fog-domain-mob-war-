@@ -257,8 +257,14 @@ public final class FogDomainBlackHole {
 
             data.addAbility(player.getUUID(), typeId);
 
-            // Sinh vật bị hấp thụ chết thật.
-            mob.discard();
+        // Mở khóa các kỹ năng riêng của sinh vật.
+        int unlockedSkills = data.unlockCreatureSkills(
+        player.getUUID(),
+        typeId
+);
+
+        // Sinh vật bị hấp thụ chết thật.
+        mob.discard();
 
             player.sendSystemMessage(Component.literal(
                     "Đã hấp thụ sinh vật: " + typeId

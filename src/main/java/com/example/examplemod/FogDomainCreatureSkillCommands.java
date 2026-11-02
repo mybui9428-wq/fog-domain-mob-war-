@@ -4,10 +4,12 @@ package com.example.examplemod;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 
 import net.minecraft.commands.Commands;
+import net.minecraft.core.Holder;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
@@ -191,7 +193,6 @@ public final class FogDomainCreatureSkillCommands {
 
         switch (id) {
 
-            // Kỹ năng cũ
             case FogDomainCreatureSkills.CREEPER_EXPLOSION -> {
                 areaDamage(player, 4, 12, 3);
                 particles(level, ParticleTypes.EXPLOSION,
@@ -287,7 +288,6 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Wither
             case FogDomainCreatureSkills.WITHER_STORM -> {
                 areaDamage(player, 9, 12, 2);
                 for (LivingEntity e : nearby(player, 9)) {
@@ -299,7 +299,6 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Wither Skeleton
             case FogDomainCreatureSkills.WITHER_SKELETON_SLASH -> {
                 if (target == null) return false;
                 damage(player, target, 12);
@@ -311,7 +310,6 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Skeleton
             case FogDomainCreatureSkills.SKELETON_ARROW,
                  FogDomainCreatureSkills.BOGGED_ARROW,
                  FogDomainCreatureSkills.PILLAGER_CROSSBOW,
@@ -330,7 +328,6 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Zombie và biến thể
             case FogDomainCreatureSkills.ZOMBIE_HORDE,
                  FogDomainCreatureSkills.ZOMBIE_VILLAGER_CALL -> {
                 areaDamage(player, 6, 7, 1.2);
@@ -354,7 +351,6 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Drowned
             case FogDomainCreatureSkills.DROWNED_TIDAL -> {
                 areaDamage(player, 8, 8, 1.5);
                 for (LivingEntity e : nearby(player, 8)) {
@@ -368,7 +364,6 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Slime
             case FogDomainCreatureSkills.SLIME_BOUNCE,
                  FogDomainCreatureSkills.MAGMA_CUBE_BURN,
                  FogDomainCreatureSkills.SULFUR_CUBE_BLAST -> {
@@ -386,7 +381,6 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Bee
             case FogDomainCreatureSkills.BEE_STING -> {
                 if (target == null) return false;
                 damage(player, target, 5);
@@ -398,7 +392,6 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Kỹ năng lao tới / cận chiến
             case FogDomainCreatureSkills.GOAT_RAM,
                  FogDomainCreatureSkills.HOGLIN_CHARGE,
                  FogDomainCreatureSkills.RAVAGER_RAM,
@@ -423,12 +416,10 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Kỹ năng khống chế
             case FogDomainCreatureSkills.EVOKER_FANGS,
                  FogDomainCreatureSkills.SHULKER_PROJECTILE,
                  FogDomainCreatureSkills.GUARDIAN_LASER,
-                 FogDomainCreatureSkills.ELDER_GUARDIAN_LASER,
-                 FogDomainCreatureSkills.GHAST_FIREBALL -> {
+                 FogDomainCreatureSkills.ELDER_GUARDIAN_LASER -> {
                 if (target == null) return false;
                 damage(player, target, 13);
                 effect(target, MobEffects.SLOWNESS, 3, 1);
@@ -438,7 +429,6 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Kỹ năng dịch chuyển / lao nhanh
             case FogDomainCreatureSkills.DOLPHIN_DASH,
                  FogDomainCreatureSkills.PHANTOM_DIVE,
                  FogDomainCreatureSkills.VEX_DASH,
@@ -452,8 +442,7 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Hỗ trợ / phòng thủ
-            case FogDomainCreatureSkills.AXolotl_REGEN -> {
+            case FogDomainCreatureSkills.AXOLOTL_REGEN -> {
                 effect(player, MobEffects.REGENERATION, 8, 1);
                 particles(level, ParticleTypes.HEART,
                         player.position().add(0, 1, 0),
@@ -483,7 +472,6 @@ public final class FogDomainCreatureSkillCommands {
                 return true;
             }
 
-            // Các kỹ năng nguyên tố / sinh vật nhỏ
             case FogDomainCreatureSkills.LLAMA_SPIT,
                  FogDomainCreatureSkills.PUFFERFISH_POISON,
                  FogDomainCreatureSkills.FROG_TONGUE,
@@ -535,7 +523,7 @@ public final class FogDomainCreatureSkillCommands {
 
     private static void effect(
             LivingEntity target,
-            net.minecraft.world.effect.MobEffect effect,
+            Holder<MobEffect> effect,
             int seconds,
             int amplifier
     ) {

@@ -14,7 +14,6 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 public final class FogDomainAbilityData extends SavedData {
@@ -26,7 +25,6 @@ public final class FogDomainAbilityData extends SavedData {
     public static final String SKILL_TAME = "tame";
     public static final String SKILL_DEVOUR = "devour";
 
-    // Giữ nguyên các nhóm sức mạnh cũ để tương thích dữ liệu.
     public static final List<String> SKILLS = List.of(
             SKILL_ENERGY,
             SKILL_CAGE,
@@ -48,8 +46,6 @@ public final class FogDomainAbilityData extends SavedData {
     private static final Codec<Map<String, List<String>>> CREATURE_SKILLS_CODEC =
             Codec.unboundedMap(Codec.STRING, Codec.STRING.listOf());
 
-    // Lưu nguồn gốc kỹ năng:
-    // UUID người chơi -> mã kỹ năng -> danh sách loại sinh vật cung cấp.
     private static final Codec<Map<String, Map<String, List<String>>>>
             CREATURE_SKILL_SOURCES_CODEC =
             Codec.unboundedMap(
@@ -59,6 +55,10 @@ public final class FogDomainAbilityData extends SavedData {
                             Codec.STRING.listOf()
                     )
             );
+
+    private static final Codec<Map<String, String>>
+            SELECTED_CREATURE_SKILLS_CODEC =
+            Codec.unboundedMap(Codec.STRING, Codec.STRING);
 
     private static final Codec<Map<String, Double>> ENERGY_CODEC =
             Codec.unboundedMap(Codec.STRING, Codec.DOUBLE);
@@ -74,6 +74,9 @@ public final class FogDomainAbilityData extends SavedData {
 
     private static final Map<String, Map<String, List<String>>>
             EMPTY_SKILL_SOURCE_MAP = Map.of();
+
+    private static final Map<String, String> EMPTY_SELECTED_SKILLS_MAP =
+            Map.of();
 
     private static final Map<String, Double> EMPTY_ENERGY_MAP =
             Map.of();
@@ -104,6 +107,11 @@ public final class FogDomainAbilityData extends SavedData {
                                             EMPTY_SKILL_SOURCE_MAP)
                                             .forGetter(data -> data.creatureSkillSources),
 
+                                    SELECTED_CREATURE_SKILLS_CODEC.optionalFieldOf(
+                                            "selected_creature_skills",
+                                            EMPTY_SELECTED_SKILLS_MAP)
+                                            .forGetter(data -> data.selectedCreatureSkills),
+
                                     ENERGY_CODEC.optionalFieldOf(
                                             "energy",
                                             EMPTY_ENERGY_MAP)
@@ -130,6 +138,9 @@ public final class FogDomainAbilityData extends SavedData {
     private final Map<String, Map<String, List<String>>>
             creatureSkillSources = new HashMap<>();
 
+    private final Map<String, String> selectedCreatureSkills =
+            new HashMap<>();
+
     private final Map<String, Double> energy =
             new HashMap<>();
 
@@ -144,6 +155,7 @@ public final class FogDomainAbilityData extends SavedData {
             Map<String, Map<String, Double>> loadedPowers,
             Map<String, List<String>> loadedCreatureSkills,
             Map<String, Map<String, List<String>>> loadedSkillSources,
+            Map<String, String> loadedSelectedSkills,
             Map<String, Double> loadedEnergy,
             Map<String, Map<String, Long>> loadedCooldowns
     ) {
@@ -182,6 +194,16 @@ public final class FogDomainAbilityData extends SavedData {
             });
         }
 
+        if (loadedSelectedSkills != null) {
+            loadedSelectedSkills.forEach((playerId, skillId) -> {
+                if (playerId != null
+                        && skillId != null
+                        && !skillId.isBlank()) {
+                    selectedCreatureSkills.put(playerId, skillId);
+                }
+            });
+        }
+
         if (loadedEnergy != null) {
             energy.putAll(loadedEnergy);
         }
@@ -194,7 +216,6 @@ public final class FogDomainAbilityData extends SavedData {
             });
         }
 
-        // Làm sạch các kỹ năng cũ bị trùng trong dữ liệu đã lưu.
         creatureSkills.replaceAll((id, list) ->
                 new ArrayList<>(new LinkedHashSet<>(list))
         );
@@ -212,7 +233,7 @@ public final class FogDomainAbilityData extends SavedData {
             if (id != null && list != null) {
                 destination.put(
                         id,
-                        new ArrayList<>(list)
+                        new ArrayList<>(new LinkedHashSet<>(list))
                 );
             }
         });
@@ -358,11 +379,6 @@ public final class FogDomainAbilityData extends SavedData {
 
     // -------------------- KỸ NĂNG SINH VẬT --------------------
 
-    /**
-     * Mở khóa kỹ năng của sinh vật.
-     * Không thêm kỹ năng trùng vào danh sách sử dụng.
-     * Vẫn lưu lại nguồn gốc của kỹ năng.
-     */
     public int unlockCreatureSkills(
             UUID playerId,
             String entityTypeId
@@ -400,7 +416,6 @@ public final class FogDomainAbilityData extends SavedData {
                 continue;
             }
 
-            // Ghi nhận sinh vật đã cung cấp kỹ năng này.
             List<String> skillSources = sources.computeIfAbsent(
                     skillId,
                     ignored -> new ArrayList<>()
@@ -410,11 +425,16 @@ public final class FogDomainAbilityData extends SavedData {
                 skillSources.add(entityTypeId);
             }
 
-            // Chỉ thêm một lần vào danh sách kỹ năng sử dụng.
             if (!owned.contains(skillId)) {
                 owned.add(skillId);
                 newlyUnlocked++;
             }
+        }
+
+        // Nếu chưa có kỹ năng được chọn, tự chọn kỹ năng đầu tiên.
+        if (!owned.isEmpty()
+                && !selectedCreatureSkills.containsKey(playerKey)) {
+            selectedCreatureSkills.put(playerKey, owned.get(0));
         }
 
         setDirty();
@@ -443,9 +463,6 @@ public final class FogDomainAbilityData extends SavedData {
         return owned.get(index);
     }
 
-    /**
-     * Trả về các loại sinh vật đã cung cấp một kỹ năng.
-     */
     public List<String> getCreatureSkillSources(
             UUID playerId,
             String skillId
@@ -462,6 +479,78 @@ public final class FogDomainAbilityData extends SavedData {
         return result == null
                 ? List.of()
                 : List.copyOf(result);
+    }
+
+    // -------------------- KỸ NĂNG ĐANG ĐƯỢC CHỌN --------------------
+
+    public String getSelectedCreatureSkill(UUID playerId) {
+        if (playerId == null) {
+            return null;
+        }
+
+        String playerKey = key(playerId);
+        String selected = selectedCreatureSkills.get(playerKey);
+
+        List<String> owned = creatureSkills.get(playerKey);
+
+        if (owned == null || owned.isEmpty()) {
+            return null;
+        }
+
+        if (selected != null && owned.contains(selected)) {
+            return selected;
+        }
+
+        // Tự sửa lựa chọn nếu kỹ năng cũ không còn trong danh sách.
+        selected = owned.get(0);
+        selectedCreatureSkills.put(playerKey, selected);
+        setDirty();
+
+        return selected;
+    }
+
+    public boolean setSelectedCreatureSkill(
+            UUID playerId,
+            String skillId
+    ) {
+        if (playerId == null
+                || skillId == null
+                || skillId.isBlank()) {
+            return false;
+        }
+
+        List<String> owned = getCreatureSkills(playerId);
+
+        if (!owned.contains(skillId)) {
+            return false;
+        }
+
+        selectedCreatureSkills.put(key(playerId), skillId);
+        setDirty();
+
+        return true;
+    }
+
+    public String cycleCreatureSkill(UUID playerId) {
+        if (playerId == null) {
+            return null;
+        }
+
+        List<String> owned = getCreatureSkills(playerId);
+
+        if (owned.isEmpty()) {
+            return null;
+        }
+
+        String current = getSelectedCreatureSkill(playerId);
+        int currentIndex = owned.indexOf(current);
+
+        int nextIndex = (currentIndex + 1) % owned.size();
+        String nextSkill = owned.get(nextIndex);
+
+        setSelectedCreatureSkill(playerId, nextSkill);
+
+        return nextSkill;
     }
 
     // -------------------- NĂNG LƯỢNG --------------------

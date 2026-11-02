@@ -19,7 +19,6 @@ public final class FogDomainAbilityData extends SavedData {
 
     private static final String DATA_NAME = "fog_domain_abilities";
 
-    // Bốn kỹ năng có thể lựa chọn.
     public static final String SKILL_ENERGY = "energy";
     public static final String SKILL_CAGE = "cage";
     public static final String SKILL_TAME = "tame";
@@ -32,16 +31,35 @@ public final class FogDomainAbilityData extends SavedData {
             SKILL_DEVOUR
     );
 
-    // Danh sách năng lực đã hấp thụ.
+    public static final double MAX_ENERGY = 100.0D;
+
     private static final Codec<Map<String, List<String>>> ABILITIES_CODEC =
             Codec.unboundedMap(Codec.STRING, Codec.STRING.listOf());
 
-    // Sức mạnh được lưu riêng theo UUID và từng kỹ năng.
     private static final Codec<Map<String, Map<String, Double>>> POWERS_CODEC =
             Codec.unboundedMap(
                     Codec.STRING,
                     Codec.unboundedMap(Codec.STRING, Codec.DOUBLE)
             );
+
+    // Các kỹ năng riêng nhận được từ sinh vật.
+    private static final Codec<Map<String, List<String>>> CREATURE_SKILLS_CODEC =
+            Codec.unboundedMap(Codec.STRING, Codec.STRING.listOf());
+
+    // Năng lượng hiện tại của từng người chơi.
+    private static final Codec<Map<String, Double>> ENERGY_CODEC =
+            Codec.unboundedMap(Codec.STRING, Codec.DOUBLE);
+
+    // Thời điểm hết hồi chiêu của từng kỹ năng.
+    private static final Codec<Map<String, Map<String, Long>>> COOLDOWNS_CODEC =
+            Codec.unboundedMap(
+                    Codec.STRING,
+                    Codec.unboundedMap(Codec.STRING, Codec.LONG)
+            );
+
+    private static final Map<String, List<String>> EMPTY_SKILL_MAP = Map.of();
+    private static final Map<String, Double> EMPTY_ENERGY_MAP = Map.of();
+    private static final Map<String, Map<String, Long>> EMPTY_COOLDOWN_MAP = Map.of();
 
     public static final SavedDataType<FogDomainAbilityData> TYPE =
             new SavedDataType<>(
@@ -53,38 +71,77 @@ public final class FogDomainAbilityData extends SavedData {
                                             .forGetter(data -> data.abilities),
 
                                     POWERS_CODEC.optionalFieldOf("powers", Map.of())
-                                            .forGetter(data -> data.powers)
+                                            .forGetter(data -> data.powers),
+
+                                    CREATURE_SKILLS_CODEC.optionalFieldOf(
+                                            "creature_skills", EMPTY_SKILL_MAP)
+                                            .forGetter(data -> data.creatureSkills),
+
+                                    ENERGY_CODEC.optionalFieldOf(
+                                            "energy", EMPTY_ENERGY_MAP)
+                                            .forGetter(data -> data.energy),
+
+                                    COOLDOWNS_CODEC.optionalFieldOf(
+                                            "cooldowns", EMPTY_COOLDOWN_MAP)
+                                            .forGetter(data -> data.cooldowns)
                             ).apply(instance, FogDomainAbilityData::new)
                     )
             );
 
     private final Map<String, List<String>> abilities = new HashMap<>();
+    private final Map<String, Map<String, Double>> powers = new HashMap<>();
 
-    private final Map<String, Map<String, Double>> powers =
-            new HashMap<>();
+    private final Map<String, List<String>> creatureSkills = new HashMap<>();
+    private final Map<String, Double> energy = new HashMap<>();
+    private final Map<String, Map<String, Long>> cooldowns = new HashMap<>();
 
     public FogDomainAbilityData() {
     }
 
     private FogDomainAbilityData(
             Map<String, List<String>> loadedAbilities,
-            Map<String, Map<String, Double>> loadedPowers
+            Map<String, Map<String, Double>> loadedPowers,
+            Map<String, List<String>> loadedCreatureSkills,
+            Map<String, Double> loadedEnergy,
+            Map<String, Map<String, Long>> loadedCooldowns
     ) {
-        if (loadedAbilities != null) {
-            loadedAbilities.forEach((id, list) -> {
-                if (id != null && list != null) {
-                    abilities.put(id, new ArrayList<>(list));
+        copyLists(loadedAbilities, abilities);
+        copyLists(loadedCreatureSkills, creatureSkills);
+
+        if (loadedPowers != null) {
+            loadedPowers.forEach((id, map) -> {
+                if (id != null && map != null) {
+                    powers.put(id, new HashMap<>(map));
                 }
             });
         }
 
-        if (loadedPowers != null) {
-            loadedPowers.forEach((id, skillMap) -> {
-                if (id != null && skillMap != null) {
-                    powers.put(id, new HashMap<>(skillMap));
+        if (loadedEnergy != null) {
+            energy.putAll(loadedEnergy);
+        }
+
+        if (loadedCooldowns != null) {
+            loadedCooldowns.forEach((id, map) -> {
+                if (id != null && map != null) {
+                    cooldowns.put(id, new HashMap<>(map));
                 }
             });
         }
+    }
+
+    private static void copyLists(
+            Map<String, List<String>> source,
+            Map<String, List<String>> destination
+    ) {
+        if (source == null) {
+            return;
+        }
+
+        source.forEach((id, list) -> {
+            if (id != null && list != null) {
+                destination.put(id, new ArrayList<>(list));
+            }
+        });
     }
 
     public static FogDomainAbilityData get(MinecraftServer server) {
@@ -95,11 +152,8 @@ public final class FogDomainAbilityData extends SavedData {
         return entityId.toString();
     }
 
-    /**
-     * Khởi tạo sức mạnh cho một người chơi hoặc sinh vật.
-     * Controller tubi2531 bắt đầu 10 điểm mỗi kỹ năng.
-     * Những đối tượng khác bắt đầu 100 điểm mỗi kỹ năng.
-     */
+    // -------------------- SỨC MẠNH --------------------
+
     public void initializePower(UUID entityId, boolean isController) {
         String id = key(entityId);
 
@@ -121,9 +175,6 @@ public final class FogDomainAbilityData extends SavedData {
         }
     }
 
-    /**
-     * Lấy sức mạnh của một kỹ năng.
-     */
     public double getPower(UUID entityId, String skill) {
         Map<String, Double> skillMap = powers.get(key(entityId));
 
@@ -134,9 +185,6 @@ public final class FogDomainAbilityData extends SavedData {
         return skillMap.getOrDefault(skill, 0.0D);
     }
 
-    /**
-     * Cộng sức mạnh. Không giới hạn số lần cộng dồn.
-     */
     public void addPower(UUID entityId, String skill, double amount) {
         if (amount <= 0.0D) {
             return;
@@ -145,15 +193,10 @@ public final class FogDomainAbilityData extends SavedData {
         Map<String, Double> skillMap =
                 powers.computeIfAbsent(key(entityId), ignored -> new HashMap<>());
 
-        double current = skillMap.getOrDefault(skill, 0.0D);
-        skillMap.put(skill, current + amount);
-
+        skillMap.put(skill, skillMap.getOrDefault(skill, 0.0D) + amount);
         setDirty();
     }
 
-    /**
-     * Đặt sức mạnh của một kỹ năng.
-     */
     public void setPower(UUID entityId, String skill, double amount) {
         Map<String, Double> skillMap =
                 powers.computeIfAbsent(key(entityId), ignored -> new HashMap<>());
@@ -162,11 +205,6 @@ public final class FogDomainAbilityData extends SavedData {
         setDirty();
     }
 
-    /**
-     * Người chơi bị hấp thụ:
-     * Người đó giữ lại một nửa sức mạnh từng kỹ năng.
-     * tubi2531 nhận nửa còn lại.
-     */
     public void transferPlayerPowers(UUID ownerId, UUID targetId) {
         initializePower(ownerId, true);
         initializePower(targetId, false);
@@ -182,63 +220,169 @@ public final class FogDomainAbilityData extends SavedData {
         setDirty();
     }
 
-    /**
-     * Sinh vật bị hấp thụ:
-     * tubi2531 nhận toàn bộ sức mạnh của sinh vật.
-     */
     public void transferCreaturePowers(UUID ownerId, UUID creatureId) {
         initializePower(ownerId, true);
         initializePower(creatureId, false);
 
         for (String skill : SKILLS) {
-            double creaturePower = getPower(creatureId, skill);
-            addPower(ownerId, skill, creaturePower);
+            addPower(ownerId, skill, getPower(creatureId, skill));
         }
 
         setDirty();
     }
 
-    /**
-     * Lưu năng lực đã hấp thụ.
-     * Cho phép trùng lặp để năng lực có thể cộng dồn.
-     */
+    // -------------------- NĂNG LỰC ĐÃ HẤP THỤ --------------------
+
     public boolean addAbility(UUID playerId, String entityTypeId) {
         if (playerId == null || entityTypeId == null || entityTypeId.isBlank()) {
             return false;
         }
 
-        List<String> owned =
-                abilities.computeIfAbsent(key(playerId), ignored -> new ArrayList<>());
+        abilities.computeIfAbsent(key(playerId), ignored -> new ArrayList<>())
+                .add(entityTypeId);
 
-        owned.add(entityTypeId);
         setDirty();
-
         return true;
     }
 
     public boolean hasAbility(UUID playerId, String entityTypeId) {
         List<String> owned = abilities.get(key(playerId));
-
         return owned != null && owned.contains(entityTypeId);
     }
 
     public List<String> getAbilities(UUID playerId) {
         List<String> owned = abilities.get(key(playerId));
-
-        if (owned == null) {
-            return List.of();
-        }
-
-        return List.copyOf(owned);
+        return owned == null ? List.of() : List.copyOf(owned);
     }
 
     public int getAbilityCount(UUID playerId) {
         return getAbilities(playerId).size();
     }
 
+    // -------------------- KỸ NĂNG SINH VẬT --------------------
+
     /**
-     * Tính tổng sức mạnh của bốn kỹ năng.
+     * Mở khóa các kỹ năng của loại sinh vật đã hấp thụ.
+     * Kỹ năng trùng lặp được giữ lại để có thể cộng dồn.
      */
+    public int unlockCreatureSkills(UUID playerId, String entityTypeId) {
+        if (playerId == null || entityTypeId == null || entityTypeId.isBlank()) {
+            return 0;
+        }
+
+        List<String> unlocked = FogDomainCreatureSkills.getSkills(entityTypeId);
+
+        if (unlocked.isEmpty()) {
+            return 0;
+        }
+
+        List<String> owned = creatureSkills.computeIfAbsent(
+                key(playerId), ignored -> new ArrayList<>());
+
+        owned.addAll(unlocked);
+        setDirty();
+
+        return unlocked.size();
+    }
+
+    public List<String> getCreatureSkills(UUID playerId) {
+        List<String> owned = creatureSkills.get(key(playerId));
+        return owned == null ? List.of() : List.copyOf(owned);
+    }
+
+    public int getCreatureSkillCount(UUID playerId) {
+        return getCreatureSkills(playerId).size();
+    }
+
+    public String getCreatureSkillAt(UUID playerId, int index) {
+        List<String> owned = getCreatureSkills(playerId);
+
+        if (index < 0 || index >= owned.size()) {
+            return null;
+        }
+
+        return owned.get(index);
+    }
+
+    // -------------------- NĂNG LƯỢNG --------------------
+
+    public double getEnergy(UUID playerId) {
+        return energy.getOrDefault(key(playerId), MAX_ENERGY);
+    }
+
+    public void setEnergy(UUID playerId, double amount) {
+        energy.put(
+                key(playerId),
+                Math.max(0.0D, Math.min(MAX_ENERGY, amount))
+        );
+        setDirty();
+    }
+
+    public boolean consumeEnergy(UUID playerId, double amount) {
+        if (amount <= 0.0D) {
+            return true;
+        }
+
+        double current = getEnergy(playerId);
+
+        if (current < amount) {
+            return false;
+        }
+
+        setEnergy(playerId, current - amount);
+        return true;
+    }
+
+    public void regenerateEnergy(UUID playerId, double amount) {
+        if (amount <= 0.0D) {
+            return;
+        }
+
+        setEnergy(playerId, getEnergy(playerId) + amount);
+    }
+
+    // -------------------- HỒI CHIÊU RIÊNG --------------------
+
+    public boolean isOnCooldown(
+            UUID playerId,
+            String skillId,
+            long currentGameTime
+    ) {
+        return getCooldownRemaining(playerId, skillId, currentGameTime) > 0L;
+    }
+
+    public long getCooldownRemaining(
+            UUID playerId,
+            String skillId,
+            long currentGameTime
+    ) {
+        Map<String, Long> playerCooldowns = cooldowns.get(key(playerId));
+
+        if (playerCooldowns == null) {
+            return 0L;
+        }
+
+        long expiry = playerCooldowns.getOrDefault(skillId, 0L);
+        return Math.max(0L, expiry - currentGameTime);
+    }
+
+    public void startCooldown(
+            UUID playerId,
+            String skillId,
+            long currentGameTime,
+            long durationTicks
+    ) {
+        if (playerId == null || skillId == null || durationTicks <= 0L) {
+            return;
+        }
+
+        Map<String, Long> playerCooldowns =
+                cooldowns.computeIfAbsent(key(playerId), ignored -> new HashMap<>());
+
+        playerCooldowns.put(skillId, currentGameTime + durationTicks);
+        setDirty();
+    }
+
     public double getTotalPower(UUID entityId) {
         double total = 0.0D;
 

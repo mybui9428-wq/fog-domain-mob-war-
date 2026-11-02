@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
@@ -18,7 +19,12 @@ public final class FogPossessionClient {
     private FogPossessionClient() {
     }
 
-    private static void onClientTick(ClientTickEvent.Post event) {
+    // Được cập nhật khi client nhận gói đồng bộ từ server.
+    public static boolean soulMode = false;
+
+    @SubscribeEvent
+    public static void onClientTick(ClientTickEvent.Post event) {
+
         Minecraft minecraft = Minecraft.getInstance();
 
         if (minecraft.player == null || minecraft.level == null) {
@@ -27,7 +33,14 @@ public final class FogPossessionClient {
 
         Entity camera = minecraft.getCameraEntity();
 
-        if (camera == null || camera == minecraft.player) {
+        if (camera == null) {
+            return;
+        }
+
+        // Bình thường không gửi gói điều khiển.
+        // Khi nhập xác: camera là sinh vật.
+        // Khi xuất hồn: soulMode bật dù camera vẫn là người chơi.
+        if (camera == minecraft.player && !soulMode) {
             return;
         }
 

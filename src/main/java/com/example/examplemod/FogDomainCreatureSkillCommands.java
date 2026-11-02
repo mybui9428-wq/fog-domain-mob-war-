@@ -38,8 +38,9 @@ public final class FogDomainCreatureSkillCommands {
             return 0;
         }
 
+        ServerLevel level = (ServerLevel) player.level();
         FogDomainAbilityData data =
-                FogDomainAbilityData.get(player.server);
+                FogDomainAbilityData.get(level.getServer());
 
         List<String> skills =
                 data.getCreatureSkills(player.getUUID());
@@ -72,8 +73,9 @@ public final class FogDomainCreatureSkillCommands {
             return 0;
         }
 
+        ServerLevel level = (ServerLevel) player.level();
         FogDomainAbilityData data =
-                FogDomainAbilityData.get(player.server);
+                FogDomainAbilityData.get(level.getServer());
 
         String skillId = data.getCreatureSkillAt(
                 player.getUUID(), number - 1);
@@ -84,7 +86,6 @@ public final class FogDomainCreatureSkillCommands {
             return 0;
         }
 
-        ServerLevel level = (ServerLevel) player.level();
         long gameTime = level.getGameTime();
 
         long remaining = data.getCooldownRemaining(
@@ -106,7 +107,6 @@ public final class FogDomainCreatureSkillCommands {
         }
 
         // Kỹ năng sinh vật không tiêu hao năng lượng.
-        // Mỗi kỹ năng có thời gian hồi chiêu riêng.
         long cooldown = getCooldown(skillId);
 
         data.startCooldown(
@@ -146,7 +146,6 @@ public final class FogDomainCreatureSkillCommands {
         ServerLevel level = (ServerLevel) player.level();
 
         Vec3 look = player.getLookAngle().normalize();
-
         LivingEntity target = findTarget(player, 25.0D);
 
         switch (skillId) {
@@ -309,7 +308,7 @@ public final class FogDomainCreatureSkillCommands {
                 areaDamage(player, 8.0D, 18.0F, 2.0D);
 
                 level.sendParticles(
-                        ParticleTypes.DRAGON_BREATH,
+                        ParticleTypes.PORTAL,
                         player.getX() + look.x * 3.0D,
                         player.getY() + 1.0D + look.y * 3.0D,
                         player.getZ() + look.z * 3.0D,
@@ -402,10 +401,12 @@ public final class FogDomainCreatureSkillCommands {
                     .subtract(player.position());
 
             if (direction.lengthSqr() > 0.01D) {
+                Vec3 normalized = direction.normalize();
+
                 target.push(
-                        direction.normalize().x * knockback,
+                        normalized.x * knockback,
                         0.35D,
-                        direction.normalize().z * knockback
+                        normalized.z * knockback
                 );
                 target.hurtMarked = true;
             }

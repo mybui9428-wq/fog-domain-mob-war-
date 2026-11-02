@@ -62,8 +62,8 @@ public final class FogDomainPassive {
     }
 
     private static boolean isController(ServerPlayer player) {
-        return player.getGameProfile().getName()
-                .equalsIgnoreCase(CONTROLLER);
+        return player.getName().getString()
+        .equalsIgnoreCase(CONTROLLER);
     }
 
     /**
@@ -259,8 +259,8 @@ public final class FogDomainPassive {
             return;
         }
 
-        FogDomainAbilityData data =
-                FogDomainAbilityData.get(player.server);
+      FogDomainAbilityData data =
+        FogDomainAbilityData.get(player.getServer());
 
         data.initializePower(player.getUUID(), true);
 
@@ -268,7 +268,7 @@ public final class FogDomainPassive {
                 .getKey(target.getType())
                 .toString();
 
-        player.serverLevel().sendParticles(
+        ((ServerLevel) player.level()).sendParticles(
                 ParticleTypes.SOUL,
                 target.getX(),
                 target.getY() + target.getBbHeight() * 0.5D,

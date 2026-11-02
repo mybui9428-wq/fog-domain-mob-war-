@@ -29,8 +29,13 @@ public final class FogDomainCreatureSkillCommands {
     }
 
     private static boolean isController(ServerPlayer player) {
-        return player.getName().getString()
-                .equalsIgnoreCase("tubi2531");
+        return player.getName().getString().equalsIgnoreCase("tubi2531");
+    }
+
+    private static FogDomainAbilityData getData(ServerPlayer player) {
+        return FogDomainAbilityData.get(
+                ((ServerLevel) player.level()).getServer()
+        );
     }
 
     private static int showList(ServerPlayer player) {
@@ -38,63 +43,132 @@ public final class FogDomainCreatureSkillCommands {
             return 0;
         }
 
-        ServerLevel level = (ServerLevel) player.level();
-        FogDomainAbilityData data =
-                FogDomainAbilityData.get(level.getServer());
-
-        List<String> skills =
-                data.getCreatureSkills(player.getUUID());
+        FogDomainAbilityData data = getData(player);
+        List<String> skills = data.getCreatureSkills(player.getUUID());
+        String selected = data.getSelectedCreatureSkill(player.getUUID());
 
         player.sendSystemMessage(Component.literal(
-                "===== KỸ NĂNG SINH VẬT ====="));
+                "===== KỸ NĂNG SINH VẬT ====="
+        ));
 
         if (skills.isEmpty()) {
             player.sendSystemMessage(Component.literal(
-                    "Bạn chưa mở khóa kỹ năng sinh vật nào."));
+                    "Bạn chưa mở khóa kỹ năng sinh vật nào."
+            ));
             return 1;
         }
 
         for (int i = 0; i < skills.size(); i++) {
             String id = skills.get(i);
+            boolean isSelected = id.equals(selected);
 
             player.sendSystemMessage(Component.literal(
                     (i + 1) + ". "
-                            + FogDomainCreatureSkills.getSkillName(id)));
+                            + FogDomainCreatureSkills.getSkillName(id)
+                            + (isSelected ? " [ĐANG CHỌN]" : "")
+            ));
         }
 
         player.sendSystemMessage(Component.literal(
-                "Dùng /fogskill creatureuse <số> để sử dụng."));
+                "Dùng /fogskill created để đổi kỹ năng."
+        ));
+
+        player.sendSystemMessage(Component.literal(
+                "Dùng /fogskill creaturecast để sử dụng kỹ năng đang chọn."
+        ));
+
+        player.sendSystemMessage(Component.literal(
+                "Hoặc dùng /fogskill creatureuse <số>."
+        ));
 
         return 1;
     }
 
-    private static int useSkill(ServerPlayer player, int number) {
+    private static int cycleSkill(ServerPlayer player) {
         if (!isController(player)) {
             return 0;
         }
 
-        ServerLevel level = (ServerLevel) player.level();
-        FogDomainAbilityData data =
-                FogDomainAbilityData.get(level.getServer());
+        FogDomainAbilityData data = getData(player);
+
+        String nextSkill = data.cycleCreatureSkill(player.getUUID());
+
+        if (nextSkill == null) {
+            player.sendSystemMessage(Component.literal(
+                    "Bạn chưa mở khóa kỹ năng sinh vật nào."
+            ));
+            return 0;
+        }
+
+        player.sendSystemMessage(Component.literal(
+                "Đã đổi sang: "
+                        + FogDomainCreatureSkills.getSkillName(nextSkill)
+        ));
+
+        return 1;
+    }
+
+    private static int useSelectedSkill(ServerPlayer player) {
+        if (!isController(player)) {
+            return 0;
+        }
+
+        FogDomainAbilityData data = getData(player);
+
+        String selected = data.getSelectedCreatureSkill(player.getUUID());
+
+        if (selected == null) {
+            player.sendSystemMessage(Component.literal(
+                    "Bạn chưa có kỹ năng sinh vật nào."
+            ));
+            return 0;
+        }
+
+        return useSkill(player, selected);
+    }
+
+    private static int useSkillByNumber(ServerPlayer player, int number) {
+        if (!isController(player)) {
+            return 0;
+        }
+
+        FogDomainAbilityData data = getData(player);
 
         String skillId = data.getCreatureSkillAt(
-                player.getUUID(), number - 1);
+                player.getUUID(),
+                number - 1
+        );
 
         if (skillId == null) {
             player.sendSystemMessage(Component.literal(
-                    "Số thứ tự kỹ năng không hợp lệ."));
+                    "Số thứ tự kỹ năng không hợp lệ."
+            ));
             return 0;
         }
+
+        data.setSelectedCreatureSkill(player.getUUID(), skillId);
+
+        return useSkill(player, skillId);
+    }
+
+    private static int useSkill(ServerPlayer player, String skillId) {
+        ServerLevel level = (ServerLevel) player.level();
+        FogDomainAbilityData data = getData(player);
 
         long gameTime = level.getGameTime();
 
         long remaining = data.getCooldownRemaining(
-                player.getUUID(), skillId, gameTime);
+                player.getUUID(),
+                skillId,
+                gameTime
+        );
 
         if (remaining > 0L) {
             player.sendSystemMessage(Component.literal(
                     "Kỹ năng còn hồi chiêu "
-                            + (remaining / 20 + 1) + " giây."));
+                            + ((remaining + 19L) / 20L)
+                            + " giây."
+            ));
             return 0;
         }
 
@@ -102,23 +176,22 @@ public final class FogDomainCreatureSkillCommands {
 
         if (!success) {
             player.sendSystemMessage(Component.literal(
-                    "Không thể sử dụng kỹ năng lúc này."));
+                    "Không thể sử dụng kỹ năng lúc này."
+            ));
             return 0;
         }
-
-        // Kỹ năng sinh vật không tiêu hao năng lượng.
-        long cooldown = getCooldown(skillId);
 
         data.startCooldown(
                 player.getUUID(),
                 skillId,
                 gameTime,
-                cooldown
+                getCooldown(skillId)
         );
 
         player.sendSystemMessage(Component.literal(
                 "Đã sử dụng: "
-                        + FogDomainCreatureSkills.getSkillName(skillId)));
+                        + FogDomainCreatureSkills.getSkillName(skillId)
+        ));
 
         return 1;
     }
@@ -152,6 +225,7 @@ public final class FogDomainCreatureSkillCommands {
 
             case FogDomainCreatureSkills.CREEPER_EXPLOSION -> {
                 areaDamage(player, 4.0D, 12.0F, 3.0D);
+
                 level.sendParticles(
                         ParticleTypes.EXPLOSION,
                         player.getX() + look.x * 2.0D,
@@ -164,7 +238,8 @@ public final class FogDomainCreatureSkillCommands {
 
             case FogDomainCreatureSkills.ENDERMAN_TELEPORT -> {
                 Vec3 destination = player.position().add(
-                        look.scale(8.0D));
+                        look.scale(8.0D)
+                );
 
                 player.teleportTo(
                         level,
@@ -236,10 +311,12 @@ public final class FogDomainCreatureSkillCommands {
                 if (target == null) return false;
 
                 target.addEffect(new MobEffectInstance(
-                        MobEffects.POISON, 20 * 8, 1));
+                        MobEffects.POISON, 20 * 8, 1
+                ));
 
                 target.addEffect(new MobEffectInstance(
-                        MobEffects.SLOWNESS, 20 * 8, 1));
+                        MobEffects.SLOWNESS, 20 * 8, 1
+                ));
 
                 level.sendParticles(
                         ParticleTypes.WITCH,
@@ -289,10 +366,12 @@ public final class FogDomainCreatureSkillCommands {
                 if (target == null) return false;
 
                 target.addEffect(new MobEffectInstance(
-                        MobEffects.SLOWNESS, 20 * 10, 5));
+                        MobEffects.SLOWNESS, 20 * 10, 5
+                ));
 
                 target.addEffect(new MobEffectInstance(
-                        MobEffects.JUMP_BOOST, 20 * 10, 128));
+                        MobEffects.JUMP_BOOST, 20 * 10, 128
+                ));
 
                 level.sendParticles(
                         ParticleTypes.ITEM_SNOWBALL,
@@ -408,6 +487,7 @@ public final class FogDomainCreatureSkillCommands {
                         0.35D,
                         normalized.z * knockback
                 );
+
                 target.hurtMarked = true;
             }
         }
@@ -417,21 +497,49 @@ public final class FogDomainCreatureSkillCommands {
     public static void registerCommands(RegisterCommandsEvent event) {
         event.getDispatcher().register(
                 Commands.literal("fogskill")
+
+                        .then(Commands.literal("created")
+                                .executes(context ->
+                                        cycleSkill(
+                                                context.getSource()
+                                                        .getPlayerOrException()
+                                        )
+                                )
+                        )
+
                         .then(Commands.literal("creaturelist")
                                 .executes(context ->
-                                        showList(context.getSource()
-                                                .getPlayerOrException())))
+                                        showList(
+                                                context.getSource()
+                                                        .getPlayerOrException()
+                                        )
+                                )
+                        )
+
+                        .then(Commands.literal("creaturecast")
+                                .executes(context ->
+                                        useSelectedSkill(
+                                                context.getSource()
+                                                        .getPlayerOrException()
+                                        )
+                                )
+                        )
+
                         .then(Commands.literal("creatureuse")
                                 .then(Commands.argument(
                                         "number",
-                                        IntegerArgumentType.integer(1))
+                                        IntegerArgumentType.integer(1)
+                                )
                                         .executes(context ->
-                                                useSkill(
+                                                useSkillByNumber(
                                                         context.getSource()
                                                                 .getPlayerOrException(),
                                                         IntegerArgumentType.getInteger(
-                                                                context, "number")
-                                                )))
+                                                                context, "number"
+                                                        )
+                                                )
+                                        )
+                                )
                         )
         );
     }

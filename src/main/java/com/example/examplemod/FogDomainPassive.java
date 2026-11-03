@@ -1,4 +1,3 @@
-
 package com.example.examplemod;
 
 import java.util.ArrayList;
@@ -43,6 +42,9 @@ public final class FogDomainPassive {
     private static final Map<UUID, PassiveData> ACTIVE = new HashMap<>();
     private static final Map<UUID, Integer> COOLDOWNS = new HashMap<>();
 
+    // Người chơi chờ kích hoạt Nhập Hồn sau khi sát thương đã được áp dụng.
+    private static final Map<UUID, ServerLevel> PENDING = new HashMap<>();
+
     private static final class PassiveData {
         final ServerLevel level;
         final UUID playerId;
@@ -64,7 +66,7 @@ public final class FogDomainPassive {
         return player.getName().getString().equalsIgnoreCase(CONTROLLER);
     }
 
-    // Kích hoạt khi sát thương sắp giết tubi2531.
+    // Chặn sát thương chí mạng và chờ tick tiếp theo để kích hoạt.
     @SubscribeEvent
     public static void onLivingDamage(LivingDamageEvent.Pre event) {
 
@@ -73,21 +75,21 @@ public final class FogDomainPassive {
         }
 
         if (!isController(player)) {
-    return;
+            return;
         }
 
         UUID id = player.getUUID();
 
-        if (ACTIVE.containsKey(id)) {
+        // Đang nhập hồn hoặc đang chờ kích hoạt.
+        if (ACTIVE.containsKey(id) || PENDING.containsKey(id)) {
             event.setNewDamage(0.0F);
-            player.setHealth(1.0F);
             return;
         }
 
+        // Đang hồi chiêu: không kích hoạt Nhập Hồn lần nữa.
         if (COOLDOWNS.containsKey(id)) {
             if (player.getHealth() <= 1.0F) {
                 event.setNewDamage(0.0F);
-                player.setHealth(1.0F);
             }
             return;
         }
@@ -96,9 +98,12 @@ public final class FogDomainPassive {
         float damage = event.getNewDamage();
 
         if (health - damage <= 1.0F) {
+
+            // Giảm sát thương để sau khi xử lý còn đúng 1 máu.
             event.setNewDamage(Math.max(0.0F, health - 1.0F));
-            player.setHealth(1.0F);
-            startPassive(player);
+
+            // Chưa kích hoạt ngay trong sự kiện sát thương.
+            PENDING.put(id, (ServerLevel) player.level());
         }
     }
 
@@ -116,6 +121,7 @@ public final class FogDomainPassive {
         Vec3 originalPosition = player.position();
 
         PassiveData data = new PassiveData(level, id, originalPosition);
+
         ACTIVE.put(id, data);
         COOLDOWNS.put(id, COOLDOWN_TICKS);
 
@@ -442,6 +448,31 @@ public final class FogDomainPassive {
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
 
+        // Xử lý những người chơi đang chờ kích hoạt Nhập Hồn.
+        Iterator<Map.Entry<UUID, ServerLevel>> pendingIterator =
+                PENDING.entrySet().iterator();
+
+        while (pendingIterator.hasNext()) {
+
+            Map.Entry<UUID, ServerLevel> entry = pendingIterator.next();
+
+            UUID id = entry.getKey();
+            ServerLevel level = entry.getValue();
+
+            if (!(level.getEntity(id) instanceof ServerPlayer player)
+                    || !player.isAlive()
+                    || player.isRemoved()) {
+
+                pendingIterator.remove();
+                continue;
+            }
+
+            pendingIterator.remove();
+
+            // Sát thương đã được xử lý xong, bây giờ mới kích hoạt.
+            startPassive(player);
+        }
+
         // Đếm thời gian hồi kỹ năng.
         Iterator<Map.Entry<UUID, Integer>> cooldownIterator =
                 COOLDOWNS.entrySet().iterator();
@@ -475,7 +506,7 @@ public final class FogDomainPassive {
                 continue;
             }
 
-            // Linh hồn không thể chết trong thời gian Nhập Hồn.
+            // Giữ nhân vật ở 1 máu trong thời gian Nhập Hồn.
             player.setHealth(1.0F);
 
             data.ticks++;
@@ -484,4 +515,4 @@ public final class FogDomainPassive {
             pullNearby(data, player);
         }
     }
-}
+                }

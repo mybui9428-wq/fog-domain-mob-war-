@@ -90,10 +90,13 @@ public class ExampleMod {
     ) {
         modEventBus.addListener(this::commonSetup);
 
-        // Dang ky payload yeu cau nhap hon tu client den server
-        modEventBus.addListener(FogPossessionPayload::register);
+        // Dang ky payload nhap hon
+modEventBus.addListener(FogPossessionPayload::register);
 modEventBus.addListener(FogPossessionControlPayload::register);
 modEventBus.addListener(FogPossessionSyncPayload::register);
+
+// Dang ky payload HUD
+modEventBus.addListener(FogHudPayload::register);
 
 BLOCKS.register(modEventBus);
         

@@ -19,7 +19,7 @@ public final class FogPossessionClient {
     private FogPossessionClient() {
     }
 
-    // Được cập nhật khi client nhận gói đồng bộ từ server.
+    // true khi người chơi đang điều khiển linh hồn.
     public static boolean soulMode = false;
 
     @SubscribeEvent
@@ -37,9 +37,8 @@ public final class FogPossessionClient {
             return;
         }
 
-        // Bình thường không gửi gói điều khiển.
-        // Khi nhập xác: camera là sinh vật.
-        // Khi xuất hồn: soulMode bật dù camera vẫn là người chơi.
+        // Không gửi điều khiển khi đang chơi bình thường.
+        // Vẫn gửi khi điều khiển sinh vật hoặc linh hồn.
         if (camera == minecraft.player && !soulMode) {
             return;
         }

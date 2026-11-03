@@ -72,38 +72,33 @@ public final class FogDomainPossession {
     }
 
     public static boolean stopSoul(ServerPlayer player) {
-        UUID id = player.getUUID();
+    UUID id = player.getUUID();
 
-        if (!isSoulMode(player)) {
-            return false;
-        }
+    // Xóa trạng thái linh hồn trước.
+    SOUL_MODE.remove(id);
 
-        SOUL_MODE.remove(id);
+    // Khôi phục người chơi về trạng thái bình thường.
+    player.setInvulnerable(false);
+    player.setInvisible(false);
+    player.setNoGravity(false);
 
-        player.setInvulnerable(
-                OLD_INVULNERABLE.getOrDefault(id, false)
-        );
-        player.setInvisible(
-                OLD_INVISIBLE.getOrDefault(id, false)
-        );
-        player.setNoGravity(
-                OLD_NO_GRAVITY.getOrDefault(id, false)
-        );
+    // Xóa dữ liệu trạng thái cũ.
+    OLD_INVULNERABLE.remove(id);
+    OLD_INVISIBLE.remove(id);
+    OLD_NO_GRAVITY.remove(id);
+    SOUL_BODY_POSITIONS.remove(id);
 
-        OLD_INVULNERABLE.remove(id);
-        OLD_INVISIBLE.remove(id);
-        OLD_NO_GRAVITY.remove(id);
-        SOUL_BODY_POSITIONS.remove(id);
+    // Xóa vận tốc còn sót lại.
+    player.setDeltaMovement(Vec3.ZERO);
 
-        player.setDeltaMovement(Vec3.ZERO);
+    // Đồng bộ trạng thái thoát linh hồn về client.
+    PacketDistributor.sendToPlayer(
+            player,
+            new FogPossessionSyncPayload(3, 0)
+    );
 
-        PacketDistributor.sendToPlayer(
-                player,
-                new FogPossessionSyncPayload(3, 0)
-        );
-
-        return true;
-    }
+    return true;
+            }
 
     public static Vec3 getSoulBodyPosition(ServerPlayer player) {
         return SOUL_BODY_POSITIONS.get(player.getUUID());

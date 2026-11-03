@@ -29,8 +29,8 @@ public record FogPossessionControlPayload(
                     )
             );
 
-    public static final StreamCodec<ByteBuf, FogPossessionControlPayload>
-            STREAM_CODEC = StreamCodec.composite(
+    public static final StreamCodec<ByteBuf, FogPossessionControlPayload> STREAM_CODEC =
+            StreamCodec.composite(
                     ByteBufCodecs.FLOAT,
                     FogPossessionControlPayload::forward,
 
@@ -79,19 +79,35 @@ public record FogPossessionControlPayload(
                 return;
             }
 
-            if (!FogDomainPossession.isPossessing(player)) {
+            // Ưu tiên điều khiển linh hồn khi đang ở chế độ Nhập Hồn.
+            if (FogDomainPossession.isSoulMode(player)) {
+
+                FogDomainPossession.controlSoul(
+                        player,
+                        payload.forward(),
+                        payload.strafe(),
+                        payload.yaw(),
+                        payload.pitch(),
+                        payload.jump()
+                );
+
                 return;
             }
 
-            FogDomainPossession.control(
-                    player,
-                    payload.forward(),
-                    payload.strafe(),
-                    payload.yaw(),
-                    payload.pitch(),
-                    payload.jump(),
-                    payload.attack()
-            );
+            // Nếu không ở chế độ linh hồn thì giữ điều khiển
+            // sinh vật như hệ thống Nhập Hồn cũ.
+            if (FogDomainPossession.isPossessing(player)) {
+
+                FogDomainPossession.control(
+                        player,
+                        payload.forward(),
+                        payload.strafe(),
+                        payload.yaw(),
+                        payload.pitch(),
+                        payload.jump(),
+                        payload.attack()
+                );
+            }
         });
     }
 }

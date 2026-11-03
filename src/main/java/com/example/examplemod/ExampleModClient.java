@@ -121,24 +121,22 @@ public class ExampleModClient {
                 0xFF55DDEE
         );
 
-        graphics.drawString(
-                minecraft.font,
-                Component.literal("LINH VUC SUONG MU"),
-                x + 7,
-                y + 6,
-                0xFF55DDEE,
-                false
-        );
-
-        for (int i = 0; i < visibleLines; i++) {
-            graphics.drawString(
-                    minecraft.font,
-                    Component.literal(lines[i]),
-                    x + 7,
-                    y + 20 + i * 12,
-                    0xFFFFFFFF,
-                    false
-            );
-        }
-    }
-}
+        graphics.textRenderer(
+        GuiGraphicsExtractor.HoveredTextEffects.NONE
+).accept(
+        Component.literal("LINH VUC SUONG MU"),
+        x + 7,
+        y + 6,
+        0xFF55DDEE,
+        false
+);
+        for (int i = 0; i < visibleLines; i++) 
+        graphics.textRenderer(
+        GuiGraphicsExtractor.HoveredTextEffects.NONE
+).accept(
+        Component.literal(lines[i]),
+        x + 7,
+        y + 20 + i * 12,
+        0xFFFFFFFF,
+        false
+);

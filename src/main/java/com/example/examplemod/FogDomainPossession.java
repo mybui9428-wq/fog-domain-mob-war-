@@ -218,60 +218,67 @@ public final class FogDomainPossession {
     }
 
     public static void controlSoul(
-            ServerPlayer player,
-            float forward,
-            float strafe,
-            float yaw,
-            float pitch,
-            boolean jump
-    ) {
-        if (!isController(player) || !isSoulMode(player)) {
-            return;
-        }
+        ServerPlayer player,
+        float forward,
+        float strafe,
+        float yaw,
+        float pitch,
+        boolean jump
+) {
+    if (!isController(player) || !isSoulMode(player)) {
+        return;
+    }
 
-        forward = Math.max(-1.0F, Math.min(1.0F, forward));
-        strafe = Math.max(-1.0F, Math.min(1.0F, strafe));
-        pitch = Math.max(-90.0F, Math.min(90.0F, pitch));
+    forward = Math.max(-1.0F, Math.min(1.0F, forward));
+    strafe = Math.max(-1.0F, Math.min(1.0F, strafe));
+    pitch = Math.max(-90.0F, Math.min(90.0F, pitch));
 
-        player.setYRot(yaw);
-        player.setXRot(pitch);
-        player.yRotO = yaw;
-        player.xRotO = pitch;
+    player.setYRot(yaw);
+    player.setXRot(pitch);
+    player.yRotO = yaw;
+    player.xRotO = pitch;
 
-        double yawRad = Math.toRadians(yaw);
-        double pitchRad = Math.toRadians(pitch);
+    double yawRad = Math.toRadians(yaw);
+    double pitchRad = Math.toRadians(pitch);
 
-        double cosPitch = Math.cos(pitchRad);
+    double cosPitch = Math.cos(pitchRad);
 
-        Vec3 look = new Vec3(
-                -Math.sin(yawRad) * cosPitch,
-                -Math.sin(pitchRad),
-                Math.cos(yawRad) * cosPitch
-        );
+    Vec3 look = new Vec3(
+            -Math.sin(yawRad) * cosPitch,
+            -Math.sin(pitchRad),
+            Math.cos(yawRad) * cosPitch
+    );
 
-        Vec3 side = new Vec3(
-                Math.cos(yawRad),
-                0.0D,
-                Math.sin(yawRad)
-        );
+    Vec3 side = new Vec3(
+            Math.cos(yawRad),
+            0.0D,
+            Math.sin(yawRad)
+    );
 
-        Vec3 movement = look.scale(forward).add(side.scale(strafe));
+    Vec3 movement = look.scale(forward)
+            .add(side.scale(strafe));
 
-        if (jump) {
-            movement = movement.add(0.0D, 1.0D, 0.0D);
-        }
+    // Nhấn Space để bay lên.
+    if (jump) {
+        movement = movement.add(0.0D, 1.0D, 0.0D);
+    }
 
-        if (movement.lengthSqr() > 1.0D) {
-            movement = movement.normalize();
-        }
+    if (movement.lengthSqr() > 1.0D) {
+        movement = movement.normalize();
+    }
 
-        Vec3 next = player.position().add(movement.scale(0.45D));
+    // Bay mượt bằng vận tốc, không dịch chuyển tức thời.
+    double speed = 0.32D;
 
-        player.setPos(next.x, next.y, next.z);
+    player.setNoGravity(true);
+    player.setInvulnerable(true);
+    player.setInvisible(true);
+
+    if (movement.lengthSqr() > 0.001D) {
+        player.setDeltaMovement(movement.scale(speed));
+    } else {
         player.setDeltaMovement(Vec3.ZERO);
-        player.setNoGravity(true);
-        player.setInvulnerable(true);
-        player.setInvisible(true);
+    }
     }
 
     public static void control(

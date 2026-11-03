@@ -260,7 +260,7 @@ public final class FogDomainPassive {
         }
 
       FogDomainAbilityData data =
-        FogDomainAbilityData.get(player.getServer());
+        FogDomainAbilityData.get(((ServerLevel) player.level()).getServer());
 
         data.initializePower(player.getUUID(), true);
 

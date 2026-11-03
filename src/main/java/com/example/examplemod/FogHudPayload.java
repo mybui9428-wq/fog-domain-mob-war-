@@ -1,11 +1,11 @@
 
 package com.example.examplemod;
 
-import net.minecraft.network.ByteBufCodecs;
+import io.netty.buffer.ByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
-import io.netty.buffer.ByteBuf;
 
 public record FogHudPayload(String data)
         implements CustomPacketPayload {

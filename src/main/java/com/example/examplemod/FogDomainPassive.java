@@ -1,6 +1,14 @@
 
 package com.example.examplemod;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -8,23 +16,18 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
+import net.minecraft.commands.Commands;
+
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class FogDomainPassive {
@@ -32,29 +35,25 @@ public final class FogDomainPassive {
     private static final String CONTROLLER = "tubi2531";
 
     private static final double SUCTION_RADIUS = 15.0D;
-    private static final double ASSIMILATION_RADIUS = 40.0D;
+    private static final double ASSIMILATION_RANGE = 6.0D;
 
-    private static final int SUCTION_TICKS = 40;
     private static final int WEAKNESS_TICKS = 20 * 60;
     private static final int COOLDOWN_TICKS = 20 * 60;
 
-    private static final Map<UUID, PassiveData> ACTIVE =
-            new HashMap<>();
-
-    private static final Map<UUID, Integer> COOLDOWNS =
-            new HashMap<>();
-
-    private static final Random RANDOM = new Random();
+    private static final Map<UUID, PassiveData> ACTIVE = new HashMap<>();
+    private static final Map<UUID, Integer> COOLDOWNS = new HashMap<>();
 
     private static final class PassiveData {
         final ServerLevel level;
         final UUID playerId;
+        final Vec3 blackHolePosition;
         int ticks;
 
-        PassiveData(ServerLevel level, UUID playerId) {
+        PassiveData(ServerLevel level, UUID playerId, Vec3 position) {
             this.level = level;
             this.playerId = playerId;
-            this.ticks = SUCTION_TICKS;
+            this.blackHolePosition = position;
+            this.ticks = 0;
         }
     }
 
@@ -62,14 +61,10 @@ public final class FogDomainPassive {
     }
 
     private static boolean isController(ServerPlayer player) {
-        return player.getName().getString()
-        .equalsIgnoreCase(CONTROLLER);
+        return player.getName().getString().equalsIgnoreCase(CONTROLLER);
     }
 
-    /**
-     * Khi sát thương sắp làm tubi2531 chết,
-     * giữ lại đúng 1 HP và kích hoạt Nhập Hồn.
-     */
+    // Kích hoạt khi sát thương sắp giết tubi2531.
     @SubscribeEvent
     public static void onLivingDamage(LivingDamageEvent.Pre event) {
 
@@ -77,11 +72,7 @@ public final class FogDomainPassive {
             return;
         }
 
-        if (!isController(player)) {
-            return;
-        }
-
-        if (!MobWarCommands.enabled) {
+        if (!isController(player) || !MobWarCommands.enabled) {
             return;
         }
 
@@ -105,12 +96,8 @@ public final class FogDomainPassive {
         float damage = event.getNewDamage();
 
         if (health - damage <= 1.0F) {
-
-            // Không cho sát thương làm người chơi chết.
             event.setNewDamage(Math.max(0.0F, health - 1.0F));
-
             player.setHealth(1.0F);
-
             startPassive(player);
         }
     }
@@ -125,68 +112,75 @@ public final class FogDomainPassive {
 
         ServerLevel level = (ServerLevel) player.level();
 
-        ACTIVE.put(id, new PassiveData(level, id));
+        // Lưu vị trí cơ thể trước khi linh hồn bắt đầu di chuyển.
+        Vec3 originalPosition = player.position();
 
+        PassiveData data = new PassiveData(level, id, originalPosition);
+        ACTIVE.put(id, data);
         COOLDOWNS.put(id, COOLDOWN_TICKS);
 
         player.setHealth(1.0F);
 
-        player.sendSystemMessage(Component.literal(
-                "§5§lNHẬP HỒN! §dCơ thể đang mở hố đen hấp thụ..."));
+        // Bật chế độ linh hồn trong hệ thống điều khiển hiện có.
+        FogDomainPossession.startSoul(player);
 
         level.sendParticles(
                 ParticleTypes.PORTAL,
-                player.getX(),
-                player.getY() + 1.0D,
-                player.getZ(),
-                180,
-                1.5D,
-                1.5D,
-                1.5D,
-                0.5D
+                originalPosition.x,
+                originalPosition.y + 1.0D,
+                originalPosition.z,
+                180, 1.5D, 1.5D, 1.5D, 0.5D
         );
 
         level.sendParticles(
                 ParticleTypes.SOUL,
-                player.getX(),
-                player.getY() + 1.0D,
-                player.getZ(),
-                80,
-                1.0D,
-                1.0D,
-                1.0D,
-                0.2D
+                originalPosition.x,
+                originalPosition.y + 1.0D,
+                originalPosition.z,
+                100, 1.0D, 1.0D, 1.0D, 0.2D
         );
+
+        player.sendSystemMessage(Component.literal(
+                "§5§lNHẬP HỒN! §dCơ thể đã biến thành hố đen. Linh hồn được tự do di chuyển."
+        ));
+
+        player.sendSystemMessage(Component.literal(
+                "§dNgắm vào sinh vật hoặc người chơi rồi dùng /fogassimilation để nhập hồn."
+        ));
     }
 
+    // Hố đen hút thực thể quanh vị trí cơ thể ban đầu.
     private static void pullNearby(PassiveData data, ServerPlayer player) {
 
         ServerLevel level = data.level;
+        Vec3 hole = data.blackHolePosition.add(0.0D, 1.0D, 0.0D);
 
-        AABB area = player.getBoundingBox().inflate(SUCTION_RADIUS);
+        AABB area = new AABB(
+                hole.x - SUCTION_RADIUS,
+                hole.y - SUCTION_RADIUS,
+                hole.z - SUCTION_RADIUS,
+                hole.x + SUCTION_RADIUS,
+                hole.y + SUCTION_RADIUS,
+                hole.z + SUCTION_RADIUS
+        );
 
         List<LivingEntity> nearby = level.getEntitiesOfClass(
                 LivingEntity.class,
                 area,
-                entity -> entity != player
-                        && entity.isAlive()
-                        && !entity.isRemoved()
-                        && entity.distanceToSqr(player)
+                target -> target != player
+                        && target.isAlive()
+                        && !target.isRemoved()
+                        && target.distanceToSqr(hole)
                                 <= SUCTION_RADIUS * SUCTION_RADIUS
         );
-
-        Vec3 center = player.position().add(0.0D, 1.0D, 0.0D);
 
         for (LivingEntity target : nearby) {
 
             Vec3 targetCenter = target.getBoundingBox().getCenter();
-
-            Vec3 direction = center.subtract(targetCenter);
-
+            Vec3 direction = hole.subtract(targetCenter);
             double distance = direction.length();
 
-            if (distance > 0.01D) {
-
+            if (distance > 0.1D) {
                 Vec3 velocity = direction.normalize().scale(
                         Math.min(0.8D, 0.15D + distance * 0.06D)
                 );
@@ -195,95 +189,177 @@ public final class FogDomainPassive {
                 target.hurtMarked = true;
             }
 
+            if (data.ticks % 5 == 0) {
+                level.sendParticles(
+                        ParticleTypes.PORTAL,
+                        target.getX(),
+                        target.getY() + target.getBbHeight() * 0.5D,
+                        target.getZ(),
+                        3, 0.2D, 0.3D, 0.2D, 0.05D
+                );
+            }
+
+            // Sinh vật chạm tới hố đen bị hấp thụ và hồi máu.
+            // Người chơi khác chỉ bị hút, không tự động bị giết.
+            if (!(target instanceof ServerPlayer) && distance <= 1.5D) {
+                target.discard();
+                player.heal(2.0F);
+            }
+        }
+
+        if (data.ticks % 5 == 0) {
+            level.sendParticles(
+                    ParticleTypes.SOUL,
+                    hole.x,
+                    hole.y,
+                    hole.z,
+                    12, 0.5D, 0.5D, 0.5D, 0.1D
+            );
+
             level.sendParticles(
                     ParticleTypes.PORTAL,
-                    target.getX(),
-                    target.getY() + target.getBbHeight() * 0.5D,
-                    target.getZ(),
-                    3,
-                    0.2D,
-                    0.3D,
-                    0.2D,
-                    0.05D
+                    hole.x,
+                    hole.y,
+                    hole.z,
+                    8, 0.4D, 0.4D, 0.4D, 0.1D
             );
         }
-
-        level.sendParticles(
-                ParticleTypes.SOUL,
-                center.x,
-                center.y,
-                center.z,
-                10,
-                0.5D,
-                0.5D,
-                0.5D,
-                0.1D
-        );
     }
 
-    /**
-     * Chọn ngẫu nhiên một sinh vật hoặc người chơi
-     * trong phạm vi 40 khối để đồng hóa.
-     */
-    private static LivingEntity chooseTarget(ServerPlayer player) {
+    // Tìm thực thể gần nhất nằm trên đường ngắm của linh hồn.
+    private static LivingEntity findTarget(ServerPlayer player) {
 
-        ServerLevel level = (ServerLevel) player.level();
+        Vec3 start = player.getEyePosition();
+        Vec3 look = player.getLookAngle();
+        Vec3 end = start.add(look.scale(ASSIMILATION_RANGE));
 
-        AABB area = player.getBoundingBox().inflate(
-                ASSIMILATION_RADIUS
-        );
+        AABB searchArea = player.getBoundingBox()
+                .expandTowards(look.scale(ASSIMILATION_RANGE))
+                .inflate(1.0D);
 
-        List<LivingEntity> candidates = level.getEntitiesOfClass(
+        List<LivingEntity> candidates = player.level().getEntitiesOfClass(
                 LivingEntity.class,
-                area,
-                entity -> entity != player
-                        && entity.isAlive()
-                        && !entity.isRemoved()
-                        && entity.distanceToSqr(player)
-                                <= ASSIMILATION_RADIUS
-                                * ASSIMILATION_RADIUS
+                searchArea,
+                target -> target != player
+                        && target.isAlive()
+                        && !target.isRemoved()
+                        && (!(target instanceof ServerPlayer)
+                            || !isController((ServerPlayer) target))
         );
 
-        if (candidates.isEmpty()) {
-            return null;
+        LivingEntity closest = null;
+        double nearestDistance = Double.MAX_VALUE;
+
+        for (LivingEntity target : candidates) {
+
+            Optional<Vec3> hit = target.getBoundingBox()
+                    .inflate(0.3D)
+                    .clip(start, end);
+
+            if (hit.isPresent()) {
+                double distance = start.distanceToSqr(hit.get());
+
+                if (distance < nearestDistance) {
+                    nearestDistance = distance;
+                    closest = target;
+                }
+            }
         }
 
-        return candidates.get(RANDOM.nextInt(candidates.size()));
+        return closest;
+    }
+
+    // Lệnh /fogassimilation để nhập thực thể đang ngắm.
+    @SubscribeEvent
+    public static void registerCommands(RegisterCommandsEvent event) {
+
+        event.getDispatcher().register(
+                Commands.literal("fogassimilation")
+                        .requires(source ->
+                                source.getEntity() instanceof ServerPlayer
+                        )
+                        .executes(context -> {
+
+                            ServerPlayer player =
+                                    context.getSource().getPlayerOrException();
+
+                            if (!isController(player)) {
+                                player.sendSystemMessage(Component.literal(
+                                        "§cBạn không phải người điều khiển lĩnh vực."
+                                ));
+                                return 0;
+                            }
+
+                            if (!ACTIVE.containsKey(player.getUUID())) {
+                                player.sendSystemMessage(Component.literal(
+                                        "§cBạn không ở chế độ linh hồn."
+                                ));
+                                return 0;
+                            }
+
+                            LivingEntity target = findTarget(player);
+
+                            if (target == null) {
+                                player.sendSystemMessage(Component.literal(
+                                        "§cKhông tìm thấy mục tiêu trong tầm ngắm 6 khối."
+                                ));
+                                return 0;
+                            }
+
+                            assimilate(player, target);
+                            return 1;
+                        })
+        );
     }
 
     private static void assimilate(
             ServerPlayer player,
             LivingEntity target
     ) {
+
         if (target == null || !target.isAlive() || target.isRemoved()) {
             return;
         }
 
-      FogDomainAbilityData data =
-        FogDomainAbilityData.get(((ServerLevel) player.level()).getServer());
+        if (target == player) {
+            return;
+        }
 
-        data.initializePower(player.getUUID(), true);
+        ServerLevel level = (ServerLevel) player.level();
+
+        if (target.level() != level) {
+            return;
+        }
+
+        UUID playerId = player.getUUID();
+
+        // Lưu vị trí mục tiêu để tubi2531 xuất hiện tại đó.
+        double x = target.getX();
+        double y = target.getY();
+        double z = target.getZ();
+
+        FogDomainAbilityData data =
+                FogDomainAbilityData.get(level.getServer());
+
+        data.initializePower(playerId, true);
 
         String typeId = BuiltInRegistries.ENTITY_TYPE
                 .getKey(target.getType())
                 .toString();
 
-        ((ServerLevel) player.level()).sendParticles(
+        level.sendParticles(
                 ParticleTypes.SOUL,
-                target.getX(),
-                target.getY() + target.getBbHeight() * 0.5D,
-                target.getZ(),
-                60,
-                0.6D,
-                0.8D,
-                0.6D,
-                0.2D
+                x,
+                y + target.getBbHeight() * 0.5D,
+                z,
+                80, 0.6D, 0.8D, 0.6D, 0.2D
         );
 
         if (target instanceof ServerPlayer absorbedPlayer) {
 
+            // Nhận 50% sức mạnh từng kỹ năng của người chơi.
             data.transferPlayerPowers(
-                    player.getUUID(),
+                    playerId,
                     absorbedPlayer.getUUID()
             );
 
@@ -296,22 +372,19 @@ public final class FogDomainPassive {
             player.sendSystemMessage(Component.literal(
                     "§dĐã đồng hóa người chơi "
                             + absorbedPlayer.getName().getString()
-                            + ". Bạn nhận 50% sức mạnh của họ."
+                            + ". Bạn nhận 50% sức mạnh từng kỹ năng."
             ));
 
         } else if (target instanceof Mob mob) {
 
             data.initializePower(mob.getUUID(), false);
 
-            data.transferCreaturePowers(
-                    player.getUUID(),
-                    mob.getUUID()
-            );
+            data.transferCreaturePowers(playerId, mob.getUUID());
 
-            data.addAbility(player.getUUID(), typeId);
+            data.addAbility(playerId, typeId);
 
             int unlocked = data.unlockCreatureSkills(
-                    player.getUUID(),
+                    playerId,
                     typeId
             );
 
@@ -325,14 +398,21 @@ public final class FogDomainPassive {
             ));
 
         } else {
-            // Sinh vật không thuộc Mob: loại bỏ sau khi đồng hóa.
+
             target.discard();
+
+            data.addAbility(playerId, typeId);
 
             player.sendSystemMessage(Component.literal(
                     "§dĐã đồng hóa: " + typeId
             ));
         }
 
+        // Kết thúc linh hồn, trả lại người chơi gốc.
+        ACTIVE.remove(playerId);
+        FogDomainPossession.stopSoul(player);
+
+        player.setPos(x, y, z);
         player.setHealth(player.getMaxHealth());
         player.getFoodData().setFoodLevel(20);
 
@@ -342,21 +422,33 @@ public final class FogDomainPassive {
                 0
         ));
 
+        level.sendParticles(
+                ParticleTypes.EXPLOSION,
+                x,
+                y + 1.0D,
+                z,
+                8, 1.0D, 1.0D, 1.0D, 0.0D
+        );
+
         player.sendSystemMessage(Component.literal(
-                "§5Nhập Hồn hoàn tất! Bạn bị suy yếu trong 1 phút."
+                "§5§lNHẬP HỒN HOÀN TẤT! §dBạn đã trở lại với cơ thể của chính mình."
+        ));
+
+        player.sendSystemMessage(Component.literal(
+                "§cBạn bị suy yếu trong 1 phút."
         ));
     }
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
 
-        // Đếm thời gian hồi của Nhập Hồn.
-        var cooldownIterator = COOLDOWNS.entrySet().iterator();
+        // Đếm thời gian hồi kỹ năng.
+        Iterator<Map.Entry<UUID, Integer>> cooldownIterator =
+                COOLDOWNS.entrySet().iterator();
 
         while (cooldownIterator.hasNext()) {
 
             Map.Entry<UUID, Integer> entry = cooldownIterator.next();
-
             int remaining = entry.getValue() - 1;
 
             if (remaining <= 0) {
@@ -366,61 +458,30 @@ public final class FogDomainPassive {
             }
         }
 
-        var iterator = ACTIVE.entrySet().iterator();
+        Iterator<Map.Entry<UUID, PassiveData>> iterator =
+                ACTIVE.entrySet().iterator();
 
         while (iterator.hasNext()) {
 
             Map.Entry<UUID, PassiveData> entry = iterator.next();
-
             PassiveData data = entry.getValue();
 
-            Entity entity = data.level.getEntity(data.playerId);
-
-            if (!(entity instanceof ServerPlayer player)
+            if (!(data.level.getEntity(data.playerId)
+                    instanceof ServerPlayer player)
                     || !player.isAlive()
                     || player.isRemoved()) {
+
                 iterator.remove();
                 continue;
             }
 
-            // Giữ máu ở nửa tim trong lúc hố đen hoạt động.
+            // Linh hồn không thể chết trong thời gian Nhập Hồn.
             player.setHealth(1.0F);
 
-            data.ticks--;
+            data.ticks++;
 
+            // Hố đen hút ở vị trí cơ thể ban đầu.
             pullNearby(data, player);
-
-            if (data.ticks <= 0) {
-
-                iterator.remove();
-
-                data.level.sendParticles(
-                        ParticleTypes.EXPLOSION,
-                        player.getX(),
-                        player.getY() + 1.0D,
-                        player.getZ(),
-                        8,
-                        1.0D,
-                        1.0D,
-                        1.0D,
-                        0.0D
-                );
-
-                LivingEntity target = chooseTarget(player);
-
-                if (target == null) {
-
-                    player.setHealth(player.getMaxHealth());
-
-                    player.sendSystemMessage(Component.literal(
-                            "§cNhập Hồn thất bại: không có mục tiêu trong 40 khối."
-                    ));
-
-                } else {
-
-                    assimilate(player, target);
-                }
-            }
         }
     }
 }

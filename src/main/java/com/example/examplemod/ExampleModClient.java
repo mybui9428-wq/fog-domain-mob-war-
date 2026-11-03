@@ -130,13 +130,17 @@ public class ExampleModClient {
         0xFF55DDEE,
         false
 );
-        for (int i = 0; i < visibleLines; i++) 
-        graphics.textRenderer(
-        GuiGraphicsExtractor.HoveredTextEffects.NONE
-).accept(
-        Component.literal(lines[i]),
-        x + 7,
-        y + 20 + i * 12,
-        0xFFFFFFFF,
-        false
-);
+        
+        for (int i = 0; i < visibleLines; i++) {
+            graphics.textRenderer(
+                    GuiGraphicsExtractor.HoveredTextEffects.NONE
+            ).accept(
+                    Component.literal(lines[i]),
+                    x + 7,
+                    y + 20 + i * 12,
+                    0xFFFFFFFF,
+                    false
+            );
+        }
+    }
+}

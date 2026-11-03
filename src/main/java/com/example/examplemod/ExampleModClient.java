@@ -124,23 +124,20 @@ public class ExampleModClient {
         graphics.textRenderer(
         GuiGraphicsExtractor.HoveredTextEffects.NONE
 ).accept(
-        Component.literal("LINH VUC SUONG MU"),
+        net.minecraft.client.gui.TextAlignment.LEFT,
         x + 7,
         y + 6,
-        0xFF55DDEE,
-        false
+        GuiGraphicsExtractor.TextRendererParameters.DEFAULT,
+        Component.literal("LINH VUC SUONG MU")
 );
-        
         for (int i = 0; i < visibleLines; i++) {
-            graphics.textRenderer(
-                    GuiGraphicsExtractor.HoveredTextEffects.NONE
-            ).accept(
-                    Component.literal(lines[i]),
-                    x + 7,
-                    y + 20 + i * 12,
-                    0xFFFFFFFF,
-                    false
-            );
+    graphics.textRenderer(
+            GuiGraphicsExtractor.HoveredTextEffects.NONE
+    ).accept(
+            net.minecraft.client.gui.TextAlignment.LEFT,
+            x + 7,
+            y + 20 + i * 12,
+            GuiGraphicsExtractor.TextRendererParameters.DEFAULT,
+            Component.literal(lines[i])
+    );
         }
-    }
-}

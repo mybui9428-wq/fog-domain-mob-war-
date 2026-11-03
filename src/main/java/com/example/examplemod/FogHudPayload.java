@@ -6,6 +6,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 public record FogHudPayload(String data)
         implements CustomPacketPayload {
@@ -18,15 +19,19 @@ public record FogHudPayload(String data)
                     )
             );
 
-    public static final StreamCodec<ByteBuf, FogHudPayload>
-            STREAM_CODEC =
-            ByteBufCodecs.STRING_UTF8.map(
-                    FogHudPayload::new,
-                    FogHudPayload::data
+    public static final StreamCodec<ByteBuf, FogHudPayload> STREAM_CODEC =
+            StreamCodec.composite(
+                    ByteBufCodecs.STRING_UTF8,
+                    FogHudPayload::data,
+                    FogHudPayload::new
             );
 
     @Override
-    public Type<FogHudPayload> type() {
+    public Type<? extends CustomPacketPayload> type() {
         return TYPE;
+    }
+
+    public static void register(RegisterPayloadHandlersEvent event) {
+        event.registrar("1").playToClient(TYPE, STREAM_CODEC);
     }
 }

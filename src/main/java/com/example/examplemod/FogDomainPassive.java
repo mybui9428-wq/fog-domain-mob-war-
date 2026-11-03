@@ -72,8 +72,8 @@ public final class FogDomainPassive {
             return;
         }
 
-        if (!isController(player) || !MobWarCommands.enabled) {
-            return;
+        if (!isController(player)) {
+    return;
         }
 
         UUID id = player.getUUID();

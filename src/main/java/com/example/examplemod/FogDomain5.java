@@ -92,12 +92,25 @@ public final class FogDomain5 {
                                         return 0;
                                     }
 
+                                    int changed =
+                                            FogDomain5Terrain.createPool(player);
+
+                                    if (changed <= 0) {
+                                        context.getSource().sendFailure(
+                                                Component.literal(
+                                                        "Không tạo được hồ. "
+                                                        + "Hãy thử ở khu vực đã tải chunk."));
+                                        return 0;
+                                    }
+
                                     setActive(id, true);
 
                                     context.getSource().sendSuccess(
                                             () -> Component.literal(
                                                     "Đã bật Lĩnh Vực Thôn Phệ tầng "
-                                                            + getTier(id) + "/7."),
+                                                            + getTier(id) + "/7."
+                                                            + " Đã tạo hồ và thay đổi "
+                                                            + changed + " block."),
                                             false
                                     );
 
@@ -119,11 +132,16 @@ public final class FogDomain5 {
                                         return 0;
                                     }
 
+                                    int restored =
+                                            FogDomain5Terrain.restorePool(player);
+
                                     setActive(id, false);
 
                                     context.getSource().sendSuccess(
                                             () -> Component.literal(
-                                                    "Đã tắt Lĩnh Vực Thôn Phệ."),
+                                                    "Đã tắt Lĩnh Vực Thôn Phệ. "
+                                                    + "Đã khôi phục "
+                                                    + restored + " block."),
                                             false
                                     );
 

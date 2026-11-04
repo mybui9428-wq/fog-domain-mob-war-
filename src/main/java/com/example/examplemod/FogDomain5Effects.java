@@ -57,6 +57,14 @@ public final class FogDomain5Effects {
         double centerY = player.getY();
         double centerZ = player.getZ();
 
+        // Tạo thời tiết rơi từ trên cao xuống toàn bộ khu vực hồ.
+        spawnDomainWeather(
+                level,
+                centerX,
+                centerY,
+                centerZ
+        );
+
         AABB area = new AABB(
                 centerX - RADIUS,
                 centerY - 12,
@@ -85,7 +93,7 @@ public final class FogDomain5Effects {
                 continue;
             }
 
-            // Chỉ sao chép khi sinh vật thực sự đang ở trong nước.
+            // Sao chép năng lực khi sinh vật đang ở trong nước.
             if (target.isInWater()) {
                 copyCreatureAbilities(player, target, data);
             }
@@ -94,8 +102,113 @@ public final class FogDomain5Effects {
             applyRain(target);
             applySnow(target);
             applyFire(target);
-            spawnWeather(level, target);
         }
+    }
+
+    private static void spawnDomainWeather(
+            ServerLevel level,
+            double centerX,
+            double centerY,
+            double centerZ
+    ) {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+
+        // Mưa rơi từ trên cao.
+        for (int i = 0; i < 100; i++) {
+            double x = centerX + random.nextDouble(-RADIUS, RADIUS);
+            double z = centerZ + random.nextDouble(-RADIUS, RADIUS);
+
+            if (distanceSquared(x, z, centerX, centerZ)
+                    > RADIUS * RADIUS) {
+                continue;
+            }
+
+            double y = centerY + random.nextDouble(8.0D, 18.0D);
+
+            level.sendParticles(
+                    ParticleTypes.FALLING_WATER,
+                    x, y, z,
+                    1,
+                    0.03D, 0.05D, 0.03D,
+                    0.01D
+            );
+        }
+
+        // Tuyết rơi từ trên cao.
+        for (int i = 0; i < 55; i++) {
+            double x = centerX + random.nextDouble(-RADIUS, RADIUS);
+            double z = centerZ + random.nextDouble(-RADIUS, RADIUS);
+
+            if (distanceSquared(x, z, centerX, centerZ)
+                    > RADIUS * RADIUS) {
+                continue;
+            }
+
+            double y = centerY + random.nextDouble(8.0D, 20.0D);
+
+            level.sendParticles(
+                    ParticleTypes.SNOWFLAKE,
+                    x, y, z,
+                    1,
+                    0.15D, 0.12D, 0.15D,
+                    0.015D
+            );
+        }
+
+        // Gió cuốn mây và bụi ngang qua hồ.
+        for (int i = 0; i < 30; i++) {
+            double x = centerX + random.nextDouble(-RADIUS, RADIUS);
+            double z = centerZ + random.nextDouble(-RADIUS, RADIUS);
+            double y = centerY + random.nextDouble(0.0D, 5.0D);
+
+            level.sendParticles(
+                    ParticleTypes.CLOUD,
+                    x, y, z,
+                    1,
+                    0.35D, 0.08D, 0.08D,
+                    0.025D
+            );
+        }
+
+        // Hạt lửa xuất hiện trên cao và rơi xuống.
+        for (int i = 0; i < 18; i++) {
+            double x = centerX + random.nextDouble(-RADIUS, RADIUS);
+            double z = centerZ + random.nextDouble(-RADIUS, RADIUS);
+
+            if (distanceSquared(x, z, centerX, centerZ)
+                    > RADIUS * RADIUS) {
+                continue;
+            }
+
+            double y = centerY + random.nextDouble(7.0D, 15.0D);
+
+            level.sendParticles(
+                    ParticleTypes.FLAME,
+                    x, y, z,
+                    1,
+                    0.08D, 0.15D, 0.08D,
+                    0.035D
+            );
+
+            level.sendParticles(
+                    ParticleTypes.SMOKE,
+                    x, y + 0.2D, z,
+                    1,
+                    0.05D, 0.08D, 0.05D,
+                    0.015D
+            );
+        }
+    }
+
+    private static double distanceSquared(
+            double x,
+            double z,
+            double centerX,
+            double centerZ
+    ) {
+        double dx = x - centerX;
+        double dz = z - centerZ;
+        return dx * dx + dz * dz;
     }
 
     private static void copyCreatureAbilities(
@@ -112,13 +225,6 @@ public final class FogDomain5Effects {
                 entityTypeId
         );
 
-        List<String> sources =
-                data.getCreatureSkillSources(
-                        owner.getUUID(),
-                        "unused_check"
-                );
-
-        // Mở khóa kỹ năng của loại sinh vật này.
         int newSkills = data.unlockCreatureSkills(
                 owner.getUUID(),
                 entityTypeId
@@ -180,44 +286,10 @@ public final class FogDomain5Effects {
 
     private static void applyFire(LivingEntity target) {
 
+        // Lửa vẫn gây cháy cho sinh vật trong vùng.
         if (randomChance(2)) {
             target.setRemainingFireTicks(
                     Math.max(target.getRemainingFireTicks(), 60)
-            );
-        }
-    }
-
-    private static void spawnWeather(
-            ServerLevel level,
-            LivingEntity target
-    ) {
-        double x = target.getX();
-        double y = target.getY();
-        double z = target.getZ();
-
-        level.sendParticles(
-                ParticleTypes.CLOUD,
-                x, y + 0.8D, z,
-                2, 0.5D, 0.3D, 0.5D, 0.02D
-        );
-
-        level.sendParticles(
-                ParticleTypes.RAIN,
-                x, y + 1.5D, z,
-                3, 0.4D, 0.5D, 0.4D, 0.02D
-        );
-
-        level.sendParticles(
-                ParticleTypes.SNOWFLAKE,
-                x, y + 1.8D, z,
-                1, 0.4D, 0.5D, 0.4D, 0.01D
-        );
-
-        if (randomChance(2)) {
-            level.sendParticles(
-                    ParticleTypes.FLAME,
-                    x, y + 0.5D, z,
-                    2, 0.4D, 0.3D, 0.4D, 0.01D
             );
         }
     }

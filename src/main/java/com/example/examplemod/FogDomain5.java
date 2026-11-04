@@ -28,8 +28,8 @@ public final class FogDomain5 {
     }
 
     private static boolean isController(ServerPlayer player) {
-    return player.getName().getString()
-            .equalsIgnoreCase("tubi2531");
+        return player.getName().getString()
+                .equalsIgnoreCase("tubi2531");
     }
 
     public static int getTier(UUID playerId) {
@@ -61,23 +61,16 @@ public final class FogDomain5 {
 
                                     int current = getTier(player.getUUID());
 
-                                    if (current >= MAX_TIER) {
-                                        context.getSource().sendSuccess(
-                                                () -> Component.literal(
-                                                        "Lĩnh vực đã đạt tầng tối đa 7."),
-                                                false
-                                        );
-                                        return Command.SINGLE_SUCCESS;
-                                    }
+                                    int nextTier = current >= MAX_TIER
+                                            ? 1
+                                            : current + 1;
 
-                                    int next = current + 1;
-                                    int next = current >= MAX_TIER ? 1 : current + 1;
-                                    TIERS.put(player.getUUID(), next);
+                                    TIERS.put(player.getUUID(), nextTier);
 
                                     context.getSource().sendSuccess(
                                             () -> Component.literal(
                                                     "Đã chọn Lĩnh Vực Thôn Phệ tầng "
-                                                            + next + "/7."),
+                                                            + nextTier + "/7."),
                                             false
                                     );
 

@@ -20,6 +20,7 @@ public final class FogDomain5Effects {
 
     private static final int RADIUS = 30;
     private static final int EFFECT_INTERVAL = 20;
+    private static final int MAX_FREEZE_TICKS = 140;
 
     private FogDomain5Effects() {
     }
@@ -40,11 +41,8 @@ public final class FogDomain5Effects {
             return;
         }
 
-        if (!FogDomain5.isActive(player.getUUID())) {
-            return;
-        }
-
-        if (FogDomain5.getTier(player.getUUID()) != 1) {
+        if (!FogDomain5.isActive(player.getUUID())
+                || FogDomain5.getTier(player.getUUID()) != 1) {
             return;
         }
 
@@ -85,8 +83,8 @@ public final class FogDomain5Effects {
 
             applyWind(target);
             applyRain(target);
-            applySnow(level, target);
-            applyFire(level, target);
+            applySnow(target);
+            applyFire(target);
             spawnWeather(level, target);
         }
     }
@@ -94,11 +92,11 @@ public final class FogDomain5Effects {
     private static void applyWind(LivingEntity target) {
 
         target.addEffect(new MobEffectInstance(
-                MobEffects.CONFUSION, 60, 0, false, false, true
+                MobEffects.NAUSEA, 60, 0, false, false, true
         ));
 
         target.addEffect(new MobEffectInstance(
-                MobEffects.MOVEMENT_SLOWDOWN, 60, 0, false, false, true
+                MobEffects.SLOWNESS, 60, 0, false, false, true
         ));
 
         target.addEffect(new MobEffectInstance(
@@ -121,25 +119,23 @@ public final class FogDomain5Effects {
         ));
     }
 
-    private static void applySnow(
-            ServerLevel level,
-            LivingEntity target
-    ) {
+    private static void applySnow(LivingEntity target) {
+
         if (randomChance(3)) {
             int frozen = target.getTicksFrozen();
 
             target.setTicksFrozen(
-                    Math.min(target.getMaxTicksFrozen(), frozen + 10)
+                    Math.min(MAX_FREEZE_TICKS, frozen + 2)
             );
         }
     }
 
-    private static void applyFire(
-            ServerLevel level,
-            LivingEntity target
-    ) {
+    private static void applyFire(LivingEntity target) {
+
         if (randomChance(2)) {
-            target.setSecondsOnFire(3);
+            target.setRemainingFireTicks(
+                    Math.max(target.getRemainingFireTicks(), 60)
+            );
         }
     }
 
@@ -154,34 +150,26 @@ public final class FogDomain5Effects {
         level.sendParticles(
                 ParticleTypes.CLOUD,
                 x, y + 0.8D, z,
-                2,
-                0.5D, 0.3D, 0.5D,
-                0.02D
+                2, 0.5D, 0.3D, 0.5D, 0.02D
         );
 
         level.sendParticles(
                 ParticleTypes.RAIN,
                 x, y + 1.5D, z,
-                3,
-                0.4D, 0.5D, 0.4D,
-                0.02D
+                3, 0.4D, 0.5D, 0.4D, 0.02D
         );
 
         level.sendParticles(
                 ParticleTypes.SNOWFLAKE,
                 x, y + 1.8D, z,
-                1,
-                0.4D, 0.5D, 0.4D,
-                0.01D
+                1, 0.4D, 0.5D, 0.4D, 0.01D
         );
 
         if (randomChance(2)) {
             level.sendParticles(
                     ParticleTypes.FLAME,
                     x, y + 0.5D, z,
-                    2,
-                    0.4D, 0.3D, 0.4D,
-                    0.01D
+                    2, 0.4D, 0.3D, 0.4D, 0.01D
             );
         }
     }

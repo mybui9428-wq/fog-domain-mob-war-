@@ -7,9 +7,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -50,15 +50,41 @@ public final class FogDomain5Terrain {
         ServerLevel level = (ServerLevel) player.level();
         BlockPos playerPos = player.blockPosition();
 
-        int centerX = playerPos.getX();
-        int centerZ = playerPos.getZ();
-
         int surfaceY = findSurface(level, playerPos);
 
         if (surfaceY == Integer.MIN_VALUE) {
             return 0;
         }
 
+        Map<BlockPos, BlockState> saved = buildPool(
+                level,
+                playerPos.getX(),
+                playerPos.getZ(),
+                surfaceY
+        );
+
+        if (saved.isEmpty()) {
+            return 0;
+        }
+
+        ORIGINAL.put(id, saved);
+
+        POOLS.put(id, new PoolData(
+                level,
+                playerPos.getX(),
+                playerPos.getZ(),
+                surfaceY
+        ));
+
+        return saved.size();
+    }
+
+    private static Map<BlockPos, BlockState> buildPool(
+            ServerLevel level,
+            int centerX,
+            int centerZ,
+            int surfaceY
+    ) {
         Map<BlockPos, BlockState> saved = new LinkedHashMap<>();
         int radiusSquared = RADIUS * RADIUS;
 
@@ -87,13 +113,11 @@ public final class FogDomain5Terrain {
                         continue;
                     }
 
-                    // Không phá bedrock hoặc barrier.
                     if (oldState.is(Blocks.BEDROCK)
                             || oldState.is(Blocks.BARRIER)) {
                         continue;
                     }
 
-                    // Không thay block không thể phá.
                     if (oldState.getDestroySpeed(level, pos) < 0) {
                         continue;
                     }
@@ -109,17 +133,7 @@ public final class FogDomain5Terrain {
             }
         }
 
-        if (saved.isEmpty()) {
-            return 0;
-        }
-
-        ORIGINAL.put(id, saved);
-        POOLS.put(
-                id,
-                new PoolData(level, centerX, centerZ, surfaceY)
-        );
-
-        return saved.size();
+        return saved;
     }
 
     private static int findSurface(
@@ -167,42 +181,83 @@ public final class FogDomain5Terrain {
         return Integer.MIN_VALUE;
     }
 
-    public static int restorePool(ServerPlayer player) {
-        UUID id = player.getUUID();
-
-        Map<BlockPos, BlockState> saved = ORIGINAL.remove(id);
-        POOLS.remove(id);
-
-        if (saved == null) {
-            return 0;
-        }
-
-        ServerLevel level = (ServerLevel) player.level();
+    private static int restoreBlocks(
+            ServerLevel level,
+            Map<BlockPos, BlockState> saved
+    ) {
         int restored = 0;
 
         for (Map.Entry<BlockPos, BlockState> entry : saved.entrySet()) {
-
             BlockPos pos = entry.getKey();
 
             if (!level.hasChunkAt(pos)) {
                 continue;
             }
 
-            // Chỉ khôi phục vị trí vẫn là nước do hồ tạo ra.
+            // Không ghi đè block đã bị người chơi thay đổi.
             if (!level.getBlockState(pos).is(Blocks.WATER)) {
                 continue;
             }
 
-            level.setBlock(
-                    pos,
-                    entry.getValue(),
-                    3
-            );
-
+            level.setBlock(pos, entry.getValue(), 3);
             restored++;
         }
 
         return restored;
+    }
+
+    public static int restorePool(ServerPlayer player) {
+        UUID id = player.getUUID();
+
+        Map<BlockPos, BlockState> saved = ORIGINAL.remove(id);
+        PoolData pool = POOLS.remove(id);
+
+        if (saved == null || pool == null) {
+            return 0;
+        }
+
+        return restoreBlocks(pool.level(), saved);
+    }
+
+    private static void movePool(
+            ServerPlayer player,
+            PoolData oldPool
+    ) {
+        UUID id = player.getUUID();
+
+        int newX = player.blockPosition().getX();
+        int newZ = player.blockPosition().getZ();
+
+        if (newX == oldPool.centerX()
+                && newZ == oldPool.centerZ()) {
+            return;
+        }
+
+        Map<BlockPos, BlockState> oldBlocks = ORIGINAL.get(id);
+
+        if (oldBlocks == null) {
+            return;
+        }
+
+        // Khôi phục vị trí hồ cũ trước.
+        restoreBlocks(oldPool.level(), oldBlocks);
+
+        // Tạo hồ mới theo vị trí hiện tại.
+        Map<BlockPos, BlockState> newBlocks = buildPool(
+                oldPool.level(),
+                newX,
+                newZ,
+                oldPool.surfaceY()
+        );
+
+        ORIGINAL.put(id, newBlocks);
+
+        POOLS.put(id, new PoolData(
+                oldPool.level(),
+                newX,
+                newZ,
+                oldPool.surfaceY()
+        ));
     }
 
     @SubscribeEvent
@@ -217,9 +272,19 @@ public final class FogDomain5Terrain {
             return;
         }
 
-        PoolData pool = POOLS.get(player.getUUID());
+        UUID id = player.getUUID();
+        PoolData pool = POOLS.get(id);
 
         if (pool == null || pool.level() != player.level()) {
+            return;
+        }
+
+        // Di chuyển hồ theo người điều khiển.
+        movePool(player, pool);
+
+        pool = POOLS.get(id);
+
+        if (pool == null) {
             return;
         }
 
@@ -230,23 +295,11 @@ public final class FogDomain5Terrain {
             return;
         }
 
-        BlockPos waterPos = new BlockPos(
-                player.blockPosition().getX(),
-                pool.surfaceY(),
-                player.blockPosition().getZ()
-        );
-
-        if (!pool.level().hasChunkAt(waterPos)
-                || !pool.level().getBlockState(waterPos)
-                        .is(Blocks.WATER)) {
-            return;
-        }
-
-        // Giữ người điều khiển trên mặt hồ.
         double targetY = pool.surfaceY() + 1.0D;
 
+        // Cứu người điều khiển nếu bị chìm dưới mặt hồ.
         if (player.getY() < targetY
-                && player.getY() > pool.surfaceY() - 0.5D) {
+                && player.getY() > pool.surfaceY() - 8.0D) {
 
             player.setPos(
                     player.getX(),

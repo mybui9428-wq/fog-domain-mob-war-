@@ -28,8 +28,8 @@ public final class FogDomain5 {
     }
 
     private static boolean isController(ServerPlayer player) {
-        return player.getGameProfile().getName()
-                .equalsIgnoreCase("tubi2531");
+    return player.getName().getString()
+            .equalsIgnoreCase("tubi2531");
     }
 
     public static int getTier(UUID playerId) {
@@ -71,6 +71,7 @@ public final class FogDomain5 {
                                     }
 
                                     int next = current + 1;
+                                    int next = current >= MAX_TIER ? 1 : current + 1;
                                     TIERS.put(player.getUUID(), next);
 
                                     context.getSource().sendSuccess(

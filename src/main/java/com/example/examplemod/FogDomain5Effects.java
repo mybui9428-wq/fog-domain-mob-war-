@@ -2,6 +2,7 @@
 package com.example.examplemod;
 
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -68,6 +69,9 @@ public final class FogDomain5Effects {
         List<LivingEntity> entities =
                 level.getEntitiesOfClass(LivingEntity.class, area);
 
+        FogDomainAbilityData data =
+                FogDomainAbilityData.get(level.getServer());
+
         for (LivingEntity target : entities) {
 
             if (target == player || !target.isAlive()) {
@@ -81,11 +85,55 @@ public final class FogDomain5Effects {
                 continue;
             }
 
+            // Chỉ sao chép khi sinh vật thực sự đang ở trong nước.
+            if (target.isInWater()) {
+                copyCreatureAbilities(player, target, data);
+            }
+
             applyWind(target);
             applyRain(target);
             applySnow(target);
             applyFire(target);
             spawnWeather(level, target);
+        }
+    }
+
+    private static void copyCreatureAbilities(
+            ServerPlayer owner,
+            LivingEntity creature,
+            FogDomainAbilityData data
+    ) {
+        String entityTypeId = BuiltInRegistries.ENTITY_TYPE
+                .getKey(creature.getType())
+                .toString();
+
+        boolean newAbility = data.addAbility(
+                owner.getUUID(),
+                entityTypeId
+        );
+
+        List<String> sources =
+                data.getCreatureSkillSources(
+                        owner.getUUID(),
+                        "unused_check"
+                );
+
+        // Mở khóa kỹ năng của loại sinh vật này.
+        int newSkills = data.unlockCreatureSkills(
+                owner.getUUID(),
+                entityTypeId
+        );
+
+        if (newAbility || newSkills > 0) {
+            owner.sendSystemMessage(
+                    net.minecraft.network.chat.Component.literal(
+                            "§b[Lĩnh Vực Thôn Phệ] §fĐã sao chép: "
+                                    + entityTypeId
+                                    + (newSkills > 0
+                                    ? " | Kỹ năng mới: " + newSkills
+                                    : "")
+                    )
+            );
         }
     }
 

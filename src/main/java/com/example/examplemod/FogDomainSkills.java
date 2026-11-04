@@ -726,4 +726,13 @@ private static int cast(ServerPlayer player) {
             }
         }
     }
+        // Dữ liệu dành cho bảng HUD.
+    public static String getSelectedSkillName() {
+        return SKILLS[selectedSkill];
+    }
+
+    public static int getTamedCount(UUID playerId) {
+        List<UUID> owned = TAMED.get(playerId);
+        return owned == null ? 0 : owned.size();
+            }
 }

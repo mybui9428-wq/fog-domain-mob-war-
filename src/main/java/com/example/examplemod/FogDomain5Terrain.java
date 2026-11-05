@@ -2,20 +2,16 @@
 package com.example.examplemod;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -24,122 +20,24 @@ import java.util.UUID;
 public final class FogDomain5Terrain {
 
     private static final int RADIUS = 30;
-    private static final int FIRST_DEPTH = 3;
-    private static final int SECOND_DEPTH = 3;
+    private static final int DEPTH = 3;
+    private static final int OPEN_SKY_CHECK = 8;
 
-    private static final int CLEAR_HEIGHT = 30;
+    // Chỉ di chuyển hồ khi người chơi đi xa 20 block.
     private static final int MOVE_DISTANCE = 20;
 
-    // Tăng tốc xử lý.
-    private static final int MAX_POSITIONS_PER_TICK = 1200;
-    private static final int MAX_CHANGES_PER_TICK = 400;
-
-    private static final int UPDATE_FLAGS =
-            Block.UPDATE_CLIENTS
-                    | Block.UPDATE_NEIGHBORS
-                    | Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS
-                    | Block.UPDATE_SUPPRESS_DROPS;
-
-    private static final Map<UUID, Map<BlockPos, SavedBlock>> ORIGINAL =
+    private static final Map<UUID, Map<BlockPos, BlockState>> ORIGINAL =
             new HashMap<>();
 
     private static final Map<UUID, PoolData> POOLS =
             new HashMap<>();
 
-    private static final Map<UUID, PoolBuild> BUILDS =
-            new HashMap<>();
-
-    private static final Map<UUID, RestoreTask> RESTORES =
-            new HashMap<>();
-
-    private static final Map<UUID, Map<BlockPos, BlockState>> FOOT_BLOCKS =
-            new HashMap<>();
-
-    private static final Map<UUID, BlockPos> LAST_FOOT_BLOCK =
-            new HashMap<>();
-
-    private record SavedBlock(
-            BlockState state,
-            CompoundTag blockEntityData
-    ) {}
-
     private record PoolData(
             ServerLevel level,
             int centerX,
             int centerZ,
-            int surfaceY,
-            int depth,
-            boolean secondPool
-    ) {}
-
-    private static final class PoolBuild {
-
-        private final ServerLevel level;
-        private final int centerX;
-        private final int centerZ;
-        private final int surfaceY;
-        private final int depth;
-        private final boolean secondPool;
-
-        private final Map<BlockPos, SavedBlock> saved =
-                new LinkedHashMap<>();
-
-        // 0: lưu dữ liệu và xóa cây cỏ.
-        // 1: xóa các block còn lại.
-        // 2: tạo hồ nước và Barrier.
-        private int stage = 0;
-
-        private int cursor = 0;
-
-        private PoolBuild(
-                ServerLevel level,
-                int centerX,
-                int centerZ,
-                int surfaceY,
-                int depth,
-                boolean secondPool
-        ) {
-            this.level = level;
-            this.centerX = centerX;
-            this.centerZ = centerZ;
-            this.surfaceY = surfaceY;
-            this.depth = depth;
-            this.secondPool = secondPool;
-        }
-    }
-
-    private static final class RestoreTask {
-
-        private final ServerLevel level;
-        private final Iterator<Map.Entry<BlockPos, SavedBlock>> iterator;
-
-        private final boolean createNextPool;
-        private final int nextX;
-        private final int nextZ;
-        private final int nextSurfaceY;
-        private final int nextDepth;
-        private final boolean nextSecondPool;
-
-        private RestoreTask(
-                ServerLevel level,
-                Map<BlockPos, SavedBlock> saved,
-                boolean createNextPool,
-                int nextX,
-                int nextZ,
-                int nextSurfaceY,
-                int nextDepth,
-                boolean nextSecondPool
-        ) {
-            this.level = level;
-            this.iterator = new ArrayList<>(saved.entrySet()).iterator();
-
-            this.createNextPool = createNextPool;
-            this.nextX = nextX;
-            this.nextZ = nextZ;
-            this.nextSurfaceY = nextSurfaceY;
-            this.nextDepth = nextDepth;
-            this.nextSecondPool = nextSecondPool;
-        }
+            int surfaceY
+    ) {
     }
 
     private FogDomain5Terrain() {
@@ -150,89 +48,111 @@ public final class FogDomain5Terrain {
                 .equalsIgnoreCase("tubi2531");
     }
 
-    private static int getMinY(int surfaceY) {
-        return surfaceY - FIRST_DEPTH;
-    }
-
-    private static int getMaxY(int surfaceY) {
-        return surfaceY + CLEAR_HEIGHT;
-    }
-
-    private static int getColumnCount() {
-        return (RADIUS * 2 + 1) * (RADIUS * 2 + 1);
-    }
-
-    private static int getLayerCount(int surfaceY) {
-        return getMaxY(surfaceY) - getMinY(surfaceY) + 1;
-    }
-
-    private static boolean insideCircle(int x, int z) {
-        return x * x + z * z <= RADIUS * RADIUS;
-    }
-
-    private static boolean isBoundary(int x, int z) {
-        return !insideCircle(x + 1, z)
-                || !insideCircle(x - 1, z)
-                || !insideCircle(x, z + 1)
-                || !insideCircle(x, z - 1);
+    // Chỉ trả về true khi hồ đã tạo xong.
+    public static boolean isReady(UUID id) {
+        return POOLS.containsKey(id)
+                && ORIGINAL.containsKey(id);
     }
 
     public static int createPool(ServerPlayer player) {
 
         UUID id = player.getUUID();
 
-        if (ORIGINAL.containsKey(id)
-                || BUILDS.containsKey(id)
-                || RESTORES.containsKey(id)) {
+        if (ORIGINAL.containsKey(id)) {
             return 0;
         }
 
         ServerLevel level = (ServerLevel) player.level();
+        BlockPos playerPos = player.blockPosition();
 
-        int groundY = findSurface(
-                level,
-                player.blockPosition()
-        );
+        int surfaceY = findSurface(level, playerPos);
 
-        if (groundY == Integer.MIN_VALUE) {
+        if (surfaceY == Integer.MIN_VALUE) {
             return 0;
         }
 
-        // Không cộng thêm 1 block.
-        startBuild(
-                id,
+        Map<BlockPos, BlockState> saved = buildPool(
                 level,
-                player.blockPosition().getX(),
-                player.blockPosition().getZ(),
-                groundY,
-                FIRST_DEPTH,
-                false
+                playerPos.getX(),
+                playerPos.getZ(),
+                surfaceY
         );
 
-        return 1;
+        if (saved.isEmpty()) {
+            return 0;
+        }
+
+        ORIGINAL.put(id, saved);
+
+        POOLS.put(id, new PoolData(
+                level,
+                playerPos.getX(),
+                playerPos.getZ(),
+                surfaceY
+        ));
+
+        return saved.size();
     }
 
-    private static void startBuild(
-            UUID id,
+    private static Map<BlockPos, BlockState> buildPool(
             ServerLevel level,
             int centerX,
             int centerZ,
-            int surfaceY,
-            int depth,
-            boolean secondPool
+            int surfaceY
     ) {
 
-        PoolBuild build = new PoolBuild(
-                level,
-                centerX,
-                centerZ,
-                surfaceY,
-                depth,
-                secondPool
-        );
+        Map<BlockPos, BlockState> saved =
+                new LinkedHashMap<>();
 
-        BUILDS.put(id, build);
-        ORIGINAL.put(id, build.saved);
+        int radiusSquared = RADIUS * RADIUS;
+
+        for (int x = -RADIUS; x <= RADIUS; x++) {
+            for (int z = -RADIUS; z <= RADIUS; z++) {
+
+                if (x * x + z * z > radiusSquared) {
+                    continue;
+                }
+
+                for (int depth = 0; depth < DEPTH; depth++) {
+
+                    BlockPos pos = new BlockPos(
+                            centerX + x,
+                            surfaceY - depth,
+                            centerZ + z
+                    );
+
+                    if (!level.hasChunkAt(pos)) {
+                        continue;
+                    }
+
+                    BlockState oldState =
+                            level.getBlockState(pos);
+
+                    if (level.getBlockEntity(pos) != null) {
+                        continue;
+                    }
+
+                    if (oldState.is(Blocks.BEDROCK)
+                            || oldState.is(Blocks.BARRIER)) {
+                        continue;
+                    }
+
+                    if (oldState.getDestroySpeed(level, pos) < 0) {
+                        continue;
+                    }
+
+                    saved.put(pos.immutable(), oldState);
+
+                    level.setBlock(
+                            pos,
+                            Blocks.WATER.defaultBlockState(),
+                            3
+                    );
+                }
+            }
+        }
+
+        return saved;
     }
 
     private static int findSurface(
@@ -240,494 +160,108 @@ public final class FogDomain5Terrain {
             BlockPos start
     ) {
 
-        for (int y = start.getY() + 1;
-             y >= start.getY() - 8;
+        int startY = start.getY();
+
+        for (int y = startY + 2;
+             y >= startY - 5;
              y--) {
 
-            BlockPos pos = new BlockPos(
+            BlockPos ground = new BlockPos(
                     start.getX(),
                     y,
                     start.getZ()
             );
 
-            if (!level.hasChunkAt(pos)) {
+            if (!level.hasChunkAt(ground)) {
                 continue;
             }
 
-            BlockState state = level.getBlockState(pos);
+            BlockState state =
+                    level.getBlockState(ground);
 
             if (!state.isSolid()
-                    || !state.getFluidState().isEmpty()
-                    || state.is(Blocks.BEDROCK)
-                    || state.is(Blocks.BARRIER)) {
+                    || !state.getFluidState().isEmpty()) {
                 continue;
             }
 
-            return y;
+            boolean open = true;
+
+            for (int h = 1; h <= OPEN_SKY_CHECK; h++) {
+
+                BlockPos above = ground.above(h);
+
+                if (!level.hasChunkAt(above)
+                        || !level.getBlockState(above).isAir()) {
+                    open = false;
+                    break;
+                }
+            }
+
+            if (open) {
+                return y;
+            }
         }
 
         return Integer.MIN_VALUE;
     }
 
-    private static void processBuild(
-            UUID id,
-            PoolBuild build
+    private static int restoreBlocks(
+            ServerLevel level,
+            Map<BlockPos, BlockState> saved
     ) {
 
-        int positions = 0;
-        int changes = 0;
+        int restored = 0;
 
-        int columns = getColumnCount();
-        int layers = getLayerCount(build.surfaceY);
+        for (Map.Entry<BlockPos, BlockState> entry
+                : saved.entrySet()) {
 
-        int totalScanPositions = columns * layers;
+            BlockPos pos = entry.getKey();
 
-        while (positions < MAX_POSITIONS_PER_TICK
-                && changes < MAX_CHANGES_PER_TICK) {
-
-            if (build.stage == 0 || build.stage == 1) {
-
-                if (build.cursor >= totalScanPositions) {
-
-                    build.cursor = 0;
-                    build.stage++;
-
-                    continue;
-                }
-
-                int layerIndex = build.cursor / columns;
-                int columnIndex = build.cursor % columns;
-
-                build.cursor++;
-                positions++;
-
-                int x = columnIndex / (RADIUS * 2 + 1) - RADIUS;
-                int z = columnIndex % (RADIUS * 2 + 1) - RADIUS;
-
-                if (!insideCircle(x, z)) {
-                    continue;
-                }
-
-                int y = getMinY(build.surfaceY) + layerIndex;
-
-                BlockPos pos = new BlockPos(
-                        build.centerX + x,
-                        y,
-                        build.centerZ + z
-                );
-
-                if (!build.level.hasChunkAt(pos)) {
-                    continue;
-                }
-
-                BlockState state = build.level.getBlockState(pos);
-
-                if (build.stage == 0) {
-
-                    CompoundTag blockEntityData = null;
-
-                    BlockEntity blockEntity =
-                            build.level.getBlockEntity(pos);
-
-                    if (blockEntity != null) {
-                        blockEntityData =
-                                blockEntity.saveWithFullMetadata(
-                                        build.level.registryAccess()
-                                ).copy();
-                    }
-
-                    build.saved.put(
-                            pos.immutable(),
-                            new SavedBlock(state, blockEntityData)
-                    );
-
-                    if (!state.isAir()
-                            && state.canBeReplaced()
-                            && !state.is(Blocks.BEDROCK)) {
-
-                        build.level.setBlock(
-                                pos,
-                                Blocks.AIR.defaultBlockState(),
-                                UPDATE_FLAGS
-                        );
-
-                        changes++;
-                    }
-
-                } else {
-
-                    if (!state.isAir()
-                            && !state.is(Blocks.BEDROCK)) {
-
-                        build.level.setBlock(
-                                pos,
-                                Blocks.AIR.defaultBlockState(),
-                                UPDATE_FLAGS
-                        );
-
-                        changes++;
-                    }
-                }
-
+            if (!level.hasChunkAt(pos)) {
                 continue;
             }
 
-            if (build.stage == 2) {
-
-                if (build.cursor >= columns) {
-                    finishBuild(id, build);
-                    return;
-                }
-
-                int columnIndex = build.cursor++;
-
-                int x = columnIndex / (RADIUS * 2 + 1) - RADIUS;
-                int z = columnIndex % (RADIUS * 2 + 1) - RADIUS;
-
-                positions++;
-
-                if (!insideCircle(x, z)) {
-                    continue;
-                }
-
-                if (changes + build.depth + 1 > MAX_CHANGES_PER_TICK) {
-                    build.cursor--;
-                    return;
-                }
-
-                int worldX = build.centerX + x;
-                int worldZ = build.centerZ + z;
-
-                boolean boundary = isBoundary(x, z);
-
-                for (int y = 0; y < build.depth; y++) {
-
-                    BlockPos pos = new BlockPos(
-                            worldX,
-                            build.surfaceY - y,
-                            worldZ
-                    );
-
-                    if (!build.level.hasChunkAt(pos)) {
-                        continue;
-                    }
-
-                    BlockState replacement = boundary
-                            ? Blocks.BARRIER.defaultBlockState()
-                            : Blocks.WATER.defaultBlockState();
-
-                    build.level.setBlock(
-                            pos,
-                            replacement,
-                            UPDATE_FLAGS
-                    );
-
-                    changes++;
-                }
-
-                BlockPos floor = new BlockPos(
-                        worldX,
-                        build.surfaceY - build.depth,
-                        worldZ
-                );
-
-                if (build.level.hasChunkAt(floor)) {
-
-                    build.level.setBlock(
-                            floor,
-                            Blocks.BARRIER.defaultBlockState(),
-                            UPDATE_FLAGS
-                    );
-
-                    changes++;
-                }
+            if (!level.getBlockState(pos).is(Blocks.WATER)) {
+                continue;
             }
-        }
-    }
-
-    private static void finishBuild(
-            UUID id,
-            PoolBuild build
-    ) {
-
-        BUILDS.remove(id);
-
-        POOLS.put(id, new PoolData(
-                build.level,
-                build.centerX,
-                build.centerZ,
-                build.surfaceY,
-                build.depth,
-                build.secondPool
-        ));
-    }
-
-    private static void restoreBlock(
-            ServerLevel level,
-            BlockPos pos,
-            SavedBlock saved
-    ) {
-
-        if (!level.hasChunkAt(pos)) {
-            return;
-        }
-
-        BlockState current = level.getBlockState(pos);
-
-        if (!current.isAir()
-                && !current.is(Blocks.WATER)
-                && !current.is(Blocks.BARRIER)) {
-            return;
-        }
-
-        level.setBlock(
-                pos,
-                saved.state(),
-                UPDATE_FLAGS
-        );
-
-        if (saved.blockEntityData() != null) {
-
-            BlockEntity restored = BlockEntity.loadStatic(
-                    pos,
-                    saved.state(),
-                    saved.blockEntityData(),
-                    level.registryAccess()
-            );
-
-            if (restored != null) {
-                level.setBlockEntity(restored);
-                restored.setChanged();
-            }
-        }
-    }
-
-    private static void startRestore(
-            UUID id,
-            ServerLevel level,
-            Map<BlockPos, SavedBlock> saved,
-            boolean createNextPool,
-            int nextX,
-            int nextZ,
-            int nextSurfaceY,
-            int nextDepth,
-            boolean nextSecondPool
-    ) {
-
-        if (saved == null) {
-            return;
-        }
-
-        RESTORES.put(
-                id,
-                new RestoreTask(
-                        level,
-                        saved,
-                        createNextPool,
-                        nextX,
-                        nextZ,
-                        nextSurfaceY,
-                        nextDepth,
-                        nextSecondPool
-                )
-        );
-    }
-
-    private static void processRestore(UUID id, RestoreTask task) {
-
-        int processed = 0;
-
-        while (processed < MAX_POSITIONS_PER_TICK
-                && task.iterator.hasNext()) {
-
-            Map.Entry<BlockPos, SavedBlock> entry =
-                    task.iterator.next();
-
-            restoreBlock(
-                    task.level,
-                    entry.getKey(),
-                    entry.getValue()
-            );
-
-            processed++;
-        }
-
-        if (task.iterator.hasNext()) {
-            return;
-        }
-
-        RESTORES.remove(id);
-        ORIGINAL.remove(id);
-        POOLS.remove(id);
-
-        if (task.createNextPool
-                && FogDomain5.isActive(id)) {
-
-            startBuild(
-                    id,
-                    task.level,
-                    task.nextX,
-                    task.nextZ,
-                    task.nextSurfaceY,
-                    task.nextDepth,
-                    task.nextSecondPool
-            );
-        }
-    }
-
-    private static void removeFootBlock(
-            UUID id,
-            ServerLevel level
-    ) {
-
-        BlockPos oldPos = LAST_FOOT_BLOCK.remove(id);
-
-        if (oldPos == null) {
-            return;
-        }
-
-        Map<BlockPos, BlockState> saved = FOOT_BLOCKS.get(id);
-
-        if (saved == null) {
-            return;
-        }
-
-        BlockState original = saved.remove(oldPos);
-
-        if (original != null
-                && level.hasChunkAt(oldPos)
-                && level.getBlockState(oldPos).is(Blocks.BARRIER)) {
 
             level.setBlock(
-                    oldPos,
-                    original,
-                    UPDATE_FLAGS
+                    pos,
+                    entry.getValue(),
+                    3
             );
+
+            restored++;
         }
 
-        if (saved.isEmpty()) {
-            FOOT_BLOCKS.remove(id);
-        }
-    }
-
-    private static void updateFootBlock(
-            UUID id,
-            ServerPlayer player
-    ) {
-
-        ServerLevel level = (ServerLevel) player.level();
-
-        BlockPos newPos = player.blockPosition().below();
-
-        if (newPos.equals(LAST_FOOT_BLOCK.get(id))) {
-            return;
-        }
-
-        removeFootBlock(id, level);
-
-        if (!level.hasChunkAt(newPos)) {
-            return;
-        }
-
-        BlockState oldState = level.getBlockState(newPos);
-
-        if (!oldState.isAir()
-                && !oldState.is(Blocks.WATER)) {
-            return;
-        }
-
-        FOOT_BLOCKS.computeIfAbsent(
-                id,
-                key -> new LinkedHashMap<>()
-        ).put(newPos.immutable(), oldState);
-
-        level.setBlock(
-                newPos,
-                Blocks.BARRIER.defaultBlockState(),
-                UPDATE_FLAGS
-        );
-
-        LAST_FOOT_BLOCK.put(id, newPos.immutable());
+        return restored;
     }
 
     public static int restorePool(ServerPlayer player) {
 
         UUID id = player.getUUID();
 
-        PoolBuild build = BUILDS.remove(id);
+        Map<BlockPos, BlockState> saved =
+                ORIGINAL.remove(id);
 
-        removeFootBlock(
-                id,
-                (ServerLevel) player.level()
-        );
+        PoolData pool = POOLS.remove(id);
 
-        Map<BlockPos, BlockState> footSaved =
-                FOOT_BLOCKS.remove(id);
-
-        LAST_FOOT_BLOCK.remove(id);
-
-        if (footSaved != null) {
-            for (Map.Entry<BlockPos, BlockState> entry
-                    : footSaved.entrySet()) {
-
-                BlockPos pos = entry.getKey();
-
-                if (player.level().hasChunkAt(pos)
-                        && player.level().getBlockState(pos)
-                        .is(Blocks.BARRIER)) {
-
-                    player.level().setBlock(
-                            pos,
-                            entry.getValue(),
-                            UPDATE_FLAGS
-                    );
-                }
-            }
+        if (saved == null || pool == null) {
+            return 0;
         }
 
-        Map<BlockPos, SavedBlock> saved = ORIGINAL.get(id);
-
-        if (saved == null) {
-            if (build != null) {
-                ORIGINAL.put(id, build.saved);
-                saved = build.saved;
-            } else {
-                return 0;
-            }
-        }
-
-        PoolData pool = POOLS.get(id);
-
-        ServerLevel level = pool != null
-                ? pool.level()
-                : build != null
-                    ? build.level
-                    : (ServerLevel) player.level();
-
-        int count = saved.size();
-
-        RESTORES.remove(id);
-
-        startRestore(
-                id,
-                level,
-                saved,
-                false,
-                0,
-                0,
-                0,
-                0,
-                false
+        return restoreBlocks(
+                pool.level(),
+                saved
         );
-
-        return count;
     }
 
     private static void movePool(
-            UUID id,
             ServerPlayer player,
             PoolData oldPool
     ) {
+
+        UUID id = player.getUUID();
 
         int newX = player.blockPosition().getX();
         int newZ = player.blockPosition().getZ();
@@ -735,28 +269,63 @@ public final class FogDomain5Terrain {
         int dx = newX - oldPool.centerX();
         int dz = newZ - oldPool.centerZ();
 
+        // Chưa đi đủ 20 block thì không cập nhật hồ.
         if (dx * dx + dz * dz
                 < MOVE_DISTANCE * MOVE_DISTANCE) {
             return;
         }
 
-        Map<BlockPos, SavedBlock> oldBlocks = ORIGINAL.get(id);
+        Map<BlockPos, BlockState> oldBlocks =
+                ORIGINAL.get(id);
 
         if (oldBlocks == null) {
             return;
         }
 
-        startRestore(
-                id,
+        // Tìm mặt đất mới trước khi khôi phục hồ cũ.
+        int newSurfaceY = findSurface(
                 oldPool.level(),
-                oldBlocks,
-                true,
+                new BlockPos(
+                        newX,
+                        player.blockPosition().getY(),
+                        newZ
+                )
+        );
+
+        if (newSurfaceY == Integer.MIN_VALUE) {
+            return;
+        }
+
+        // Khôi phục hồ cũ.
+        restoreBlocks(
+                oldPool.level(),
+                oldBlocks
+        );
+
+        oldBlocks.clear();
+
+        // Tạo hồ mới tại vị trí tubi2531.
+        Map<BlockPos, BlockState> newBlocks = buildPool(
+                oldPool.level(),
                 newX,
                 newZ,
-                oldPool.surfaceY(),
-                oldPool.depth(),
-                oldPool.secondPool()
+                newSurfaceY
         );
+
+        if (newBlocks.isEmpty()) {
+            ORIGINAL.remove(id);
+            POOLS.remove(id);
+            return;
+        }
+
+        ORIGINAL.put(id, newBlocks);
+
+        POOLS.put(id, new PoolData(
+                oldPool.level(),
+                newX,
+                newZ,
+                newSurfaceY
+        ));
     }
 
     @SubscribeEvent
@@ -772,35 +341,47 @@ public final class FogDomain5Terrain {
 
         UUID id = player.getUUID();
 
-        RestoreTask restore = RESTORES.get(id);
-
-        if (restore != null) {
-            processRestore(id, restore);
-            return;
-        }
-
-        if (!FogDomain5.isActive(id)) {
-            return;
-        }
-
-        PoolBuild build = BUILDS.get(id);
-
-        if (build != null) {
-            processBuild(id, build);
-            return;
-        }
-
         PoolData pool = POOLS.get(id);
 
         if (pool == null || pool.level() != player.level()) {
             return;
         }
 
-        // Không còn tự chuyển sang hồ sâu 15 block.
-        movePool(id, player, pool);
+        movePool(player, pool);
 
-        updateFootBlock(id, player);
+        pool = POOLS.get(id);
 
-        player.fallDistance = 0.0F;
+        if (pool == null) {
+            return;
+        }
+
+        double dx = player.getX() - pool.centerX();
+        double dz = player.getZ() - pool.centerZ();
+
+        if (dx * dx + dz * dz > RADIUS * RADIUS) {
+            return;
+        }
+
+        double targetY = pool.surfaceY() + 1.0D;
+
+        if (player.getY() < targetY
+                && player.getY() > pool.surfaceY() - 8.0D) {
+
+            player.setPos(
+                    player.getX(),
+                    targetY,
+                    player.getZ()
+            );
+
+            Vec3 motion = player.getDeltaMovement();
+
+            player.setDeltaMovement(
+                    motion.x,
+                    Math.max(0.0D, motion.y),
+                    motion.z
+            );
+
+            player.fallDistance = 0.0F;
+        }
     }
 }

@@ -42,8 +42,14 @@ public final class FogDomain5Effects {
             return;
         }
 
-        if (!FogDomain5.isActive(player.getUUID())
-                || FogDomain5.getTier(player.getUUID()) != 1) {
+        if (!FogDomain5.isActive(player.getUUID())) {
+            return;
+        }
+
+        int tier = FogDomain5.getTier(player.getUUID());
+
+        // Tầng 7 sẽ có hệ thống riêng.
+        if (tier < 1 || tier > 6) {
             return;
         }
 
@@ -53,16 +59,18 @@ public final class FogDomain5Effects {
             return;
         }
 
+        int power = tier - 1;
+
         double centerX = player.getX();
         double centerY = player.getY();
         double centerZ = player.getZ();
 
-        // Tạo thời tiết rơi từ trên cao xuống toàn bộ khu vực hồ.
         spawnDomainWeather(
                 level,
                 centerX,
                 centerY,
-                centerZ
+                centerZ,
+                tier
         );
 
         AABB area = new AABB(
@@ -93,15 +101,14 @@ public final class FogDomain5Effects {
                 continue;
             }
 
-            // Sao chép năng lực khi sinh vật đang ở trong nước.
             if (target.isInWater()) {
                 copyCreatureAbilities(player, target, data);
             }
 
-            applyWind(target);
-            applyRain(target);
-            applySnow(target);
-            applyFire(target);
+            applyWind(target, power);
+            applyRain(target, power);
+            applySnow(target, power);
+            applyFire(target, tier);
         }
     }
 
@@ -109,17 +116,22 @@ public final class FogDomain5Effects {
             ServerLevel level,
             double centerX,
             double centerY,
-            double centerZ
+            double centerZ,
+            int tier
     ) {
         ThreadLocalRandom random = ThreadLocalRandom.current();
 
-        // Mưa rơi từ trên cao.
-        for (int i = 0; i < 100; i++) {
+        // Tăng số hạt theo tầng nhưng có giới hạn để giảm lag.
+        int rainCount = Math.min(180, 70 + tier * 12);
+        int snowCount = Math.min(100, 25 + tier * 10);
+        int windCount = Math.min(65, 15 + tier * 7);
+        int fireCount = Math.min(45, 8 + tier * 6);
+
+        for (int i = 0; i < rainCount; i++) {
             double x = centerX + random.nextDouble(-RADIUS, RADIUS);
             double z = centerZ + random.nextDouble(-RADIUS, RADIUS);
 
-            if (distanceSquared(x, z, centerX, centerZ)
-                    > RADIUS * RADIUS) {
+            if (!insideCircle(x, z, centerX, centerZ)) {
                 continue;
             }
 
@@ -134,13 +146,11 @@ public final class FogDomain5Effects {
             );
         }
 
-        // Tuyết rơi từ trên cao.
-        for (int i = 0; i < 55; i++) {
+        for (int i = 0; i < snowCount; i++) {
             double x = centerX + random.nextDouble(-RADIUS, RADIUS);
             double z = centerZ + random.nextDouble(-RADIUS, RADIUS);
 
-            if (distanceSquared(x, z, centerX, centerZ)
-                    > RADIUS * RADIUS) {
+            if (!insideCircle(x, z, centerX, centerZ)) {
                 continue;
             }
 
@@ -155,10 +165,14 @@ public final class FogDomain5Effects {
             );
         }
 
-        // Gió cuốn mây và bụi ngang qua hồ.
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < windCount; i++) {
             double x = centerX + random.nextDouble(-RADIUS, RADIUS);
             double z = centerZ + random.nextDouble(-RADIUS, RADIUS);
+
+            if (!insideCircle(x, z, centerX, centerZ)) {
+                continue;
+            }
+
             double y = centerY + random.nextDouble(0.0D, 5.0D);
 
             level.sendParticles(
@@ -170,13 +184,11 @@ public final class FogDomain5Effects {
             );
         }
 
-        // Hạt lửa xuất hiện trên cao và rơi xuống.
-        for (int i = 0; i < 18; i++) {
+        for (int i = 0; i < fireCount; i++) {
             double x = centerX + random.nextDouble(-RADIUS, RADIUS);
             double z = centerZ + random.nextDouble(-RADIUS, RADIUS);
 
-            if (distanceSquared(x, z, centerX, centerZ)
-                    > RADIUS * RADIUS) {
+            if (!insideCircle(x, z, centerX, centerZ)) {
                 continue;
             }
 
@@ -200,7 +212,7 @@ public final class FogDomain5Effects {
         }
     }
 
-    private static double distanceSquared(
+    private static boolean insideCircle(
             double x,
             double z,
             double centerX,
@@ -208,7 +220,8 @@ public final class FogDomain5Effects {
     ) {
         double dx = x - centerX;
         double dz = z - centerZ;
-        return dx * dx + dz * dz;
+
+        return dx * dx + dz * dz <= RADIUS * RADIUS;
     }
 
     private static void copyCreatureAbilities(
@@ -243,53 +256,80 @@ public final class FogDomain5Effects {
         }
     }
 
-    private static void applyWind(LivingEntity target) {
+    private static void applyWind(
+            LivingEntity target,
+            int power
+    ) {
+        int amplifier = Math.min(power, 5);
+        int duration = 60;
 
         target.addEffect(new MobEffectInstance(
-                MobEffects.NAUSEA, 60, 0, false, false, true
+                MobEffects.NAUSEA, duration, amplifier,
+                false, false, true
         ));
 
         target.addEffect(new MobEffectInstance(
-                MobEffects.SLOWNESS, 60, 0, false, false, true
+                MobEffects.SLOWNESS, duration, amplifier,
+                false, false, true
         ));
 
         target.addEffect(new MobEffectInstance(
-                MobEffects.WEAKNESS, 60, 0, false, false, true
+                MobEffects.WEAKNESS, duration, amplifier,
+                false, false, true
         ));
 
         target.addEffect(new MobEffectInstance(
-                MobEffects.BLINDNESS, 40, 0, false, false, true
+                MobEffects.BLINDNESS, 40 + power * 10, 0,
+                false, false, true
         ));
 
         target.addEffect(new MobEffectInstance(
-                MobEffects.POISON, 60, 0, false, false, true
+                MobEffects.POISON, duration, amplifier,
+                false, false, true
         ));
     }
 
-    private static void applyRain(LivingEntity target) {
-
+    private static void applyRain(
+            LivingEntity target,
+            int power
+    ) {
         target.addEffect(new MobEffectInstance(
-                MobEffects.BLINDNESS, 60, 0, false, false, true
+                MobEffects.BLINDNESS,
+                60 + power * 20,
+                Math.min(power, 2),
+                false,
+                false,
+                true
         ));
     }
 
-    private static void applySnow(LivingEntity target) {
+    private static void applySnow(
+            LivingEntity target,
+            int power
+    ) {
+        int increase = 2 + power * 2;
 
-        if (randomChance(3)) {
+        if (randomChance(Math.max(1, 3 - Math.min(power, 2)))) {
             int frozen = target.getTicksFrozen();
 
             target.setTicksFrozen(
-                    Math.min(MAX_FREEZE_TICKS, frozen + 2)
+                    Math.min(MAX_FREEZE_TICKS, frozen + increase)
             );
         }
     }
 
-    private static void applyFire(LivingEntity target) {
+    private static void applyFire(
+            LivingEntity target,
+            int tier
+    ) {
+        int denominator = Math.max(1, 2 - (tier / 3));
 
-        // Lửa vẫn gây cháy cho sinh vật trong vùng.
-        if (randomChance(2)) {
+        if (randomChance(denominator)) {
             target.setRemainingFireTicks(
-                    Math.max(target.getRemainingFireTicks(), 60)
+                    Math.max(
+                            target.getRemainingFireTicks(),
+                            60 + tier * 20
+                    )
             );
         }
     }

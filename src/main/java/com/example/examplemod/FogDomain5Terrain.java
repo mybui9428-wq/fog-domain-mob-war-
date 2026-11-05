@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -26,14 +25,14 @@ public final class FogDomain5Terrain {
 
     private static final int RADIUS = 30;
     private static final int FIRST_DEPTH = 3;
-    private static final int SECOND_DEPTH = 15;
+    private static final int SECOND_DEPTH = 3;
 
     private static final int CLEAR_HEIGHT = 30;
     private static final int MOVE_DISTANCE = 20;
 
-    // Giới hạn xử lý để giảm lag.
-    private static final int MAX_POSITIONS_PER_TICK = 300;
-    private static final int MAX_CHANGES_PER_TICK = 100;
+    // Tăng tốc xử lý.
+    private static final int MAX_POSITIONS_PER_TICK = 1200;
+    private static final int MAX_CHANGES_PER_TICK = 400;
 
     private static final int UPDATE_FLAGS =
             Block.UPDATE_CLIENTS
@@ -152,7 +151,7 @@ public final class FogDomain5Terrain {
     }
 
     private static int getMinY(int surfaceY) {
-        return surfaceY - SECOND_DEPTH;
+        return surfaceY - FIRST_DEPTH;
     }
 
     private static int getMaxY(int surfaceY) {
@@ -342,7 +341,6 @@ public final class FogDomain5Terrain {
                             new SavedBlock(state, blockEntityData)
                     );
 
-                    // Xóa cây cỏ, hoa và các block có thể thay thế trước.
                     if (!state.isAir()
                             && state.canBeReplaced()
                             && !state.is(Blocks.BEDROCK)) {
@@ -358,7 +356,6 @@ public final class FogDomain5Terrain {
 
                 } else {
 
-                    // Xóa công trình và các block còn lại.
                     if (!state.isAir()
                             && !state.is(Blocks.BEDROCK)) {
 
@@ -428,7 +425,6 @@ public final class FogDomain5Terrain {
                     changes++;
                 }
 
-                // Sàn Barrier dưới đáy hồ.
                 BlockPos floor = new BlockPos(
                         worldX,
                         build.surfaceY - build.depth,
@@ -478,7 +474,6 @@ public final class FogDomain5Terrain {
 
         BlockState current = level.getBlockState(pos);
 
-        // Không ghi đè block mới do người chơi đặt vào.
         if (!current.isAir()
                 && !current.is(Blocks.WATER)
                 && !current.is(Blocks.BARRIER)) {
@@ -636,7 +631,6 @@ public final class FogDomain5Terrain {
 
         BlockState oldState = level.getBlockState(newPos);
 
-        // Chỉ đặt Barrier thay cho nước hoặc không khí.
         if (!oldState.isAir()
                 && !oldState.is(Blocks.WATER)) {
             return;
@@ -752,7 +746,6 @@ public final class FogDomain5Terrain {
             return;
         }
 
-        // Khôi phục xong vùng cũ mới bắt đầu tạo hồ mới.
         startRestore(
                 id,
                 oldPool.level(),
@@ -763,31 +756,6 @@ public final class FogDomain5Terrain {
                 oldPool.surfaceY(),
                 oldPool.depth(),
                 oldPool.secondPool()
-        );
-    }
-
-    private static void createSecondPool(
-            UUID id,
-            ServerPlayer player,
-            PoolData oldPool
-    ) {
-
-        Map<BlockPos, SavedBlock> oldBlocks = ORIGINAL.get(id);
-
-        if (oldBlocks == null) {
-            return;
-        }
-
-        startRestore(
-                id,
-                oldPool.level(),
-                oldBlocks,
-                true,
-                oldPool.centerX(),
-                oldPool.centerZ(),
-                oldPool.surfaceY(),
-                SECOND_DEPTH,
-                true
         );
     }
 
@@ -804,7 +772,6 @@ public final class FogDomain5Terrain {
 
         UUID id = player.getUUID();
 
-        // Khôi phục và xây hồ vẫn chạy kể cả khi đã tắt.
         RestoreTask restore = RESTORES.get(id);
 
         if (restore != null) {
@@ -829,16 +796,7 @@ public final class FogDomain5Terrain {
             return;
         }
 
-        // Khi người chơi xuống đáy hồ đầu tiên,
-        // thay bằng hồ sâu 15 block.
-        if (!pool.secondPool()
-                && player.getY()
-                <= pool.surfaceY() - FIRST_DEPTH) {
-
-            createSecondPool(id, player, pool);
-            return;
-        }
-
+        // Không còn tự chuyển sang hồ sâu 15 block.
         movePool(id, player, pool);
 
         updateFootBlock(id, player);

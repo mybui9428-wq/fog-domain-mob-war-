@@ -9,11 +9,15 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
@@ -22,6 +26,9 @@ public final class FogDomain5Effects {
     private static final int RADIUS = 30;
     private static final int EFFECT_INTERVAL = 20;
     private static final int MAX_FREEZE_TICKS = 140;
+
+    private static final Map<UUID, Vec3> LAST_POSITIONS =
+            new HashMap<>();
 
     private FogDomain5Effects() {
     }
@@ -42,13 +49,15 @@ public final class FogDomain5Effects {
             return;
         }
 
-        if (!FogDomain5.isActive(player.getUUID())) {
+        UUID ownerId = player.getUUID();
+
+        if (!FogDomain5.isActive(ownerId)) {
+            LAST_POSITIONS.remove(ownerId);
             return;
         }
 
-        int tier = FogDomain5.getTier(player.getUUID());
+        int tier = FogDomain5.getTier(ownerId);
 
-        // Tầng 7 sẽ có hệ thống riêng.
         if (tier < 1 || tier > 6) {
             return;
         }
@@ -66,11 +75,7 @@ public final class FogDomain5Effects {
         double centerZ = player.getZ();
 
         spawnDomainWeather(
-                level,
-                centerX,
-                centerY,
-                centerZ,
-                tier
+                level, centerX, centerY, centerZ, tier
         );
 
         AABB area = new AABB(
@@ -109,6 +114,68 @@ public final class FogDomain5Effects {
             applyRain(target, power);
             applySnow(target, power);
             applyFire(target, tier);
+
+            // Chỉ tầng 2 đến tầng 6 mới kéo chìm.
+            if (tier >= 2 && tier <= 6 && target.isInWater()) {
+                sinkEntity(target, tier);
+            }
+        }
+    }
+
+    private static void sinkEntity(
+            LivingEntity target,
+            int tier
+    ) {
+        int power = tier - 1;
+
+        Vec3 motion = target.getDeltaMovement();
+
+        // Tăng lực kéo theo từng tầng.
+        double pull = 0.035D + power * 0.025D;
+
+        // Giới hạn tốc độ chìm để tránh rơi quá nhanh.
+        double maxDownSpeed = 0.12D + power * 0.055D;
+
+        double newY = Math.max(
+                -maxDownSpeed,
+                motion.y - pull
+        );
+
+        // Khi đã gần đáy hồ sâu 3 block,
+        // giữ sinh vật ở dưới nước.
+        if (target.isInWater()) {
+            newY = Math.max(newY, -maxDownSpeed);
+        }
+
+        target.setDeltaMovement(
+                motion.x * 0.90D,
+                newY,
+                motion.z * 0.90D
+        );
+
+        target.hurtMarked = true;
+
+        // Tầng cao làm việc bơi lên khó hơn.
+        if (tier >= 5) {
+            target.addEffect(new MobEffectInstance(
+                    MobEffects.SLOWNESS,
+                    50,
+                    tier - 4,
+                    false,
+                    false,
+                    true
+            ));
+        }
+
+        if (tier == 6) {
+            target.addEffect(new MobEffectInstance(
+                    MobEffects.MINING_FATIGUE,
+                    50,
+                    1,
+                    false,
+                    false,
+                    true
+            ));
         }
     }
 
@@ -121,7 +188,6 @@ public final class FogDomain5Effects {
     ) {
         ThreadLocalRandom random = ThreadLocalRandom.current();
 
-        // Tăng số hạt theo tầng nhưng có giới hạn để giảm lag.
         int rainCount = Math.min(180, 70 + tier * 12);
         int snowCount = Math.min(100, 25 + tier * 10);
         int windCount = Math.min(65, 15 + tier * 7);
@@ -139,10 +205,8 @@ public final class FogDomain5Effects {
 
             level.sendParticles(
                     ParticleTypes.FALLING_WATER,
-                    x, y, z,
-                    1,
-                    0.03D, 0.05D, 0.03D,
-                    0.01D
+                    x, y, z, 1,
+                    0.03D, 0.05D, 0.03D, 0.01D
             );
         }
 
@@ -158,10 +222,8 @@ public final class FogDomain5Effects {
 
             level.sendParticles(
                     ParticleTypes.SNOWFLAKE,
-                    x, y, z,
-                    1,
-                    0.15D, 0.12D, 0.15D,
-                    0.015D
+                    x, y, z, 1,
+                    0.15D, 0.12D, 0.15D, 0.015D
             );
         }
 
@@ -177,10 +239,8 @@ public final class FogDomain5Effects {
 
             level.sendParticles(
                     ParticleTypes.CLOUD,
-                    x, y, z,
-                    1,
-                    0.35D, 0.08D, 0.08D,
-                    0.025D
+                    x, y, z, 1,
+                    0.35D, 0.08D, 0.08D, 0.025D
             );
         }
 
@@ -196,18 +256,14 @@ public final class FogDomain5Effects {
 
             level.sendParticles(
                     ParticleTypes.FLAME,
-                    x, y, z,
-                    1,
-                    0.08D, 0.15D, 0.08D,
-                    0.035D
+                    x, y, z, 1,
+                    0.08D, 0.15D, 0.08D, 0.035D
             );
 
             level.sendParticles(
                     ParticleTypes.SMOKE,
-                    x, y + 0.2D, z,
-                    1,
-                    0.05D, 0.08D, 0.05D,
-                    0.015D
+                    x, y + 0.2D, z, 1,
+                    0.05D, 0.08D, 0.05D, 0.015D
             );
         }
     }

@@ -2,13 +2,14 @@
 package com.example.examplemod;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.monster.Ravager;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -45,7 +46,7 @@ public final class FogDomain5Tier7 {
                 .equalsIgnoreCase("tubi2531");
     }
 
-    // Tạo làng tại vị trí người điều khiển.
+    // Tạo làng ngay tại vị trí tubi2531.
     public static int start(ServerPlayer player) {
 
         if (!isController(player)) {
@@ -64,14 +65,11 @@ public final class FogDomain5Tier7 {
         BlockPos center = player.blockPosition();
         int groundY = center.getY() - 1;
 
-        BlockPos.MutableBlockPos pos =
-                new BlockPos.MutableBlockPos();
-
-        // Quảng trường nhỏ ở trung tâm.
+        // Tạo quảng trường.
         for (int x = -4; x <= 4; x++) {
             for (int z = -4; z <= 4; z++) {
 
-                pos.set(
+                BlockPos pos = new BlockPos(
                         center.getX() + x,
                         groundY,
                         center.getZ() + z
@@ -80,7 +78,7 @@ public final class FogDomain5Tier7 {
                 if (level.isEmptyBlock(pos.above())) {
                     placeBlock(
                             level,
-                            pos.immutable(),
+                            pos,
                             Blocks.STONE_BRICKS.defaultBlockState(),
                             saved
                     );
@@ -88,7 +86,7 @@ public final class FogDomain5Tier7 {
             }
         }
 
-        // Bốn trụ đánh dấu ngôi làng.
+        // Tạo bốn trụ.
         for (int x : new int[]{-5, 5}) {
             for (int z : new int[]{-5, 5}) {
 
@@ -110,7 +108,7 @@ public final class FogDomain5Tier7 {
             }
         }
 
-        // Bệ trung tâm.
+        // Tạo bệ trung tâm.
         for (int x = -1; x <= 1; x++) {
             for (int z = -1; z <= 1; z++) {
 
@@ -131,17 +129,17 @@ public final class FogDomain5Tier7 {
 
         ORIGINAL_BLOCKS.put(ownerId, saved);
 
-        // Tạo sinh vật đặc biệt.
-        Ravager beast = EntityType.RAVAGER.create(level);
+        // Tạo Thú Thôn Phệ bằng registry.
+        Entity beast = BuiltInRegistries.ENTITY_TYPE
+                .get(ResourceLocation.parse("minecraft:ravager"))
+                .create(level);
 
         if (beast != null) {
 
-            beast.moveTo(
+            beast.setPos(
                     center.getX() + 2.5D,
                     groundY + 1,
-                    center.getZ() + 2.5D,
-                    0.0F,
-                    0.0F
+                    center.getZ() + 2.5D
             );
 
             beast.setCustomName(
@@ -149,7 +147,10 @@ public final class FogDomain5Tier7 {
             );
 
             beast.setCustomNameVisible(true);
-            beast.setPersistenceRequired();
+
+            if (beast instanceof Mob mob) {
+                mob.setPersistenceRequired();
+            }
 
             level.addFreshEntity(beast);
 
@@ -179,21 +180,17 @@ public final class FogDomain5Tier7 {
 
         BlockState oldState = level.getBlockState(pos);
 
-        // Không ghi đè công trình hoặc block có sẵn.
+        // Không ghi đè block có sẵn.
         if (!oldState.isAir()) {
             return;
         }
 
         saved.put(pos.immutable(), oldState);
 
-        level.setBlock(
-                pos,
-                newState,
-                3
-        );
+        level.setBlock(pos, newState, 3);
     }
 
-    // Dọn làng và sinh vật do tầng 7 tạo ra.
+    // Dọn làng khi tắt tầng 7.
     public static int stop(ServerPlayer player) {
 
         if (!isController(player)) {
@@ -217,7 +214,6 @@ public final class FogDomain5Tier7 {
 
                 BlockState current = level.getBlockState(pos);
 
-                // Chỉ khôi phục nếu block vẫn là block do làng tạo.
                 if (current.is(Blocks.STONE_BRICKS)
                         || current.is(Blocks.DEEPSLATE_BRICKS)
                         || current.is(Blocks.POLISHED_BLACKSTONE)) {
@@ -302,7 +298,7 @@ public final class FogDomain5Tier7 {
                 continue;
             }
 
-            // Hút sinh vật về phía người điều khiển.
+            // Hút sinh vật về phía tubi2531.
             Vec3 direction = center.subtract(target.position());
 
             if (direction.lengthSqr() > 0.0001D) {
@@ -316,7 +312,6 @@ public final class FogDomain5Tier7 {
                 target.hurtMarked = true;
             }
 
-            // Thôn phệ khi đã đến gần trung tâm.
             if (distance <= DEVOUR_DISTANCE) {
                 devourCreature(player, target);
             }
@@ -342,11 +337,10 @@ public final class FogDomain5Tier7 {
                 FogDomainAbilityData.get(level.getServer());
 
         String entityTypeId =
-                net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+                BuiltInRegistries.ENTITY_TYPE
                         .getKey(creature.getType())
                         .toString();
 
-        // Chuyển sức mạnh và mở khóa năng lực sinh vật.
         data.addAbility(owner.getUUID(), entityTypeId);
 
         data.unlockCreatureSkills(

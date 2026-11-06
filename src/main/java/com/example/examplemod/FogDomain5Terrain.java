@@ -5,11 +5,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -103,11 +103,6 @@ public final class FogDomain5Terrain {
         return saved.size();
     }
 
-    /*
-     * Tìm mặt đất ngay dưới chân người chơi.
-     * Không yêu cầu phía trên phải trống vì cây và cỏ
-     * sẽ được dọn trong quá trình tạo hồ.
-     */
     private static int findSurface(
             ServerLevel level,
             BlockPos start
@@ -129,7 +124,7 @@ public final class FogDomain5Terrain {
             if (!state.isAir()
                     && state.isSolid()
                     && state.getFluidState().isEmpty()
-                    && !state.is(BlockTags.LEAVES)
+                    && !state.is(net.minecraft.tags.BlockTags.LEAVES)
                     && !state.is(Blocks.BEDROCK)
                     && !state.is(Blocks.BARRIER)) {
                 return y;
@@ -170,11 +165,7 @@ public final class FogDomain5Terrain {
         int minY = surfaceY - DEPTH + 1;
         int maxY = surfaceY + CLEAR_HEIGHT;
 
-        /*
-         * GIAI ĐOẠN 1:
-         * Lưu dữ liệu gốc trước khi thay đổi block.
-         * Lưu cả 3 lớp đáy, kể cả vị trí vốn là không khí.
-         */
+        // Giai đoạn 1: lưu toàn bộ block gốc.
         for (int x = -RADIUS; x <= RADIUS; x++) {
             for (int z = -RADIUS; z <= RADIUS; z++) {
 
@@ -199,15 +190,15 @@ public final class FogDomain5Terrain {
                         continue;
                     }
 
-                    saved.put(pos.immutable(), saveBlock(level, pos));
+                    saved.put(
+                            pos.immutable(),
+                            saveBlock(level, pos)
+                    );
                 }
             }
         }
 
-        /*
-         * GIAI ĐOẠN 2:
-         * Xóa cỏ, hoa, lá, cây nhỏ và các block thay thế được trước.
-         */
+        // Giai đoạn 2: xóa cỏ, hoa, lá và cây trước.
         for (Map.Entry<BlockPos, SavedBlock> entry : saved.entrySet()) {
             BlockPos pos = entry.getKey();
             BlockState state = level.getBlockState(pos);
@@ -217,9 +208,10 @@ public final class FogDomain5Terrain {
             }
 
             if (state.canBeReplaced()
-                    || state.is(BlockTags.LEAVES)
-                    || state.is(BlockTags.FLOWERS)
-                    || state.is(BlockTags.LOGS)) {
+                    || state.is(net.minecraft.tags.BlockTags.LEAVES)
+                    || state.is(net.minecraft.tags.BlockTags.FLOWERS)
+                    || state.is(net.minecraft.tags.BlockTags.LOGS)) {
+
                 level.setBlock(
                         pos,
                         Blocks.AIR.defaultBlockState(),
@@ -228,10 +220,7 @@ public final class FogDomain5Terrain {
             }
         }
 
-        /*
-         * GIAI ĐOẠN 3:
-         * Dọn tất cả block còn lại trong vùng phía trên hồ.
-         */
+        // Giai đoạn 3: dọn các block còn lại phía trên mặt hồ.
         for (Map.Entry<BlockPos, SavedBlock> entry : saved.entrySet()) {
             BlockPos pos = entry.getKey();
 
@@ -248,10 +237,7 @@ public final class FogDomain5Terrain {
             }
         }
 
-        /*
-         * GIAI ĐOẠN 4:
-         * Tạo hồ nước sâu 3 block.
-         */
+        // Giai đoạn 4: tạo hồ nước sâu 3 block.
         for (int x = -RADIUS; x <= RADIUS; x++) {
             for (int z = -RADIUS; z <= RADIUS; z++) {
 
@@ -279,10 +265,7 @@ public final class FogDomain5Terrain {
             }
         }
 
-        /*
-         * GIAI ĐOẠN 5:
-         * Tạo vòng Barrier vô hình để hạn chế nước tràn ra ngoài.
-         */
+        // Giai đoạn 5: tạo vòng Barrier quanh hồ.
         for (int x = -RADIUS - 1; x <= RADIUS + 1; x++) {
             for (int z = -RADIUS - 1; z <= RADIUS + 1; z++) {
 
@@ -304,7 +287,10 @@ public final class FogDomain5Terrain {
                 }
 
                 if (!saved.containsKey(pos)) {
-                    saved.put(pos.immutable(), saveBlock(level, pos));
+                    saved.put(
+                            pos.immutable(),
+                            saveBlock(level, pos)
+                    );
                 }
 
                 level.setBlock(
@@ -333,10 +319,6 @@ public final class FogDomain5Terrain {
 
             BlockState current = level.getBlockState(pos);
 
-            /*
-             * Chỉ khôi phục vị trí mà lĩnh vực đã dọn.
-             * Không ghi đè block mới do người chơi đặt vào.
-             */
             if (!current.isAir()
                     && !current.is(Blocks.WATER)
                     && !current.is(Blocks.BARRIER)) {
@@ -345,16 +327,24 @@ public final class FogDomain5Terrain {
 
             SavedBlock original = entry.getValue();
 
-            level.setBlock(pos, original.state(), WATER_FLAGS);
+            level.setBlock(
+                    pos,
+                    original.state(),
+                    WATER_FLAGS
+            );
 
             if (original.blockEntityData() != null) {
                 BlockEntity blockEntity = level.getBlockEntity(pos);
 
                 if (blockEntity != null) {
                     blockEntity.loadWithComponents(
-                            original.blockEntityData(),
-                            level.registryAccess()
+                            TagValueInput.create(
+                                    ProblemReporter.DISCARDING,
+                                    level.registryAccess(),
+                                    original.blockEntityData()
+                            )
                     );
+
                     blockEntity.setChanged();
                 }
             }
@@ -365,10 +355,6 @@ public final class FogDomain5Terrain {
         return restored;
     }
 
-    /*
-     * Cập nhật vùng đỡ 3 x 3 dưới chân.
-     * Các vị trí đã rời đi trở lại thành nước.
-     */
     private static void updateFootBlocks(
             UUID id,
             ServerPlayer player,
@@ -410,7 +396,7 @@ public final class FogDomain5Terrain {
             }
         }
 
-        // Gỡ các Barrier đã rời khỏi vùng đỡ.
+        // Khôi phục nước tại vị trí đã rời đi.
         var iterator = old.entrySet().iterator();
 
         while (iterator.hasNext()) {
@@ -434,7 +420,7 @@ public final class FogDomain5Terrain {
             iterator.remove();
         }
 
-        // Đặt Barrier mới ở những vị trí còn là nước.
+        // Đặt Barrier ở vùng đỡ mới.
         for (BlockPos pos : wanted) {
             if (old.containsKey(pos) || !level.hasChunkAt(pos)) {
                 continue;
@@ -506,11 +492,11 @@ public final class FogDomain5Terrain {
 
         removeFootBlocks(id, level);
 
-        // Khôi phục khu vực hồ cũ trước.
+        // Khôi phục hồ cũ.
         restoreBlocks(level, oldBlocks);
         oldBlocks.clear();
 
-        // Tìm mặt đất mới sau khi khu vực cũ được khôi phục.
+        // Tìm mặt đất mới.
         int newSurfaceY = findSurface(
                 level,
                 player.blockPosition()
@@ -522,6 +508,7 @@ public final class FogDomain5Terrain {
             return;
         }
 
+        // Tạo hồ mới.
         Map<BlockPos, SavedBlock> newBlocks = buildPool(
                 level,
                 newX,
@@ -551,7 +538,10 @@ public final class FogDomain5Terrain {
         PoolData pool = POOLS.remove(id);
         Map<BlockPos, SavedBlock> saved = ORIGINAL.remove(id);
 
-        removeFootBlocks(id, (ServerLevel) player.level());
+        removeFootBlocks(
+                id,
+                (ServerLevel) player.level()
+        );
 
         if (pool == null || saved == null) {
             return 0;
@@ -596,9 +586,9 @@ public final class FogDomain5Terrain {
 
         Vec3 motion = player.getDeltaMovement();
 
-        // Cứu người chơi nếu đã bắt đầu tụt xuống nước.
         if (player.getY() < pool.surfaceY() + 0.85D
                 && player.getY() > pool.surfaceY() - 2.0D) {
+
             player.setPos(
                     player.getX(),
                     pool.surfaceY() + 1.0D,

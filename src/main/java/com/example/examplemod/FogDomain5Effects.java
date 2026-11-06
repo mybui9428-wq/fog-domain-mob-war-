@@ -14,10 +14,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
@@ -26,9 +23,6 @@ public final class FogDomain5Effects {
     private static final int RADIUS = 30;
     private static final int EFFECT_INTERVAL = 20;
     private static final int MAX_FREEZE_TICKS = 140;
-
-    private static final Map<UUID, Vec3> LAST_POSITIONS =
-            new HashMap<>();
 
     private FogDomain5Effects() {
     }
@@ -49,14 +43,11 @@ public final class FogDomain5Effects {
             return;
         }
 
-        UUID ownerId = player.getUUID();
-
-        if (!FogDomain5.isActive(ownerId)) {
-            LAST_POSITIONS.remove(ownerId);
+        if (!FogDomain5.isActive(player.getUUID())) {
             return;
         }
 
-        int tier = FogDomain5.getTier(ownerId);
+        int tier = FogDomain5.getTier(player.getUUID());
 
         if (tier < 1 || tier > 6) {
             return;
@@ -64,19 +55,9 @@ public final class FogDomain5Effects {
 
         ServerLevel level = (ServerLevel) player.level();
 
-        if (level.getGameTime() % EFFECT_INTERVAL != 0) {
-            return;
-        }
-
-        int power = tier - 1;
-
         double centerX = player.getX();
         double centerY = player.getY();
         double centerZ = player.getZ();
-
-        spawnDomainWeather(
-                level, centerX, centerY, centerZ, tier
-        );
 
         AABB area = new AABB(
                 centerX - RADIUS,
@@ -89,6 +70,38 @@ public final class FogDomain5Effects {
 
         List<LivingEntity> entities =
                 level.getEntitiesOfClass(LivingEntity.class, area);
+
+        // Kéo chìm mỗi tick để thắng lực nổi và khả năng bơi.
+        if (tier >= 2 && tier <= 6) {
+            for (LivingEntity target : entities) {
+
+                if (target == player || !target.isAlive()) {
+                    continue;
+                }
+
+                double dx = target.getX() - centerX;
+                double dz = target.getZ() - centerZ;
+
+                if (dx * dx + dz * dz > RADIUS * RADIUS) {
+                    continue;
+                }
+
+                if (target.isInWater()) {
+                    sinkEntity(target, tier);
+                }
+            }
+        }
+
+        // Các hiệu ứng còn lại chỉ chạy mỗi giây để giảm lag.
+        if (level.getGameTime() % EFFECT_INTERVAL != 0) {
+            return;
+        }
+
+        int power = tier - 1;
+
+        spawnDomainWeather(
+                level, centerX, centerY, centerZ, tier
+        );
 
         FogDomainAbilityData data =
                 FogDomainAbilityData.get(level.getServer());
@@ -115,9 +128,27 @@ public final class FogDomain5Effects {
             applySnow(target, power);
             applyFire(target, tier);
 
-            // Chỉ tầng 2 đến tầng 6 mới kéo chìm.
-            if (tier >= 2 && tier <= 6 && target.isInWater()) {
-                sinkEntity(target, tier);
+            // Làm sinh vật khó bơi lên ở tầng cao.
+            if (tier >= 5 && target.isInWater()) {
+                target.addEffect(new MobEffectInstance(
+                        MobEffects.SLOWNESS,
+                        50,
+                        tier - 4,
+                        false,
+                        false,
+                        true
+                ));
+            }
+
+            if (tier == 6 && target.isInWater()) {
+                target.addEffect(new MobEffectInstance(
+                        MobEffects.MINING_FATIGUE,
+                        50,
+                        1,
+                        false,
+                        false,
+                        true
+                ));
             }
         }
     }
@@ -130,53 +161,26 @@ public final class FogDomain5Effects {
 
         Vec3 motion = target.getDeltaMovement();
 
-        // Tăng lực kéo theo từng tầng.
-        double pull = 0.035D + power * 0.025D;
+        // Lực kéo tăng theo tầng.
+        double pull = 0.025D + power * 0.018D;
 
-        // Giới hạn tốc độ chìm để tránh rơi quá nhanh.
-        double maxDownSpeed = 0.12D + power * 0.055D;
+        // Tốc độ chìm tối thiểu theo từng tầng.
+        double minimumDownSpeed = 0.16D + power * 0.035D;
 
-        double newY = Math.max(
-                -maxDownSpeed,
-                motion.y - pull
+        // Luôn ép vận tốc hướng xuống.
+        // Math.min giúp sinh vật không thể bơi ngược lên.
+        double newY = Math.min(
+                motion.y - pull,
+                -minimumDownSpeed
         );
 
-        // Khi đã gần đáy hồ sâu 3 block,
-        // giữ sinh vật ở dưới nước.
-        if (target.isInWater()) {
-            newY = Math.max(newY, -maxDownSpeed);
-        }
-
         target.setDeltaMovement(
-                motion.x * 0.90D,
+                motion.x * 0.85D,
                 newY,
-                motion.z * 0.90D
+                motion.z * 0.85D
         );
 
         target.hurtMarked = true;
-
-        // Tầng cao làm việc bơi lên khó hơn.
-        if (tier >= 5) {
-            target.addEffect(new MobEffectInstance(
-                    MobEffects.SLOWNESS,
-                    50,
-                    tier - 4,
-                    false,
-                    false,
-                    true
-            ));
-        }
-
-        if (tier == 6) {
-            target.addEffect(new MobEffectInstance(
-                    MobEffects.MINING_FATIGUE,
-                    50,
-                    1,
-                    false,
-                    false,
-                    true
-            ));
-        }
     }
 
     private static void spawnDomainWeather(

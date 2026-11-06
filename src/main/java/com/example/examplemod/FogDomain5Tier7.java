@@ -3,13 +3,13 @@ package com.example.examplemod;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -46,9 +46,7 @@ public final class FogDomain5Tier7 {
                 .equalsIgnoreCase("tubi2531");
     }
 
-    // Tạo làng ngay tại vị trí tubi2531.
     public static int start(ServerPlayer player) {
-
         if (!isController(player)) {
             return 0;
         }
@@ -61,14 +59,12 @@ public final class FogDomain5Tier7 {
         }
 
         Map<BlockPos, BlockState> saved = new HashMap<>();
-
         BlockPos center = player.blockPosition();
         int groundY = center.getY() - 1;
 
-        // Tạo quảng trường.
+        // Quảng trường trung tâm.
         for (int x = -4; x <= 4; x++) {
             for (int z = -4; z <= 4; z++) {
-
                 BlockPos pos = new BlockPos(
                         center.getX() + x,
                         groundY,
@@ -77,8 +73,7 @@ public final class FogDomain5Tier7 {
 
                 if (level.isEmptyBlock(pos.above())) {
                     placeBlock(
-                            level,
-                            pos,
+                            level, pos,
                             Blocks.STONE_BRICKS.defaultBlockState(),
                             saved
                     );
@@ -86,12 +81,10 @@ public final class FogDomain5Tier7 {
             }
         }
 
-        // Tạo bốn trụ.
+        // Bốn trụ của làng.
         for (int x : new int[]{-5, 5}) {
             for (int z : new int[]{-5, 5}) {
-
                 for (int y = 0; y < 4; y++) {
-
                     BlockPos pillar = new BlockPos(
                             center.getX() + x,
                             groundY + y,
@@ -99,8 +92,7 @@ public final class FogDomain5Tier7 {
                     );
 
                     placeBlock(
-                            level,
-                            pillar,
+                            level, pillar,
                             Blocks.DEEPSLATE_BRICKS.defaultBlockState(),
                             saved
                     );
@@ -108,10 +100,9 @@ public final class FogDomain5Tier7 {
             }
         }
 
-        // Tạo bệ trung tâm.
+        // Bệ trung tâm.
         for (int x = -1; x <= 1; x++) {
             for (int z = -1; z <= 1; z++) {
-
                 BlockPos altar = new BlockPos(
                         center.getX() + x,
                         groundY + 1,
@@ -119,8 +110,7 @@ public final class FogDomain5Tier7 {
                 );
 
                 placeBlock(
-                        level,
-                        altar,
+                        level, altar,
                         Blocks.POLISHED_BLACKSTONE.defaultBlockState(),
                         saved
                 );
@@ -129,13 +119,22 @@ public final class FogDomain5Tier7 {
 
         ORIGINAL_BLOCKS.put(ownerId, saved);
 
-        // Tạo Thú Thôn Phệ bằng registry.
-        Entity beast = BuiltInRegistries.ENTITY_TYPE
-                .get(ResourceLocation.parse("minecraft:ravager"))
-                .create(level);
+        // Tạo Ravager từ registry, không dùng ResourceLocation.
+        EntityType<?> ravagerType = null;
+
+        for (EntityType<?> type : BuiltInRegistries.ENTITY_TYPE) {
+            if ("minecraft:ravager".equals(
+                    BuiltInRegistries.ENTITY_TYPE.getKey(type).toString())) {
+                ravagerType = type;
+                break;
+            }
+        }
+
+        Entity beast = ravagerType == null
+                ? null
+                : ravagerType.create(level);
 
         if (beast != null) {
-
             beast.setPos(
                     center.getX() + 2.5D,
                     groundY + 1,
@@ -145,7 +144,6 @@ public final class FogDomain5Tier7 {
             beast.setCustomName(
                     Component.literal("§5Thú Thôn Phệ")
             );
-
             beast.setCustomNameVisible(true);
 
             if (beast instanceof Mob mob) {
@@ -177,22 +175,17 @@ public final class FogDomain5Tier7 {
             BlockState newState,
             Map<BlockPos, BlockState> saved
     ) {
-
         BlockState oldState = level.getBlockState(pos);
 
-        // Không ghi đè block có sẵn.
         if (!oldState.isAir()) {
             return;
         }
 
         saved.put(pos.immutable(), oldState);
-
         level.setBlock(pos, newState, 3);
     }
 
-    // Dọn làng khi tắt tầng 7.
     public static int stop(ServerPlayer player) {
-
         if (!isController(player)) {
             return 0;
         }
@@ -206,24 +199,15 @@ public final class FogDomain5Tier7 {
         int restored = 0;
 
         if (saved != null) {
-
             for (Map.Entry<BlockPos, BlockState> entry
                     : saved.entrySet()) {
-
                 BlockPos pos = entry.getKey();
-
                 BlockState current = level.getBlockState(pos);
 
                 if (current.is(Blocks.STONE_BRICKS)
                         || current.is(Blocks.DEEPSLATE_BRICKS)
                         || current.is(Blocks.POLISHED_BLACKSTONE)) {
-
-                    level.setBlock(
-                            pos,
-                            entry.getValue(),
-                            3
-                    );
-
+                    level.setBlock(pos, entry.getValue(), 3);
                     restored++;
                 }
             }
@@ -232,9 +216,7 @@ public final class FogDomain5Tier7 {
         UUID beastId = SPECIAL_CREATURES.remove(ownerId);
 
         if (beastId != null) {
-
             Entity beast = level.getEntity(beastId);
-
             if (beast != null) {
                 beast.discard();
             }
@@ -254,7 +236,6 @@ public final class FogDomain5Tier7 {
 
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
-
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
@@ -282,33 +263,29 @@ public final class FogDomain5Tier7 {
                 LivingEntity.class,
                 player.getBoundingBox().inflate(SUCTION_RADIUS)
         )) {
-
             if (target == player || !target.isAlive()) {
                 continue;
             }
 
-            if (target.getUUID().equals(
-                    SPECIAL_CREATURES.get(ownerId))) {
+            UUID specialId = SPECIAL_CREATURES.get(ownerId);
+            if (specialId != null
+                    && target.getUUID().equals(specialId)) {
                 continue;
             }
 
             double distance = target.position().distanceTo(center);
-
             if (distance > SUCTION_RADIUS) {
                 continue;
             }
 
-            // Hút sinh vật về phía tubi2531.
             Vec3 direction = center.subtract(target.position());
 
             if (direction.lengthSqr() > 0.0001D) {
-
                 Vec3 pull = direction.normalize().scale(0.35D);
 
                 target.setDeltaMovement(
                         target.getDeltaMovement().scale(0.35D).add(pull)
                 );
-
                 target.hurtMarked = true;
             }
 
@@ -322,12 +299,8 @@ public final class FogDomain5Tier7 {
             ServerPlayer owner,
             LivingEntity creature
     ) {
-
-        if (!creature.isAlive()) {
-            return;
-        }
-
-        if (creature instanceof ServerPlayer) {
+        if (!creature.isAlive()
+                || creature instanceof ServerPlayer) {
             return;
         }
 
@@ -354,8 +327,7 @@ public final class FogDomain5Tier7 {
         );
 
         int count = DEVOUR_COUNT.getOrDefault(
-                owner.getUUID(),
-                0
+                owner.getUUID(), 0
         ) + 1;
 
         DEVOUR_COUNT.put(owner.getUUID(), count);

@@ -8,6 +8,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.block.Blocks;
@@ -119,7 +120,7 @@ public final class FogDomain5Tier7 {
 
         ORIGINAL_BLOCKS.put(ownerId, saved);
 
-        // Tạo Ravager từ registry, không dùng ResourceLocation.
+        // Tìm Ravager trong registry.
         EntityType<?> ravagerType = null;
 
         for (EntityType<?> type : BuiltInRegistries.ENTITY_TYPE) {
@@ -130,9 +131,13 @@ public final class FogDomain5Tier7 {
             }
         }
 
+        // Minecraft 26.2 yêu cầu EntitySpawnReason.
         Entity beast = ravagerType == null
                 ? null
-                : ravagerType.create(level);
+                : ravagerType.create(
+                        level,
+                        EntitySpawnReason.COMMAND
+                );
 
         if (beast != null) {
             beast.setPos(
@@ -268,12 +273,14 @@ public final class FogDomain5Tier7 {
             }
 
             UUID specialId = SPECIAL_CREATURES.get(ownerId);
+
             if (specialId != null
                     && target.getUUID().equals(specialId)) {
                 continue;
             }
 
             double distance = target.position().distanceTo(center);
+
             if (distance > SUCTION_RADIUS) {
                 continue;
             }
@@ -286,6 +293,7 @@ public final class FogDomain5Tier7 {
                 target.setDeltaMovement(
                         target.getDeltaMovement().scale(0.35D).add(pull)
                 );
+
                 target.hurtMarked = true;
             }
 

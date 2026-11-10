@@ -455,6 +455,33 @@ public final class FogDomainAbilityData extends SavedData {
         return Map.copyOf(attributes.get(key(playerId)));
     }
 
+    // ==================== KIỂM TRA THUỘC TÍNH YẾU ====================
+
+    public int getWeakAttributeThreshold(UUID playerId) {
+        int level = getCharacterLevel(playerId);
+
+        if (level == 1) return 5;
+        if (level == 2) return 10;
+
+        // Chưa đặt ngưỡng cho cấp cao hơn.
+        return -1;
+    }
+
+    public boolean isAttributeWeak(
+            UUID playerId,
+            String attribute
+    ) {
+        if (playerId == null || !ATTRIBUTES.contains(attribute)) {
+            return false;
+        }
+
+        int threshold = getWeakAttributeThreshold(playerId);
+
+        if (threshold < 0) return false;
+
+        return getAttribute(playerId, attribute) < threshold;
+    }
+
     /**
      * Giá của mỗi điểm thuộc tính = cấp nhân vật x 10 Điểm Linh Tính.
      */

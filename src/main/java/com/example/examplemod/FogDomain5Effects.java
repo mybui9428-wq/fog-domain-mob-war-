@@ -27,18 +27,11 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class FogDomain5Effects {
 
     private static final int RADIUS = 30;
-
-    // Sức mạnh cố định tương đương tầng 6 cũ.
     private static final int POWER = 5;
-
     private static final int EFFECT_INTERVAL = 20;
-
     private static final int MAX_FREEZE_TICKS = 140;
-
-    // 200 tick = 10 giây ở trong mưa.
     private static final int FREEZE_AFTER_RAIN = 200;
 
-    // Thời gian lạnh tích lũy của từng sinh vật.
     private static final Map<UUID, Integer> RAIN_EXPOSURE =
             new HashMap<>();
 
@@ -88,7 +81,6 @@ public final class FogDomain5Effects {
 
         Set<UUID> activeEntities = new HashSet<>();
 
-        // Các hiệu ứng lạnh và chìm được xử lý mỗi tick.
         for (LivingEntity target : entities) {
 
             if (target == player || !target.isAlive()) {
@@ -104,28 +96,23 @@ public final class FogDomain5Effects {
 
             activeEntities.add(target.getUUID());
 
-            // Giữ nguyên sao chép năng lực trong nước.
+            // Giữ sao chép năng lực trong nước.
             if (target.isInWater()) {
                 copyCreatureAbilities(player, target, data);
-
                 sinkEntity(target);
             }
 
-            // Mưa khiến mục tiêu lạnh dần.
             applyRainCold(target);
 
-            // Tuyết có thể đóng băng mục tiêu.
             if (level.getGameTime() % EFFECT_INTERVAL == 0) {
                 applySnow(target, level);
             }
         }
 
-        // Xóa trạng thái lạnh khi mục tiêu rời khỏi lĩnh vực.
         RAIN_EXPOSURE.keySet().removeIf(
                 id -> !activeEntities.contains(id)
         );
 
-        // Thời tiết và gió chạy mỗi giây để hạn chế lag.
         if (level.getGameTime() % EFFECT_INTERVAL != 0) {
             return;
         }
@@ -153,7 +140,6 @@ public final class FogDomain5Effects {
             applyWind(target, centerX, centerZ);
             applyRainFog(target, level);
             applyFire(target);
-
         }
 
         applyWeakAttributes(player, level, data);
@@ -186,7 +172,6 @@ public final class FogDomain5Effects {
 
         Vec3 motion = target.getDeltaMovement();
 
-        // Gió đẩy mạnh theo hướng từ tâm lĩnh vực ra ngoài.
         double horizontalPower = 1.05D;
         double upwardPower = 0.65D;
 
@@ -219,16 +204,12 @@ public final class FogDomain5Effects {
 
         RAIN_EXPOSURE.put(id, exposure);
 
-        // Sau 10 giây bắt đầu đóng băng.
         if (exposure >= FREEZE_AFTER_RAIN) {
 
             int frozen = target.getTicksFrozen();
 
             target.setTicksFrozen(
-                    Math.min(
-                            MAX_FREEZE_TICKS,
-                            frozen + 2
-                    )
+                    Math.min(MAX_FREEZE_TICKS, frozen + 2)
             );
 
             target.addEffect(new MobEffectInstance(
@@ -240,7 +221,6 @@ public final class FogDomain5Effects {
                     true
             ));
 
-            // Càng ở lâu trong mưa càng lạnh.
             if (exposure >= FREEZE_AFTER_RAIN * 2) {
                 target.addEffect(new MobEffectInstance(
                         MobEffects.SLOWNESS,
@@ -258,7 +238,6 @@ public final class FogDomain5Effects {
             LivingEntity target,
             ServerLevel level
     ) {
-        // Sương mù bao quanh mục tiêu.
         level.sendParticles(
                 ParticleTypes.CLOUD,
                 target.getX(),
@@ -271,7 +250,6 @@ public final class FogDomain5Effects {
                 0.015D
         );
 
-        // Giảm tầm nhìn.
         target.addEffect(new MobEffectInstance(
                 MobEffects.BLINDNESS,
                 45,
@@ -300,7 +278,6 @@ public final class FogDomain5Effects {
         ThreadLocalRandom random =
                 ThreadLocalRandom.current();
 
-        // Tuyết chạm mục tiêu với xác suất mỗi giây.
         if (random.nextInt(3) != 0) {
             return;
         }
@@ -321,7 +298,6 @@ public final class FogDomain5Effects {
                 true
         ));
 
-        // Tạo vòng hạt tuyết/băng bao quanh cơ thể.
         double x = target.getX();
         double y = target.getY();
         double z = target.getZ();
@@ -392,16 +368,9 @@ public final class FogDomain5Effects {
         ThreadLocalRandom random =
                 ThreadLocalRandom.current();
 
-        // Mưa nặng hạt.
         int rainCount = 220;
-
-        // Tuyết.
         int snowCount = 90;
-
-        // Gió.
         int windCount = 65;
-
-        // Lửa rơi.
         int fireCount = 90;
 
         for (int i = 0; i < rainCount; i++) {
@@ -475,7 +444,6 @@ public final class FogDomain5Effects {
 
             double y = centerY + random.nextDouble(9.0D, 20.0D);
 
-            // Hạt lửa nhìn rõ hơn khi rơi.
             level.sendParticles(
                     ParticleTypes.FLAME,
                     x, y, z,
@@ -619,10 +587,12 @@ public final class FogDomain5Effects {
                     level.getEntitiesOfClass(Mob.class, area);
 
             for (Mob mob : mobs) {
-    if (mob.isAlive()) {
-        mob.setTarget(player);
-    }
+                if (mob.isAlive()) {
+                    mob.setTarget(player);
+                }
             }
+        }
+    }
 
     // ==================== KÉO CHÌM TRONG NƯỚC ====================
 

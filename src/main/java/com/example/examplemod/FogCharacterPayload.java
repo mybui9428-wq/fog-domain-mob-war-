@@ -65,9 +65,15 @@ public record FogCharacterPayload(String data)
         }
 
         FogDomainAbilityData data =
-        FogDomainAbilityData.get(player.level().getServer());
+                FogDomainAbilityData.get(player.level().getServer());
 
         data.initializeCharacter(player.getUUID());
+
+        // Cấp năng lực bẩm sinh nếu nhân vật chưa có.
+        data.initializeInnateAbilities(
+                player.getUUID(),
+                player.getName().getString()
+        );
 
         String message = "Du lieu da cap nhat.";
 

@@ -5,7 +5,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.Minecraft;
-import net.neoforged.neoforge.network.PacketDistributor;
+import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 public class FogCharacterScreen extends Screen {
 
@@ -195,9 +195,9 @@ public class FogCharacterScreen extends Screen {
         addRenderableWidget(
                 Button.builder(
                         Component.literal("+"),
-                        button -> PacketDistributor.sendToServer(
-                                new FogCharacterPayload("add|" + key)
-                        )
+                        button -> ClientPacketDistributor.sendToServer(
+        new FogCharacterPayload("add|" + key)
+)
                 )
                 .bounds(centerX + 60, y, 35, 20)
                 .build()

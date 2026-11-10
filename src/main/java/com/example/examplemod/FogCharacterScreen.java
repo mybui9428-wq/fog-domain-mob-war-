@@ -70,11 +70,7 @@ public class FogCharacterScreen extends Screen {
         }
     }
 
-    private void refreshScreen() {
-        clearWidgets();
-        init();
-    }
-
+    // Chỉ giữ một hàm refreshScreen
     private void refreshScreen() {
         clearWidgets();
         init();
@@ -127,20 +123,30 @@ public class FogCharacterScreen extends Screen {
                 centerX - 155, startY + 164, 310
         );
 
-        addAttribute("Nhanh nhẹn", "agility",
-                agility, centerX, startY + 190);
+        addAttribute(
+                "Nhanh nhẹn", "agility",
+                agility, centerX, startY + 190
+        );
 
-        addAttribute("Thể lực", "stamina",
-                stamina, centerX, startY + 216);
+        addAttribute(
+                "Thể lực", "stamina",
+                stamina, centerX, startY + 216
+        );
 
-        addAttribute("Sức mạnh", "strength",
-                strength, centerX, startY + 242);
+        addAttribute(
+                "Sức mạnh", "strength",
+                strength, centerX, startY + 242
+        );
 
-        addAttribute("Tinh thần", "spirit",
-                spirit, centerX, startY + 268);
+        addAttribute(
+                "Tinh thần", "spirit",
+                spirit, centerX, startY + 268
+        );
 
-        addAttribute("Mị lực", "charisma",
-                charisma, centerX, startY + 294);
+        addAttribute(
+                "Mị lực", "charisma",
+                charisma, centerX, startY + 294
+        );
 
         addLabel(
                 "Máu: " + (int) health + "/" + (int) maxHealth,
@@ -179,7 +185,12 @@ public class FogCharacterScreen extends Screen {
         return "Ngưỡng thuộc tính yếu chưa được thiết lập";
     }
 
-    private void addLabel(String text, int x, int y, int width) {
+    private void addLabel(
+            String text,
+            int x,
+            int y,
+            int width
+    ) {
         Button label = Button.builder(
                 Component.literal(text),
                 button -> {}

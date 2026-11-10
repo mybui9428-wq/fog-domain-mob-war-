@@ -8,6 +8,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -49,6 +50,24 @@ public final class FogDomain5 {
 
         event.getDispatcher().register(
                 Commands.literal("fogdomain5")
+
+                        // Mở bảng nhân vật cho mọi người chơi.
+                        .then(Commands.literal("character")
+                                .executes(context -> {
+
+                                    ServerPlayer player =
+                                            context.getSource()
+                                                    .getPlayerOrException();
+
+                                    PacketDistributor.sendToPlayer(
+                                            player,
+                                            new FogCharacterPayload("open")
+                                    );
+
+                                    return Command.SINGLE_SUCCESS;
+                                }))
+
+                        // Các lệnh lĩnh vực chỉ dành cho tubi2531.
                         .requires(source ->
                                 source.getEntity() instanceof ServerPlayer player
                                         && isController(player))
@@ -57,7 +76,8 @@ public final class FogDomain5 {
                                 .executes(context -> {
 
                                     ServerPlayer player =
-                                            context.getSource().getPlayerOrException();
+                                            context.getSource()
+                                                    .getPlayerOrException();
 
                                     int current = getTier(player.getUUID());
 
@@ -81,7 +101,8 @@ public final class FogDomain5 {
                                 .executes(context -> {
 
                                     ServerPlayer player =
-                                            context.getSource().getPlayerOrException();
+                                            context.getSource()
+                                                    .getPlayerOrException();
 
                                     UUID id = player.getUUID();
 
@@ -121,7 +142,8 @@ public final class FogDomain5 {
                                 .executes(context -> {
 
                                     ServerPlayer player =
-                                            context.getSource().getPlayerOrException();
+                                            context.getSource()
+                                                    .getPlayerOrException();
 
                                     UUID id = player.getUUID();
 
@@ -152,7 +174,8 @@ public final class FogDomain5 {
                                 .executes(context -> {
 
                                     ServerPlayer player =
-                                            context.getSource().getPlayerOrException();
+                                            context.getSource()
+                                                    .getPlayerOrException();
 
                                     UUID id = player.getUUID();
 

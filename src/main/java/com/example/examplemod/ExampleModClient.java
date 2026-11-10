@@ -56,7 +56,6 @@ public class ExampleModClient {
                         return;
                     }
 
-                    // Bắt đầu điều khiển sinh vật.
                     if (payload.action() == 1) {
 
                         Entity target = minecraft.level.getEntity(
@@ -69,21 +68,18 @@ public class ExampleModClient {
                         }
                     }
 
-                    // Kết thúc điều khiển sinh vật.
                     else if (payload.action() == 0) {
 
                         FogPossessionClient.soulMode = false;
                         minecraft.setCameraEntity(minecraft.player);
                     }
 
-                    // Bắt đầu chế độ linh hồn.
                     else if (payload.action() == 2) {
 
                         FogPossessionClient.soulMode = true;
                         minecraft.setCameraEntity(minecraft.player);
                     }
 
-                    // Kết thúc chế độ linh hồn.
                     else if (payload.action() == 3) {
 
                         FogPossessionClient.soulMode = false;
@@ -92,16 +88,73 @@ public class ExampleModClient {
                 }
         );
 
-        // Nhận dữ liệu HUD từ máy chủ.
+        // Nhận dữ liệu HUD cũ từ máy chủ.
         event.register(
                 FogHudPayload.TYPE,
                 (payload, context) -> {
                     hudData = payload.data();
                 }
         );
+
+        // Nhận dữ liệu bảng thuộc tính nhân vật.
+        event.register(
+                FogCharacterPayload.TYPE,
+                (payload, context) -> {
+
+                    String[] parts = payload.data().split("\\|", -1);
+
+                    if (parts.length < 14
+                            || !parts[0].equals("update")) {
+                        return;
+                    }
+
+                    try {
+                        int level = Integer.parseInt(parts[1]);
+                        int spiritPoints = Integer.parseInt(parts[2]);
+                        int freePoints = Integer.parseInt(parts[3]);
+                        int ruleFragments = Integer.parseInt(parts[4]);
+                        int soulCrystals = Integer.parseInt(parts[5]);
+
+                        int agility = Integer.parseInt(parts[6]);
+                        int stamina = Integer.parseInt(parts[7]);
+                        int strength = Integer.parseInt(parts[8]);
+                        int spirit = Integer.parseInt(parts[9]);
+                        int charisma = Integer.parseInt(parts[10]);
+
+                        float health = Float.parseFloat(parts[11]);
+                        float maxHealth = Float.parseFloat(parts[12]);
+
+                        String message = parts[13];
+
+                        Minecraft.getInstance().execute(() -> {
+                            FogCharacterScreen.updateData(
+                                    level,
+                                    spiritPoints,
+                                    freePoints,
+                                    ruleFragments,
+                                    soulCrystals,
+                                    agility,
+                                    stamina,
+                                    strength,
+                                    spirit,
+                                    charisma,
+                                    health,
+                                    maxHealth,
+                                    message
+                            );
+                        });
+
+                    } catch (NumberFormatException exception) {
+                        ExampleMod.LOGGER.error(
+                                "Du lieu bang nhan vat khong hop le",
+                                exception
+                        );
+                    }
+                }
+        );
     }
 
-    // Vẽ bảng trạng thái trên màn hình.
+    // Vẽ bảng trạng thái cũ trên màn hình.
     @SubscribeEvent
     public static void renderHud(RenderGuiEvent.Post event) {
 
@@ -112,7 +165,6 @@ public class ExampleModClient {
             return;
         }
 
-        // Chỉ tubi2531 nhìn thấy HUD.
         if (!minecraft.player.getName().getString()
                 .equalsIgnoreCase("tubi2531")) {
             return;
@@ -134,7 +186,6 @@ public class ExampleModClient {
         int visibleLines = Math.min(lines.length, 12);
         int height = 14 + visibleLines * 12;
 
-        // Nền bảng.
         graphics.fill(
                 x,
                 y,
@@ -143,7 +194,6 @@ public class ExampleModClient {
                 0xCC101820
         );
 
-        // Viền trên.
         graphics.fill(
                 x,
                 y,
@@ -152,12 +202,10 @@ public class ExampleModClient {
                 0xFF55DDEE
         );
 
-        // Bộ vẽ chữ.
         var textRenderer = graphics.textRenderer(
                 GuiGraphicsExtractor.HoveredTextEffects.NONE
         );
 
-        // Tiêu đề.
         textRenderer.accept(
                 TextAlignment.LEFT,
                 x + 7,
@@ -166,7 +214,6 @@ public class ExampleModClient {
                 Component.literal("LINH VUC SUONG MU")
         );
 
-        // Nội dung trạng thái.
         for (int i = 0; i < visibleLines; i++) {
 
             textRenderer.accept(

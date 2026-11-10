@@ -16,6 +16,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 public final class FogDomainAbilityData extends SavedData {
 
@@ -40,6 +41,34 @@ public final class FogDomainAbilityData extends SavedData {
             SKILL_STEAL,
             SKILL_TRIPLE_SPIRIT
     );
+
+    // ==================== 10 NĂNG LỰC BẨM SINH ====================
+
+    public static final String INNATE_SPIRIT_RETURN = "spirit_return";
+    public static final String INNATE_SHADOW_STEP = "shadow_step";
+    public static final String INNATE_SPIRIT_ARMOR = "spirit_armor";
+    public static final String INNATE_BLOOD_RAGE = "blood_rage";
+    public static final String INNATE_SPIRIT_SENSE = "spirit_sense";
+    public static final String INNATE_THUNDER = "thunder";
+    public static final String INNATE_ICE_HEART = "ice_heart";
+    public static final String INNATE_LIFE_SOURCE = "life_source";
+    public static final String INNATE_SPACE_JUMP = "space_jump";
+    public static final String INNATE_SOUL_PRESSURE = "soul_pressure";
+
+    public static final List<String> RANDOM_INNATE_ABILITIES = List.of(
+            INNATE_SPIRIT_RETURN,
+            INNATE_SHADOW_STEP,
+            INNATE_SPIRIT_ARMOR,
+            INNATE_BLOOD_RAGE,
+            INNATE_SPIRIT_SENSE,
+            INNATE_THUNDER,
+            INNATE_ICE_HEART,
+            INNATE_LIFE_SOURCE,
+            INNATE_SPACE_JUMP,
+            INNATE_SOUL_PRESSURE
+    );
+
+    public static final String PLAYER_TUBI = "tubi2531";
 
     // Đã đổi intelligence thành stamina.
     public static final List<String> ATTRIBUTES = List.of(
@@ -393,7 +422,6 @@ public final class FogDomainAbilityData extends SavedData {
         Map<String, Integer> playerAttributes =
                 attributes.computeIfAbsent(id, ignored -> new HashMap<>());
 
-        // Di chuyển dữ liệu cũ nếu còn tồn tại.
         if (playerAttributes.containsKey("intelligence")) {
             playerAttributes.putIfAbsent(
                     "stamina",
@@ -463,14 +491,10 @@ public final class FogDomainAbilityData extends SavedData {
         if (level == 1) return 5;
         if (level == 2) return 10;
 
-        // Chưa đặt ngưỡng cho cấp cao hơn.
         return -1;
     }
 
-    public boolean isAttributeWeak(
-            UUID playerId,
-            String attribute
-    ) {
+    public boolean isAttributeWeak(UUID playerId, String attribute) {
         if (playerId == null || !ATTRIBUTES.contains(attribute)) {
             return false;
         }
@@ -482,17 +506,10 @@ public final class FogDomainAbilityData extends SavedData {
         return getAttribute(playerId, attribute) < threshold;
     }
 
-    /**
-     * Giá của mỗi điểm thuộc tính = cấp nhân vật x 10 Điểm Linh Tính.
-     */
     public int getAttributePointCost(UUID playerId) {
         return getCharacterLevel(playerId) * 10;
     }
 
-    /**
-     * Nâng thuộc tính bằng đối tượng người chơi.
-     * Mỗi điểm tăng vượt 10 sẽ trừ 1 máu hiện tại.
-     */
     public boolean increaseAttribute(
             LivingEntity player,
             String attribute,
@@ -524,7 +541,6 @@ public final class FogDomainAbilityData extends SavedData {
 
         if (availablePoints < totalCost) return false;
 
-        // Chỉ tính số điểm tăng từ 11 trở lên.
         int healthCost = Math.max(
                 0,
                 newAttribute - Math.max(currentAttribute, 10)
@@ -532,19 +548,11 @@ public final class FogDomainAbilityData extends SavedData {
 
         float currentHealth = player.getHealth();
 
-        // Không cho phép việc mua thuộc tính làm người chơi chết.
         if (currentHealth <= healthCost) return false;
 
-        // Trừ Điểm Linh Tính.
-        spiritPoints.put(
-                id,
-                availablePoints - (int) totalCost
-        );
-
-        // Cộng thuộc tính.
+        spiritPoints.put(id, availablePoints - (int) totalCost);
         attributes.get(id).put(attribute, newAttribute);
 
-        // Trừ máu hiện tại; máu có thể hồi phục bình thường.
         if (healthCost > 0) {
             player.setHealth(currentHealth - healthCost);
         }
@@ -553,11 +561,6 @@ public final class FogDomainAbilityData extends SavedData {
         return true;
     }
 
-    /**
-     * Hàm cũ giữ lại để tương thích những file đang gọi UUID.
-     * Hàm này chỉ cho phép tăng thuộc tính nếu không cần trừ máu.
-     * Muốn tăng vượt 10 phải gọi overload nhận LivingEntity.
-     */
     @Deprecated
     public boolean increaseAttribute(
             UUID playerId,
@@ -580,9 +583,7 @@ public final class FogDomainAbilityData extends SavedData {
                 newValue - Math.max(current, 10)
         );
 
-        if (healthCost > 0) {
-            return false;
-        }
+        if (healthCost > 0) return false;
 
         int costPerPoint = getAttributePointCost(playerId);
         long totalCost = (long) costPerPoint * amount;
@@ -726,12 +727,113 @@ public final class FogDomainAbilityData extends SavedData {
 
     // ==================== NĂNG LỰC BẨM SINH ====================
 
-    public String getInnateAbility(UUID playerId) {
-        if (playerId == null) return null;
-        return innateAbilities.get(key(playerId));
+    public void initializeInnateAbilities(
+            UUID playerId,
+            String playerName
+    ) {
+        if (playerId == null) return;
+
+        String id = key(playerId);
+
+        boolean isTubi = playerName != null
+                && PLAYER_TUBI.equalsIgnoreCase(playerName);
+
+        // tubi2531 có hai năng lực đặc biệt.
+        if (isTubi) {
+            String specialAbilities = SKILL_STEAL + "," + SKILL_COMBINE;
+
+            if (!specialAbilities.equals(innateAbilities.get(id))) {
+                innateAbilities.put(id, specialAbilities);
+                setDirty();
+            }
+
+            Map<String, Integer> levels =
+                    skillLevels.computeIfAbsent(
+                            id,
+                            ignored -> new HashMap<>()
+                    );
+
+            boolean changed = false;
+
+            if (!levels.containsKey(SKILL_STEAL)) {
+                levels.put(SKILL_STEAL, 1);
+                changed = true;
+            }
+
+            if (!levels.containsKey(SKILL_COMBINE)) {
+                levels.put(SKILL_COMBINE, 1);
+                changed = true;
+            }
+
+            if (changed) setDirty();
+            return;
+        }
+
+        // Người chơi bình thường chỉ được chọn một lần.
+        if (innateAbilities.containsKey(id)) return;
+
+        int index = ThreadLocalRandom.current().nextInt(
+                RANDOM_INNATE_ABILITIES.size()
+        );
+
+        String ability = RANDOM_INNATE_ABILITIES.get(index);
+
+        innateAbilities.put(id, ability);
+
+        skillLevels.computeIfAbsent(
+                id,
+                ignored -> new HashMap<>()
+        ).putIfAbsent(ability, 1);
+
+        setDirty();
     }
 
-    public boolean setInnateAbility(UUID playerId, String abilityId) {
+    public List<String> getInnateAbilities(UUID playerId) {
+        if (playerId == null) return List.of();
+
+        String stored = innateAbilities.get(key(playerId));
+
+        if (stored == null || stored.isBlank()) {
+            return List.of();
+        }
+
+        List<String> result = new ArrayList<>();
+
+        for (String ability : stored.split(",")) {
+            String cleaned = ability.trim();
+
+            if (!cleaned.isEmpty() && !result.contains(cleaned)) {
+                result.add(cleaned);
+            }
+        }
+
+        return List.copyOf(result);
+    }
+
+    public String getInnateAbility(UUID playerId) {
+        List<String> owned = getInnateAbilities(playerId);
+
+        return owned.isEmpty() ? null : owned.get(0);
+    }
+
+    public boolean hasInnateAbility(
+            UUID playerId,
+            String abilityId
+    ) {
+        if (playerId == null || abilityId == null) return false;
+
+        return getInnateAbilities(playerId).contains(abilityId);
+    }
+
+    public boolean hasInnateAbility(UUID playerId) {
+        return playerId != null
+                && !getInnateAbilities(playerId).isEmpty();
+    }
+
+    public boolean setInnateAbility(
+            UUID playerId,
+            String abilityId
+    ) {
         if (playerId == null
                 || abilityId == null
                 || abilityId.isBlank()) {
@@ -743,12 +845,35 @@ public final class FogDomainAbilityData extends SavedData {
         if (innateAbilities.containsKey(id)) return false;
 
         innateAbilities.put(id, abilityId);
+
+        skillLevels.computeIfAbsent(
+                id,
+                ignored -> new HashMap<>()
+        ).putIfAbsent(abilityId, 1);
+
         setDirty();
         return true;
     }
 
-    public boolean hasInnateAbility(UUID playerId) {
-        return playerId != null && innateAbilities.containsKey(key(playerId));
+    public int getInnateAbilityLevel(
+            UUID playerId,
+            String abilityId
+    ) {
+        if (!hasInnateAbility(playerId, abilityId)) return 0;
+
+        return getSkillLevel(playerId, abilityId);
+    }
+
+    public boolean upgradeInnateAbility(
+            UUID playerId,
+            String abilityId,
+            int soulCrystalCost
+    ) {
+        if (!hasInnateAbility(playerId, abilityId)) {
+            return false;
+        }
+
+        return upgradeSkill(playerId, abilityId, soulCrystalCost);
     }
 
     // ==================== CẤP ĐỘ KỸ NĂNG ====================

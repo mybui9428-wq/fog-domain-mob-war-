@@ -1,10 +1,10 @@
 
 package com.example.examplemod;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
 public class FogCharacterScreen extends Screen {
@@ -59,15 +59,14 @@ public class FogCharacterScreen extends Screen {
 
         health = newHealth;
         maxHealth = newMaxHealth;
-
         message = newMessage;
 
         Minecraft minecraft = Minecraft.getInstance();
 
-        if (minecraft.gui.screen() instanceof FogCharacterScreen screen) {
+        if (minecraft.screen instanceof FogCharacterScreen screen) {
             screen.refreshScreen();
         } else {
-            minecraft.gui.setScreen(new FogCharacterScreen());
+            minecraft.setScreen(new FogCharacterScreen());
         }
     }
 
@@ -79,81 +78,78 @@ public class FogCharacterScreen extends Screen {
     @Override
     protected void init() {
         int centerX = this.width / 2;
-        int startY = Math.max(25, this.height / 2 - 115);
+        int startY = Math.max(10, this.height / 2 - 170);
 
         addLabel(
-                "CẤP NHÂN VẬT: " + level,
-                centerX - 110, startY, 220
+                "BẢNG THUỘC TÍNH NHÂN VẬT",
+                centerX - 145, startY, 290
+        );
+
+        addLabel(
+                "Cấp nhân vật: " + level,
+                centerX - 130, startY + 25, 260
         );
 
         addLabel(
                 "Điểm Linh Tính: " + spiritPoints,
-                centerX - 110, startY + 25, 220
+                centerX - 130, startY + 48, 260
         );
 
         addLabel(
-                "Thuộc tính có thể phân bổ: " + freePoints,
-                centerX - 110, startY + 48, 220
+                "Điểm thuộc tính: " + freePoints,
+                centerX - 130, startY + 71, 260
         );
 
         addLabel(
                 "Mảnh Vỡ Quy Tắc: " + ruleFragments,
-                centerX - 110, startY + 71, 220
+                centerX - 130, startY + 94, 260
         );
 
         addLabel(
                 "Tinh Thạch Linh Hồn: " + soulCrystals,
-                centerX - 110, startY + 94, 220
+                centerX - 130, startY + 117, 260
         );
 
-        addAttribute(
-                "Nhanh nhẹn",
-                "agility",
-                agility,
-                centerX,
-                startY + 125
-        );
+        int cost = level * 10;
 
-        addAttribute(
-                "Thể lực",
-                "stamina",
-                stamina,
-                centerX,
-                startY + 153
-        );
-
-        addAttribute(
-                "Sức mạnh",
-                "strength",
-                strength,
-                centerX,
-                startY + 181
-        );
-
-        addAttribute(
-                "Tinh thần",
-                "spirit",
-                spirit,
-                centerX,
-                startY + 209
-        );
-
-        addAttribute(
-                "Mị lực",
-                "charisma",
-                charisma,
-                centerX,
-                startY + 237
+        addLabel(
+                "Giá tăng mỗi thuộc tính: " + cost + " Điểm Linh Tính",
+                centerX - 155, startY + 143, 310
         );
 
         addLabel(
+                "Mỗi điểm trên 10 sẽ mất 1 máu hiện tại",
+                centerX - 155, startY + 164, 310
+        );
+
+        addAttribute("Nhanh nhẹn", "agility",
+                agility, centerX, startY + 190);
+
+        addAttribute("Thể lực", "stamina",
+                stamina, centerX, startY + 216);
+
+        addAttribute("Sức mạnh", "strength",
+                strength, centerX, startY + 242);
+
+        addAttribute("Tinh thần", "spirit",
+                spirit, centerX, startY + 268);
+
+        addAttribute("Mị lực", "charisma",
+                charisma, centerX, startY + 294);
+
+        addLabel(
                 "Máu: " + (int) health + "/" + (int) maxHealth,
-                centerX - 110, startY + 270, 220
+                centerX - 120, startY + 321, 240
+        );
+
+        addLabel(
+                getWeakStatus(),
+                centerX - 160, startY + 344, 320
         );
 
         addLabel(
                 message,
-                centerX - 140, startY + 295, 280
+                centerX - 160, startY + 367, 320
         );
 
         addRenderableWidget(
@@ -161,9 +157,21 @@ public class FogCharacterScreen extends Screen {
                         Component.literal("Đóng"),
                         button -> onClose()
                 )
-                .bounds(centerX - 50, startY + 320, 100, 20)
+                .bounds(centerX - 50, startY + 392, 100, 20)
                 .build()
         );
+    }
+
+    private String getWeakStatus() {
+        if (level == 1) {
+            return "Thuộc tính yếu khi dưới 5";
+        }
+
+        if (level == 2) {
+            return "Thuộc tính yếu khi dưới 10";
+        }
+
+        return "Ngưỡng thuộc tính yếu chưa được thiết lập";
     }
 
     private void addLabel(String text, int x, int y, int width) {
@@ -187,21 +195,23 @@ public class FogCharacterScreen extends Screen {
     ) {
         addLabel(
                 name + ": " + value,
-                centerX - 110,
+                centerX - 130,
                 y,
-                165
+                180
         );
 
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal("+"),
-                        button -> ClientPacketDistributor.sendToServer(
-        new FogCharacterPayload("add|" + key)
-)
+        Button increaseButton = Button.builder(
+                Component.literal("+"),
+                button -> ClientPacketDistributor.sendToServer(
+                        new FogCharacterPayload("add|" + key)
                 )
-                .bounds(centerX + 60, y, 35, 20)
-                .build()
-        );
+        )
+        .bounds(centerX + 55, y, 35, 20)
+        .build();
+
+        increaseButton.active = spiritPoints >= level * 10;
+
+        addRenderableWidget(increaseButton);
     }
 
     @Override

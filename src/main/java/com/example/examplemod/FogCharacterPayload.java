@@ -65,7 +65,7 @@ public record FogCharacterPayload(String data)
         }
 
         FogDomainAbilityData data =
-                FogDomainAbilityData.get(player.getServer());
+        FogDomainAbilityData.get(player.serverLevel().getServer());
 
         data.initializeCharacter(player.getUUID());
 

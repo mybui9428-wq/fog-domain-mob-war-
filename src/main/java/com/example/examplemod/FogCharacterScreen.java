@@ -64,10 +64,16 @@ public class FogCharacterScreen extends Screen {
         Minecraft minecraft = Minecraft.getInstance();
 
         if (minecraft.gui.screen() instanceof FogCharacterScreen screen) {
-    screen.refreshScreen();
-} else {
-    minecraft.gui.setScreen(new FogCharacterScreen());
+            screen.refreshScreen();
+        } else {
+            minecraft.gui.setScreen(new FogCharacterScreen());
         }
+    }
+
+    private void refreshScreen() {
+        clearWidgets();
+        init();
+    }
 
     private void refreshScreen() {
         clearWidgets();

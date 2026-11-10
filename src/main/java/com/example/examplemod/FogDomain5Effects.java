@@ -619,12 +619,10 @@ public final class FogDomain5Effects {
                     level.getEntitiesOfClass(Mob.class, area);
 
             for (Mob mob : mobs) {
-                if (mob.isAlive() && mob != player) {
-                    mob.setTarget(player);
-                }
-            }
-        }
+    if (mob.isAlive()) {
+        mob.setTarget(player);
     }
+            }
 
     // ==================== KÉO CHÌM TRONG NƯỚC ====================
 

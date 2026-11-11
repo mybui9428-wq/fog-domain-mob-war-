@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerPlayer;
 
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
@@ -48,8 +49,31 @@ public record FogCharacterPayload(String data)
         );
     }
 
-    // ================= SERVER =================
+    // MỞ BẢNG CHỈ SỐ TỪ LỆNH MINECRAFT
+    public static void openCharacterScreen(ServerPlayer player) {
 
+        FogDomainAbilityData data =
+                FogDomainAbilityData.get(
+                        player.level().getServer()
+                );
+
+        data.initializeCharacter(player.getUUID());
+
+        data.initializeInnateAbilities(
+                player.getUUID(),
+                player.getName().getString()
+        );
+
+        FogCharacterPayload response = createUpdate(
+                data,
+                player,
+                "Da mo bang chi so."
+        );
+
+        PacketDistributor.sendToPlayer(player, response);
+    }
+
+    // XỬ LÝ YÊU CẦU TỪ CLIENT
     private static void handleServer(
             FogCharacterPayload payload,
             IPayloadContext context
@@ -65,11 +89,12 @@ public record FogCharacterPayload(String data)
         }
 
         FogDomainAbilityData data =
-                FogDomainAbilityData.get(player.level().getServer());
+                FogDomainAbilityData.get(
+                        player.level().getServer()
+                );
 
         data.initializeCharacter(player.getUUID());
 
-        // Cấp năng lực bẩm sinh nếu nhân vật chưa có.
         data.initializeInnateAbilities(
                 player.getUUID(),
                 player.getName().getString()
@@ -78,7 +103,9 @@ public record FogCharacterPayload(String data)
         String message = "Du lieu da cap nhat.";
 
         if (request.equals("open")) {
+
             message = "Da mo bang nhan vat.";
+
         } else if (request.startsWith("add|")) {
 
             String attribute = request.substring(4);
@@ -96,15 +123,17 @@ public record FogCharacterPayload(String data)
             message = success
                     ? "Da tang " + attribute + "."
                     : "Khong du dieu kien tang thuoc tinh.";
+
         } else {
             return;
         }
 
-        context.reply(createUpdate(data, player, message));
+        context.reply(
+                createUpdate(data, player, message)
+        );
     }
 
-    // ================= SEND CHARACTER DATA =================
-
+    // TẠO DỮ LIỆU GỬI VỀ CLIENT
     private static FogCharacterPayload createUpdate(
             FogDomainAbilityData data,
             ServerPlayer player,

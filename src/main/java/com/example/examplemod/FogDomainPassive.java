@@ -19,6 +19,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 
 import net.minecraft.commands.Commands;
 
@@ -514,5 +515,116 @@ public final class FogDomainPassive {
             // Hố đen hút ở vị trí cơ thể ban đầu.
             pullNearby(data, player);
         }
+    }
+    
+    // ==================== NHẬN ĐIỂM LINH TÍNH KHI GIẾT SINH VẬT ====================
+
+    @SubscribeEvent
+    public static void onLivingDeath(LivingDeathEvent event) {
+
+        // Chỉ thưởng khi người trực tiếp gây sát thương là người chơi.
+        if (!(event.getSource().getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+
+        // Không thưởng khi giết người chơi khác.
+        if (event.getEntity() instanceof ServerPlayer) {
+            return;
+        }
+
+        LivingEntity victim = event.getEntity();
+
+        if (!victim.isAlive() && victim.isRemoved()) {
+            // Không xử lý thực thể đã bị xóa trước sự kiện.
+            return;
+        }
+
+        String entityId = BuiltInRegistries.ENTITY_TYPE
+                .getKey(victim.getType())
+                .getPath();
+
+        int reward = getSpiritPointReward(entityId);
+
+        if (reward <= 0) return;
+
+        ServerLevel level = (ServerLevel) player.level();
+
+        FogDomainAbilityData data =
+                FogDomainAbilityData.get(level.getServer());
+
+        data.initializeCharacter(player.getUUID());
+        data.addSpiritPoints(player.getUUID(), reward);
+
+        player.sendSystemMessage(Component.literal(
+                "§a+" + reward + " Điểm Linh Tính §7| §fTiêu diệt: " + entityId
+        ));
+    }
+
+    // Xác định phần thưởng theo sức mạnh sinh vật.
+    private static int getSpiritPointReward(String entityId) {
+
+        // Sinh vật rất mạnh: 20 điểm.
+        if (List.of(
+                "ravager",
+                "wither",
+                "ender_dragon",
+                "warden",
+                "elder_guardian"
+        ).contains(entityId)) {
+            return 20;
+        }
+
+        // Sinh vật mạnh: 5 điểm.
+        if (List.of(
+                "creeper",
+                "enderman",
+                "witch",
+                "blaze",
+                "ghast",
+                "magma_cube",
+                "hoglin",
+                "zoglin",
+                "piglin_brute",
+                "shulker"
+        ).contains(entityId)) {
+            return 5;
+        }
+
+        // Sinh vật yếu: 1 điểm.
+        if (List.of(
+                "chicken",
+                "cow",
+                "sheep",
+                "pig",
+                "rabbit",
+                "horse",
+                "donkey",
+                "mule",
+                "llama",
+                "cat",
+                "wolf",
+                "fox",
+                "goat",
+                "turtle",
+                "parrot",
+                "ocelot",
+                "mooshroom",
+                "bee",
+                "bat",
+                "camel",
+                "sniffer",
+                "armadillo",
+                "cod",
+                "salmon",
+                "tropical_fish",
+                "pufferfish",
+                "squid",
+                "glow_squid"
+        ).contains(entityId)) {
+            return 1;
+        }
+
+        // Sinh vật trung bình: 3 điểm.
+        return 3;
     }
                 }

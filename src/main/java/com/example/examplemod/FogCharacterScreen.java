@@ -70,7 +70,6 @@ public class FogCharacterScreen extends Screen {
         }
     }
 
-    // Chỉ giữ một hàm refreshScreen
     private void refreshScreen() {
         clearWidgets();
         init();
@@ -78,8 +77,11 @@ public class FogCharacterScreen extends Screen {
 
     @Override
     protected void init() {
+
         int centerX = this.width / 2;
-        int startY = Math.max(10, this.height / 2 - 170);
+
+        // Tự căn giữa theo chiều cao màn hình.
+        int startY = Math.max(4, (this.height - 440) / 2);
 
         addLabel(
                 "BẢNG THUỘC TÍNH NHÂN VẬT",
@@ -88,79 +90,80 @@ public class FogCharacterScreen extends Screen {
 
         addLabel(
                 "Cấp nhân vật: " + level,
-                centerX - 130, startY + 25, 260
+                centerX - 130, startY + 22, 260
         );
 
         addLabel(
                 "Điểm Linh Tính: " + spiritPoints,
-                centerX - 130, startY + 48, 260
+                centerX - 130, startY + 43, 260
         );
 
         addLabel(
                 "Điểm thuộc tính: " + freePoints,
-                centerX - 130, startY + 71, 260
+                centerX - 130, startY + 64, 260
         );
 
         addLabel(
                 "Mảnh Vỡ Quy Tắc: " + ruleFragments,
-                centerX - 130, startY + 94, 260
+                centerX - 130, startY + 85, 260
         );
 
         addLabel(
                 "Tinh Thạch Linh Hồn: " + soulCrystals,
-                centerX - 130, startY + 117, 260
+                centerX - 130, startY + 106, 260
         );
 
         int cost = level * 10;
 
         addLabel(
-                "Giá tăng mỗi thuộc tính: " + cost + " Điểm Linh Tính",
-                centerX - 155, startY + 143, 310
+                "Giá tăng: " + cost + " Điểm Linh Tính",
+                centerX - 155, startY + 130, 310
         );
 
         addLabel(
-                "Mỗi điểm trên 10 sẽ mất 1 máu hiện tại",
-                centerX - 155, startY + 164, 310
+                "Mỗi điểm trên 10 mất 1 máu hiện tại",
+                centerX - 155, startY + 151, 310
         );
 
         addAttribute(
                 "Nhanh nhẹn", "agility",
-                agility, centerX, startY + 190
+                agility, centerX, startY + 175
         );
 
         addAttribute(
                 "Thể lực", "stamina",
-                stamina, centerX, startY + 216
+                stamina, centerX, startY + 198
         );
 
         addAttribute(
                 "Sức mạnh", "strength",
-                strength, centerX, startY + 242
+                strength, centerX, startY + 221
         );
 
         addAttribute(
                 "Tinh thần", "spirit",
-                spirit, centerX, startY + 268
+                spirit, centerX, startY + 244
         );
 
         addAttribute(
                 "Mị lực", "charisma",
-                charisma, centerX, startY + 294
+                charisma, centerX, startY + 267
         );
 
+        // Phần dưới máu được thu gọn.
         addLabel(
                 "Máu: " + (int) health + "/" + (int) maxHealth,
-                centerX - 120, startY + 321, 240
+                centerX - 120, startY + 291, 240
         );
 
         addLabel(
                 getWeakStatus(),
-                centerX - 160, startY + 344, 320
+                centerX - 160, startY + 313, 320
         );
 
         addLabel(
                 message,
-                centerX - 160, startY + 367, 320
+                centerX - 160, startY + 335, 320
         );
 
         addRenderableWidget(
@@ -168,12 +171,13 @@ public class FogCharacterScreen extends Screen {
                         Component.literal("Đóng"),
                         button -> onClose()
                 )
-                .bounds(centerX - 50, startY + 392, 100, 20)
+                .bounds(centerX - 50, startY + 359, 100, 20)
                 .build()
         );
     }
 
     private String getWeakStatus() {
+
         if (level == 1) {
             return "Thuộc tính yếu khi dưới 5";
         }

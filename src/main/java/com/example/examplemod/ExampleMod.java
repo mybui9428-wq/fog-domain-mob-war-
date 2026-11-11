@@ -8,6 +8,8 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
@@ -16,6 +18,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.MapColor;
+
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -25,6 +28,7 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -90,22 +94,21 @@ public class ExampleMod {
     ) {
         modEventBus.addListener(this::commonSetup);
 
-        // Dang ky payload nhap hon
-modEventBus.addListener(FogPossessionPayload::register);
-modEventBus.addListener(FogPossessionControlPayload::register);
-modEventBus.addListener(FogPossessionSyncPayload::register);
+        // Đăng ký payload nhập hồn
+        modEventBus.addListener(FogPossessionPayload::register);
+        modEventBus.addListener(FogPossessionControlPayload::register);
+        modEventBus.addListener(FogPossessionSyncPayload::register);
 
-// Dang ky payload HUD
-modEventBus.addListener(FogHudPayload::register);
+        // Đăng ký payload HUD
+        modEventBus.addListener(FogHudPayload::register);
 
-BLOCKS.register(modEventBus);
-        
+        BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
 
         NeoForge.EVENT_BUS.register(this);
 
-        // Dang ky lenh /fogpossess start va /fogpossess stop
+        // Đăng ký lệnh nhập hồn
         NeoForge.EVENT_BUS.addListener(
                 FogPossessionCommands::register
         );
@@ -142,6 +145,37 @@ BLOCKS.register(modEventBus);
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
             event.accept(EXAMPLE_BLOCK_ITEM);
+        }
+    }
+
+    // Áp dụng máu tối đa theo Thể lực.
+    private void applyPlayerStaminaHealth(ServerPlayer player) {
+        if (player == null) return;
+
+        if (!(player.level() instanceof ServerLevel serverLevel)) {
+            return;
+        }
+
+        FogDomainAbilityData data =
+                FogDomainAbilityData.get(serverLevel.getServer());
+
+        data.initializeCharacter(player.getUUID());
+        data.applyStaminaMaxHealth(player);
+    }
+
+    // Khi người chơi đăng nhập.
+    @SubscribeEvent
+    public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            applyPlayerStaminaHealth(player);
+        }
+    }
+
+    // Khi người chơi hồi sinh.
+    @SubscribeEvent
+    public void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            applyPlayerStaminaHealth(player);
         }
     }
 

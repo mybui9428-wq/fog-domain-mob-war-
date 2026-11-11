@@ -42,12 +42,12 @@ public final class FogDomainAttributeEffects {
             return;
         }
 
-        if (player.level().isClientSide()) {
-            return;
-        }
+        if (player.level().getServer() == null) {
+    return;
+}
 
-        FogDomainAbilityData data =
-                FogDomainAbilityData.get(player.server);
+FogDomainAbilityData data =
+        FogDomainAbilityData.get(player.level().getServer());
 
         data.initializeCharacter(player.getUUID());
 

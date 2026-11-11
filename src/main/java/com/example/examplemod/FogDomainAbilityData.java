@@ -3,6 +3,8 @@ package com.example.examplemod;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import net.minecraft.resources.Identifier;
@@ -70,7 +72,6 @@ public final class FogDomainAbilityData extends SavedData {
 
     public static final String PLAYER_TUBI = "tubi2531";
 
-    // Đã đổi intelligence thành stamina.
     public static final List<String> ATTRIBUTES = List.of(
             "agility",
             "stamina",
@@ -483,6 +484,33 @@ public final class FogDomainAbilityData extends SavedData {
         return Map.copyOf(attributes.get(key(playerId)));
     }
 
+    // ==================== MÁU TỐI ĐA TỪ THỂ LỰC ====================
+
+    public double getStaminaMaxHealth(UUID playerId) {
+        if (playerId == null) return 20.0D;
+
+        int stamina = getAttribute(playerId, "stamina");
+
+        // Thể lực 5 = 20 máu.
+        // Mỗi điểm Thể lực tăng thêm 5 máu tối đa.
+        return Math.max(1.0D, 20.0D + (stamina - 5) * 5.0D);
+    }
+
+    public void applyStaminaMaxHealth(LivingEntity entity) {
+        if (entity == null) return;
+
+        double maxHealth = getStaminaMaxHealth(entity.getUUID());
+
+        AttributeInstance attribute =
+                entity.getAttribute(Attributes.MAX_HEALTH);
+
+        if (attribute == null) return;
+
+        if (Math.abs(attribute.getBaseValue() - maxHealth) > 0.001D) {
+            attribute.setBaseValue(maxHealth);
+        }
+    }
+
     // ==================== KIỂM TRA THUỘC TÍNH YẾU ====================
 
     public int getWeakAttributeThreshold(UUID playerId) {
@@ -541,6 +569,8 @@ public final class FogDomainAbilityData extends SavedData {
 
         if (availablePoints < totalCost) return false;
 
+        // Từ điểm thuộc tính thứ 11 trở đi,
+        // mỗi điểm tăng thêm sẽ mất 1 máu hiện tại.
         int healthCost = Math.max(
                 0,
                 newAttribute - Math.max(currentAttribute, 10)
@@ -551,10 +581,16 @@ public final class FogDomainAbilityData extends SavedData {
         if (currentHealth <= healthCost) return false;
 
         spiritPoints.put(id, availablePoints - (int) totalCost);
+
         attributes.get(id).put(attribute, newAttribute);
 
         if (healthCost > 0) {
             player.setHealth(currentHealth - healthCost);
+        }
+
+        // Nếu tăng Thể lực, cập nhật máu tối đa.
+        if ("stamina".equals(attribute)) {
+            applyStaminaMaxHealth(player);
         }
 
         setDirty();

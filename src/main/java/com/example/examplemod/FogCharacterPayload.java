@@ -64,13 +64,23 @@ public record FogCharacterPayload(String data)
                 player.getName().getString()
         );
 
-        FogCharacterPayload response = createUpdate(
-                data,
+        PacketDistributor.sendToPlayer(
                 player,
-                "Da mo bang chi so."
+                createUpdate(data, player, "Da mo bang chi so.")
         );
+    }
 
-        PacketDistributor.sendToPlayer(player, response);
+    // KIỂM TRA ID KỸ NĂNG ĐƯỢC PHÉP NÂNG CẤP
+    private static boolean isUpgradeableSkill(String skillId) {
+        return switch (skillId) {
+            case FogDomainAbilityData.SKILL_ENERGY,
+                 FogDomainAbilityData.SKILL_CAGE,
+                 FogDomainAbilityData.SKILL_TAME,
+                 FogDomainAbilityData.SKILL_COMBINE,
+                 FogDomainAbilityData.SKILL_STEAL,
+                 FogDomainAbilityData.SKILL_TRIPLE_SPIRIT -> true;
+            default -> false;
+        };
     }
 
     // XỬ LÝ YÊU CẦU TỪ CLIENT
@@ -138,6 +148,36 @@ public record FogCharacterPayload(String data)
                 message = "Khong du Diem Linh Tinh hoac Manh Vo Quy Tac.";
             }
 
+        } else if (request.startsWith("upgrade|")) {
+
+            String skillId = request.substring("upgrade|".length());
+
+            if (!isUpgradeableSkill(skillId)) {
+                return;
+            }
+
+            int oldSkillLevel = data.getSkillLevel(
+                    player.getUUID(),
+                    skillId
+            );
+
+            boolean success = data.upgradeSkill(
+                    player.getUUID(),
+                    skillId,
+                    0
+            );
+
+            if (success) {
+                message = "Nang cap ky nang thanh cong! Cap moi: "
+                        + data.getSkillLevel(player.getUUID(), skillId);
+            } else {
+                message = "Khong du tai nguyen de nang cap! Can "
+                        + (oldSkillLevel * 100)
+                        + " Diem Linh Tinh va "
+                        + oldSkillLevel
+                        + " Tinh Thach Linh Hon.";
+            }
+
         } else {
             return;
         }
@@ -157,19 +197,47 @@ public record FogCharacterPayload(String data)
 
         String response = String.join("|",
                 "update",
+
+                // Thông tin nhân vật
                 String.valueOf(data.getCharacterLevel(id)),
                 String.valueOf(data.getSpiritPoints(id)),
                 String.valueOf(data.getFreeStatPoints(id)),
                 String.valueOf(data.getRuleFragments(id)),
                 String.valueOf(data.getSoulCrystals(id)),
+
+                // Năm thuộc tính
                 String.valueOf(data.getAttribute(id, "agility")),
                 String.valueOf(data.getAttribute(id, "stamina")),
                 String.valueOf(data.getAttribute(id, "strength")),
                 String.valueOf(data.getAttribute(id, "spirit")),
                 String.valueOf(data.getAttribute(id, "charisma")),
+
+                // Máu
                 String.valueOf(player.getHealth()),
                 String.valueOf(player.getMaxHealth()),
-                message
+
+                // Thông báo
+                message,
+
+                // Cấp độ sáu kỹ năng
+                String.valueOf(data.getSkillLevel(
+                        id, FogDomainAbilityData.SKILL_ENERGY
+                )),
+                String.valueOf(data.getSkillLevel(
+                        id, FogDomainAbilityData.SKILL_CAGE
+                )),
+                String.valueOf(data.getSkillLevel(
+                        id, FogDomainAbilityData.SKILL_TAME
+                )),
+                String.valueOf(data.getSkillLevel(
+                        id, FogDomainAbilityData.SKILL_COMBINE
+                )),
+                String.valueOf(data.getSkillLevel(
+                        id, FogDomainAbilityData.SKILL_STEAL
+                )),
+                String.valueOf(data.getSkillLevel(
+                        id, FogDomainAbilityData.SKILL_TRIPLE_SPIRIT
+                ))
         );
 
         return new FogCharacterPayload(response);

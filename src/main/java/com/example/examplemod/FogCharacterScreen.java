@@ -26,6 +26,8 @@ public class FogCharacterScreen extends Screen {
 
     private static String message = "";
 
+    private static final int MAX_LEVEL = 20;
+
     public FogCharacterScreen() {
         super(Component.literal("Bảng thuộc tính nhân vật"));
     }
@@ -80,7 +82,6 @@ public class FogCharacterScreen extends Screen {
 
         int centerX = this.width / 2;
 
-        // Tự căn giữa theo chiều cao màn hình.
         int startY = Math.max(4, (this.height - 440) / 2);
 
         addLabel(
@@ -89,7 +90,7 @@ public class FogCharacterScreen extends Screen {
         );
 
         addLabel(
-                "Cấp nhân vật: " + level,
+                "Cấp nhân vật: " + level + "/" + MAX_LEVEL,
                 centerX - 130, startY + 22, 260
         );
 
@@ -113,10 +114,10 @@ public class FogCharacterScreen extends Screen {
                 centerX - 130, startY + 106, 260
         );
 
-        int cost = level * 10;
+        int attributeCost = level * 10;
 
         addLabel(
-                "Giá tăng: " + cost + " Điểm Linh Tính",
+                "Giá tăng thuộc tính: " + attributeCost + " Điểm Linh Tính",
                 centerX - 155, startY + 130, 310
         );
 
@@ -150,7 +151,6 @@ public class FogCharacterScreen extends Screen {
                 charisma, centerX, startY + 267
         );
 
-        // Phần dưới máu được thu gọn.
         addLabel(
                 "Máu: " + (int) health + "/" + (int) maxHealth,
                 centerX - 120, startY + 291, 240
@@ -166,12 +166,49 @@ public class FogCharacterScreen extends Screen {
                 centerX - 160, startY + 335, 320
         );
 
+        // ==================== NÚT TĂNG CẤP ====================
+
+        int levelUpSpiritCost = level * 100;
+        int levelUpFragmentCost = level;
+
+        boolean maxLevel = level >= MAX_LEVEL;
+
+        String levelUpText;
+
+        if (maxLevel) {
+            levelUpText = "Đã đạt cấp tối đa";
+        } else {
+            levelUpText = "Tăng cấp: "
+                    + levelUpSpiritCost
+                    + " Linh Tính + "
+                    + levelUpFragmentCost
+                    + " Mảnh";
+        }
+
+        Button levelUpButton = Button.builder(
+                Component.literal(levelUpText),
+                button -> ClientPacketDistributor.sendToServer(
+                        new FogCharacterPayload("levelup")
+                )
+        )
+        .bounds(centerX - 110, startY + 359, 220, 20)
+        .build();
+
+        levelUpButton.active =
+                !maxLevel
+                && spiritPoints >= levelUpSpiritCost
+                && ruleFragments >= levelUpFragmentCost;
+
+        addRenderableWidget(levelUpButton);
+
+        // ==================== NÚT ĐÓNG ====================
+
         addRenderableWidget(
                 Button.builder(
                         Component.literal("Đóng"),
                         button -> onClose()
                 )
-                .bounds(centerX - 50, startY + 359, 100, 20)
+                .bounds(centerX - 50, startY + 383, 100, 20)
                 .build()
         );
     }
@@ -186,7 +223,7 @@ public class FogCharacterScreen extends Screen {
             return "Thuộc tính yếu khi dưới 10";
         }
 
-        return "Ngưỡng thuộc tính yếu chưa được thiết lập";
+        return "Không có ngưỡng thuộc tính yếu ở cấp này";
     }
 
     private void addLabel(

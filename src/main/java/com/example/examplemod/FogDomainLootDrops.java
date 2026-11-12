@@ -1,12 +1,14 @@
 
 package com.example.examplemod;
 
+import java.util.Set;
+
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Enemy;
-import net.minecraft.world.entity.monster.NeutralMob;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 
 import net.neoforged.bus.api.SubscribeEvent;
@@ -25,6 +27,23 @@ public final class FogDomainLootDrops {
         STRONG,
         NONE
     }
+
+    // Các sinh vật trung lập, có thể phản công khi bị khiêu khích.
+    private static final Set<String> NEUTRAL_CREATURES = Set.of(
+            "minecraft:bee",
+            "minecraft:dolphin",
+            "minecraft:enderman",
+            "minecraft:fox",
+            "minecraft:goat",
+            "minecraft:iron_golem",
+            "minecraft:llama",
+            "minecraft:panda",
+            "minecraft:piglin",
+            "minecraft:polar_bear",
+            "minecraft:trader_llama",
+            "minecraft:wolf",
+            "minecraft:zombified_piglin"
+    );
 
     @SubscribeEvent
     public static void onLivingDrops(LivingDropsEvent event) {
@@ -50,26 +69,30 @@ public final class FogDomainLootDrops {
     private static CreatureRank getCreatureRank(Mob mob) {
         EntityType<?> type = mob.getType();
 
+        // Lấy ID loài từ registry thay vì gọi hằng EntityType.
+        String entityId = BuiltInRegistries.ENTITY_TYPE
+                .getKey(type)
+                .toString();
+
         // Sinh vật mạnh.
-        if (type == EntityType.WITHER
-                || type == EntityType.ENDER_DRAGON
-                || type == EntityType.WARDEN
-                || type == EntityType.ELDER_GUARDIAN) {
+        if (entityId.equals("minecraft:wither")
+                || entityId.equals("minecraft:ender_dragon")
+                || entityId.equals("minecraft:warden")
+                || entityId.equals("minecraft:elder_guardian")) {
             return CreatureRank.STRONG;
         }
 
-        // Sinh vật trung bình: các sinh vật có AI tấn công.
+        // Sinh vật trung lập không thuộc nhóm yếu hoặc trung bình.
+        if (NEUTRAL_CREATURES.contains(entityId)) {
+            return CreatureRank.NONE;
+        }
+
+        // Sinh vật có AI thù địch.
         if (mob instanceof Enemy) {
             return CreatureRank.MEDIUM;
         }
 
-        // Sinh vật trung lập có thể tấn công khi bị khiêu khích,
-        // không xếp vào nhóm sinh vật yếu.
-        if (mob instanceof NeutralMob) {
-            return CreatureRank.NONE;
-        }
-
-        // Các sinh vật không có AI tấn công.
+        // Các Mob còn lại được xếp vào nhóm yếu.
         return CreatureRank.WEAK;
     }
 
@@ -84,7 +107,7 @@ public final class FogDomainLootDrops {
                     event,
                     level,
                     mob,
-                    ExampleMod.SOUL_CRYSTAL.get().getDefaultInstance()
+                    new ItemStack(ExampleMod.SOUL_CRYSTAL.get())
             );
         }
     }
@@ -102,7 +125,7 @@ public final class FogDomainLootDrops {
                     event,
                     level,
                     mob,
-                    ExampleMod.SOUL_CRYSTAL.get().getDefaultInstance()
+                    new ItemStack(ExampleMod.SOUL_CRYSTAL.get())
             );
         }
 
@@ -111,7 +134,7 @@ public final class FogDomainLootDrops {
                     event,
                     level,
                     mob,
-                    ExampleMod.RULE_FRAGMENT.get().getDefaultInstance()
+                    new ItemStack(ExampleMod.RULE_FRAGMENT.get())
             );
         }
     }
@@ -131,14 +154,20 @@ public final class FogDomainLootDrops {
                 event,
                 level,
                 mob,
-                new ItemStack(ExampleMod.SOUL_CRYSTAL.get(), crystalCount)
+                new ItemStack(
+                        ExampleMod.SOUL_CRYSTAL.get(),
+                        crystalCount
+                )
         );
 
         addDrop(
                 event,
                 level,
                 mob,
-                new ItemStack(ExampleMod.RULE_FRAGMENT.get(), fragmentCount)
+                new ItemStack(
+                        ExampleMod.RULE_FRAGMENT.get(),
+                        fragmentCount
+                )
         );
     }
 

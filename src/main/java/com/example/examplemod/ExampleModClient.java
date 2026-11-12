@@ -104,35 +104,59 @@ public class ExampleModClient {
                 }
         );
 
-        // Nhận dữ liệu bảng thuộc tính nhân vật.
+        // Nhận dữ liệu bảng thuộc tính và cấp độ kỹ năng.
         event.register(
                 FogCharacterPayload.TYPE,
                 (payload, context) -> {
 
                     String[] parts = payload.data().split("\\|", -1);
 
-                    if (parts.length < 14
+                    // 14 phần cũ + 6 cấp độ kỹ năng = 20 phần.
+                    if (parts.length < 20
                             || !parts[0].equals("update")) {
                         return;
                     }
 
                     try {
+                        // Thông tin nhân vật.
                         int level = Integer.parseInt(parts[1]);
                         int spiritPoints = Integer.parseInt(parts[2]);
                         int freePoints = Integer.parseInt(parts[3]);
                         int ruleFragments = Integer.parseInt(parts[4]);
                         int soulCrystals = Integer.parseInt(parts[5]);
 
+                        // Năm thuộc tính.
                         int agility = Integer.parseInt(parts[6]);
                         int stamina = Integer.parseInt(parts[7]);
                         int strength = Integer.parseInt(parts[8]);
                         int spirit = Integer.parseInt(parts[9]);
                         int charisma = Integer.parseInt(parts[10]);
 
+                        // Máu.
                         float health = Float.parseFloat(parts[11]);
                         float maxHealth = Float.parseFloat(parts[12]);
 
+                        // Thông báo.
                         String message = parts[13];
+
+                        // Cấp độ sáu kỹ năng.
+                        int energySkillLevel =
+                                Integer.parseInt(parts[14]);
+
+                        int cageSkillLevel =
+                                Integer.parseInt(parts[15]);
+
+                        int tameSkillLevel =
+                                Integer.parseInt(parts[16]);
+
+                        int combineSkillLevel =
+                                Integer.parseInt(parts[17]);
+
+                        int stealSkillLevel =
+                                Integer.parseInt(parts[18]);
+
+                        int tripleSpiritSkillLevel =
+                                Integer.parseInt(parts[19]);
 
                         Minecraft.getInstance().execute(() -> {
                             FogCharacterScreen.updateData(
@@ -148,7 +172,13 @@ public class ExampleModClient {
                                     charisma,
                                     health,
                                     maxHealth,
-                                    message
+                                    message,
+                                    energySkillLevel,
+                                    cageSkillLevel,
+                                    tameSkillLevel,
+                                    combineSkillLevel,
+                                    stealSkillLevel,
+                                    tripleSpiritSkillLevel
                             );
                         });
 

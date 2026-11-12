@@ -27,7 +27,6 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.registries.DeferredBlock;
@@ -75,15 +74,25 @@ public class ExampleMod {
                     )
             );
 
+    // Vật phẩm mới: Tinh Thạch Linh Hồn.
+    public static final DeferredItem<Item> SOUL_CRYSTAL =
+            ITEMS.registerSimpleItem("soul_crystal");
+
+    // Vật phẩm mới: Mảnh Vỡ Quy Tắc.
+    public static final DeferredItem<Item> RULE_FRAGMENT =
+            ITEMS.registerSimpleItem("rule_fragment");
+
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXAMPLE_TAB =
             CREATIVE_MODE_TABS.register(
                     "example_tab",
                     () -> CreativeModeTab.builder()
                             .title(Component.translatable("itemGroup.examplemod"))
                             .withTabsBefore(CreativeModeTabs.COMBAT)
-                            .icon(() -> EXAMPLE_ITEM.get().getDefaultInstance())
+                            .icon(() -> SOUL_CRYSTAL.get().getDefaultInstance())
                             .displayItems((parameters, output) -> {
                                 output.accept(EXAMPLE_ITEM.get());
+                                output.accept(SOUL_CRYSTAL.get());
+                                output.accept(RULE_FRAGMENT.get());
                             })
                             .build()
             );
@@ -94,12 +103,12 @@ public class ExampleMod {
     ) {
         modEventBus.addListener(this::commonSetup);
 
-        // Đăng ký payload nhập hồn
+        // Đăng ký payload nhập hồn.
         modEventBus.addListener(FogPossessionPayload::register);
         modEventBus.addListener(FogPossessionControlPayload::register);
         modEventBus.addListener(FogPossessionSyncPayload::register);
 
-        // Đăng ký payload HUD
+        // Đăng ký payload HUD.
         modEventBus.addListener(FogHudPayload::register);
 
         BLOCKS.register(modEventBus);
@@ -108,7 +117,7 @@ public class ExampleMod {
 
         NeoForge.EVENT_BUS.register(this);
 
-        // Đăng ký lệnh nhập hồn
+        // Đăng ký lệnh nhập hồn.
         NeoForge.EVENT_BUS.addListener(
                 FogPossessionCommands::register
         );

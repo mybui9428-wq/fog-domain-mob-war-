@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.TextAlignment;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 
 import net.neoforged.api.distmarker.Dist;
@@ -17,6 +18,7 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
+import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
 
 @Mod(value = ExampleMod.MODID, dist = Dist.CLIENT)
 @EventBusSubscriber(
@@ -26,6 +28,12 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
 public class ExampleModClient {
 
     private static String hudData = "";
+
+    private static final Identifier VANILLA_HEALTH_LAYER =
+            Identifier.fromNamespaceAndPath(
+                    "minecraft",
+                    "health"
+            );
 
     public ExampleModClient(ModContainer container) {
         container.registerExtensionPoint(
@@ -88,7 +96,7 @@ public class ExampleModClient {
                 }
         );
 
-        // Nhận dữ liệu HUD cũ từ máy chủ.
+        // Nhận dữ liệu HUD từ máy chủ.
         event.register(
                 FogHudPayload.TYPE,
                 (payload, context) -> {
@@ -154,7 +162,80 @@ public class ExampleModClient {
         );
     }
 
-    // Vẽ bảng trạng thái cũ trên màn hình.
+    /**
+     * Ẩn trái tim mặc định của Minecraft.
+     */
+    @SubscribeEvent
+    public static void hideVanillaHealth(
+            RenderGuiLayerEvent.Pre event
+    ) {
+        Minecraft minecraft = Minecraft.getInstance();
+
+        if (minecraft.player == null
+                || minecraft.level == null) {
+            return;
+        }
+
+        if (VANILLA_HEALTH_LAYER.equals(event.getName())) {
+            event.setCanceled(true);
+        }
+    }
+
+    /**
+     * Hiển thị máu bằng số ở vị trí thanh máu cũ.
+     */
+    @SubscribeEvent
+    public static void renderNumericHealth(
+            RenderGuiEvent.Post event
+    ) {
+        Minecraft minecraft = Minecraft.getInstance();
+
+        if (minecraft.player == null
+                || minecraft.level == null) {
+            return;
+        }
+
+        if (minecraft.options.hideGui) {
+            return;
+        }
+
+        float health = minecraft.player.getHealth();
+        float maxHealth = minecraft.player.getMaxHealth();
+
+        String healthText = String.format(
+                java.util.Locale.ROOT,
+                "%.0f / %.0f HP",
+                health,
+                maxHealth
+        );
+
+        GuiGraphicsExtractor graphics =
+                event.getGuiGraphics();
+
+        int screenWidth =
+                minecraft.getWindow().getGuiScaledWidth();
+
+        int screenHeight =
+                minecraft.getWindow().getGuiScaledHeight();
+
+        int color = health <= maxHealth * 0.25F
+                ? 0xFFFF5555
+                : 0xFFFFFFFF;
+
+        var textRenderer = graphics.textRenderer(
+                GuiGraphicsExtractor.HoveredTextEffects.NONE
+        );
+
+        textRenderer.accept(
+                TextAlignment.CENTER,
+                screenWidth / 2,
+                screenHeight - 40,
+                textRenderer.defaultParameters(),
+                Component.literal(healthText)
+        );
+    }
+
+    // Vẽ bảng trạng thái trên màn hình.
     @SubscribeEvent
     public static void renderHud(RenderGuiEvent.Post event) {
 

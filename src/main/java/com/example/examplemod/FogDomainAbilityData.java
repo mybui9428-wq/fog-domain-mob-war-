@@ -81,6 +81,7 @@ public final class FogDomainAbilityData extends SavedData {
     );
 
     public static final int STARTING_LEVEL = 1;
+public static final int MAX_CHARACTER_LEVEL = 20;
     public static final int STARTING_ATTRIBUTE = 5;
     public static final int STARTING_FREE_POINTS = 0;
 
@@ -453,18 +454,85 @@ public final class FogDomainAbilityData extends SavedData {
     }
 
     public int getCharacterLevel(UUID playerId) {
-        if (playerId == null) return STARTING_LEVEL;
+    if (playerId == null) return STARTING_LEVEL;
 
-        initializeCharacter(playerId);
-        return characterLevels.getOrDefault(key(playerId), STARTING_LEVEL);
+    initializeCharacter(playerId);
+
+    return characterLevels.getOrDefault(
+            key(playerId),
+            STARTING_LEVEL
+    );
+}
+
+public void setCharacterLevel(UUID playerId, int level) {
+    if (playerId == null) return;
+
+    characterLevels.put(
+            key(playerId),
+            Math.max(1, Math.min(MAX_CHARACTER_LEVEL, level))
+    );
+
+    setDirty();
+}
+
+// ==================== TĂNG CẤP NHÂN VẬT ====================
+
+public int getLevelUpSpiritPointCost(UUID playerId) {
+    int level = getCharacterLevel(playerId);
+
+    if (level >= MAX_CHARACTER_LEVEL) return 0;
+
+    return level * 100;
+}
+
+public int getLevelUpRuleFragmentCost(UUID playerId) {
+    int level = getCharacterLevel(playerId);
+
+    if (level >= MAX_CHARACTER_LEVEL) return 0;
+
+    return level;
+}
+
+public boolean levelUp(UUID playerId) {
+    if (playerId == null) return false;
+
+    initializeCharacter(playerId);
+
+    int currentLevel = getCharacterLevel(playerId);
+
+    if (currentLevel >= MAX_CHARACTER_LEVEL) {
+        return false;
     }
 
-    public void setCharacterLevel(UUID playerId, int level) {
-        if (playerId == null) return;
+    int spiritCost = getLevelUpSpiritPointCost(playerId);
+    int fragmentCost = getLevelUpRuleFragmentCost(playerId);
 
-        characterLevels.put(key(playerId), Math.max(1, level));
-        setDirty();
+    if (getSpiritPoints(playerId) < spiritCost) {
+        return false;
     }
+
+    if (getRuleFragments(playerId) < fragmentCost) {
+        return false;
+    }
+
+    String id = key(playerId);
+
+    spiritPoints.put(
+            id,
+            getSpiritPoints(playerId) - spiritCost
+    );
+
+    ruleFragments.put(
+            id,
+            getRuleFragments(playerId) - fragmentCost
+    );
+
+    characterLevels.put(id, currentLevel + 1);
+
+    setDirty();
+
+    return true;
+}
 
     // ==================== THUỘC TÍNH ====================
 
@@ -1219,39 +1287,69 @@ public final class FogDomainAbilityData extends SavedData {
 
     // ==================== NĂNG LƯỢNG ====================
 
-    public double getEnergy(UUID playerId) {
-        if (playerId == null) return MAX_ENERGY;
+/**
+ * Tinh thần 5: năng lượng tối đa 100.
+ * Mỗi điểm Tinh thần trên 5 tăng 2% năng lượng tối đa.
+ *
+ * Ví dụ:
+ * Tinh thần 5  = 100 năng lượng.
+ * Tinh thần 10 = 110 năng lượng.
+ * Tinh thần 20 = 130 năng lượng.
+ */
+public double getMaxEnergy(UUID playerId) {
+    if (playerId == null) return MAX_ENERGY;
 
-        return energy.getOrDefault(key(playerId), MAX_ENERGY);
-    }
+    int spirit = getAttribute(playerId, "spirit");
 
-    public void setEnergy(UUID playerId, double amount) {
-        if (playerId == null) return;
+    double bonus = Math.max(0, spirit - 5) * 0.02D;
 
-        energy.put(
-                key(playerId),
-                Math.max(0.0D, Math.min(MAX_ENERGY, amount))
-        );
+    return MAX_ENERGY * (1.0D + bonus);
+}
 
-        setDirty();
-    }
+public double getEnergy(UUID playerId) {
+    if (playerId == null) return MAX_ENERGY;
 
-    public boolean consumeEnergy(UUID playerId, double amount) {
-        if (playerId == null) return false;
-        if (amount <= 0.0D) return true;
+    return energy.getOrDefault(
+            key(playerId),
+            getMaxEnergy(playerId)
+    );
+}
 
-        double current = getEnergy(playerId);
-        if (current < amount) return false;
+public void setEnergy(UUID playerId, double amount) {
+    if (playerId == null) return;
 
-        setEnergy(playerId, current - amount);
-        return true;
-    }
+    double maxEnergy = getMaxEnergy(playerId);
 
-    public void regenerateEnergy(UUID playerId, double amount) {
-        if (playerId == null || amount <= 0.0D) return;
+    energy.put(
+            key(playerId),
+            Math.max(0.0D, Math.min(maxEnergy, amount))
+    );
 
-        setEnergy(playerId, getEnergy(playerId) + amount);
-    }
+    setDirty();
+}
+
+public boolean consumeEnergy(UUID playerId, double amount) {
+    if (playerId == null) return false;
+
+    if (amount <= 0.0D) return true;
+
+    double current = getEnergy(playerId);
+
+    if (current < amount) return false;
+
+    setEnergy(playerId, current - amount);
+
+    return true;
+}
+
+public void regenerateEnergy(UUID playerId, double amount) {
+    if (playerId == null || amount <= 0.0D) return;
+
+    setEnergy(
+            playerId,
+            getEnergy(playerId) + amount
+    );
+}
 
     // ==================== HỒI CHIÊU ====================
 

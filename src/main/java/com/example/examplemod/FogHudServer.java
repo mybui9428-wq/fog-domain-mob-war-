@@ -51,6 +51,7 @@ public final class FogHudServer {
         FogDomainAbilityData data =
                 FogDomainAbilityData.get(server);
 
+        data.initializeCharacter(player.getUUID());
         data.initializePower(player.getUUID(), true);
 
         String status;
@@ -64,6 +65,8 @@ public final class FogHudServer {
         }
 
         double energy = data.getEnergy(player.getUUID());
+        double maxEnergy = data.getMaxEnergy(player.getUUID());
+
         double power = data.getTotalPower(player.getUUID());
 
         int abilityCount =
@@ -83,7 +86,11 @@ public final class FogHudServer {
                 .append('\n');
 
         hud.append("Nang luong: ")
-                .append(String.format("%.0f/100", energy))
+                .append(String.format(
+                        "%.0f/%.0f",
+                        energy,
+                        maxEnergy
+                ))
                 .append('\n');
 
         hud.append("Tong suc manh: ")

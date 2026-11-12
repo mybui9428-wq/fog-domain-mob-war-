@@ -57,7 +57,10 @@ public final class FogDomainAttributeEffects {
         data.initializeCharacter(player.getUUID());
 
         applyAgility(player, data);
-        applyStrength(player, data);
+applyStrength(player, data);
+
+// Áp dụng máu tối đa theo Thể lực.
+data.applyStaminaMaxHealth(player);
     }
 
     private static void applyAgility(

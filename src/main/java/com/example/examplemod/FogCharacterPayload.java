@@ -124,6 +124,20 @@ public record FogCharacterPayload(String data)
                     ? "Da tang " + attribute + "."
                     : "Khong du dieu kien tang thuoc tinh.";
 
+        } else if (request.equals("levelup")) {
+
+            boolean success = data.levelUp(player.getUUID());
+
+            if (success) {
+                message = "Tang cap thanh cong! Cap moi: "
+                        + data.getCharacterLevel(player.getUUID());
+            } else if (data.getCharacterLevel(player.getUUID())
+                    >= FogDomainAbilityData.MAX_CHARACTER_LEVEL) {
+                message = "Ban da dat cap toi da.";
+            } else {
+                message = "Khong du Diem Linh Tinh hoac Manh Vo Quy Tac.";
+            }
+
         } else {
             return;
         }

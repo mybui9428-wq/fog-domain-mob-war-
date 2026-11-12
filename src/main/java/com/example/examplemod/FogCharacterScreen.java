@@ -41,7 +41,6 @@ public class FogCharacterScreen extends Screen {
         super(Component.literal("Bảng nhân vật"));
     }
 
-    // Đồng bộ dữ liệu cũ.
     public static void updateData(
             int newLevel,
             int newSpiritPoints,
@@ -58,23 +57,14 @@ public class FogCharacterScreen extends Screen {
             String newMessage
     ) {
         updateCommonData(
-                newLevel,
-                newSpiritPoints,
-                newFreePoints,
-                newRuleFragments,
-                newSoulCrystals,
-                newAgility,
-                newStamina,
-                newStrength,
-                newSpirit,
-                newCharisma,
-                newHealth,
-                newMaxHealth,
-                newMessage
+                newLevel, newSpiritPoints, newFreePoints,
+                newRuleFragments, newSoulCrystals,
+                newAgility, newStamina, newStrength,
+                newSpirit, newCharisma,
+                newHealth, newMaxHealth, newMessage
         );
     }
 
-    // Đồng bộ dữ liệu mới, bao gồm cấp độ kỹ năng.
     public static void updateData(
             int newLevel,
             int newSpiritPoints,
@@ -97,19 +87,11 @@ public class FogCharacterScreen extends Screen {
             int newTripleSpiritSkillLevel
     ) {
         updateCommonData(
-                newLevel,
-                newSpiritPoints,
-                newFreePoints,
-                newRuleFragments,
-                newSoulCrystals,
-                newAgility,
-                newStamina,
-                newStrength,
-                newSpirit,
-                newCharisma,
-                newHealth,
-                newMaxHealth,
-                newMessage
+                newLevel, newSpiritPoints, newFreePoints,
+                newRuleFragments, newSoulCrystals,
+                newAgility, newStamina, newStrength,
+                newSpirit, newCharisma,
+                newHealth, newMaxHealth, newMessage
         );
 
         energySkillLevel = Math.max(1, newEnergySkillLevel);
@@ -184,101 +166,71 @@ public class FogCharacterScreen extends Screen {
         }
     }
 
-    // =====================================================
-    // TRANG THUỘC TÍNH
-    // =====================================================
+    // =================================================
+    // TRANG THUỘC TÍNH - TỐI ƯU ĐIỆN THOẠI
+    // =================================================
 
     private void initAttributePage(int centerX) {
-        int startY = Math.max(4, (this.height - 440) / 2);
 
-        addLabel(
-                "BẢNG THUỘC TÍNH NHÂN VẬT",
-                centerX - 145, startY, 290
-        );
+        int startY = Math.max(2, (this.height - 340) / 2);
 
-        addLabel(
-                "Cấp nhân vật: " + level + "/" + MAX_LEVEL,
-                centerX - 130, startY + 22, 260
-        );
+        addLabel("BẢNG THUỘC TÍNH NHÂN VẬT",
+                centerX - 145, startY, 290);
 
-        addLabel(
-                "Điểm Linh Tính: " + spiritPoints,
-                centerX - 130, startY + 43, 260
-        );
+        addLabel("Cấp nhân vật: " + level + "/" + MAX_LEVEL,
+                centerX - 130, startY + 18, 260);
 
-        addLabel(
-                "Điểm thuộc tính: " + freePoints,
-                centerX - 130, startY + 64, 260
-        );
+        addLabel("Điểm Linh Tính: " + spiritPoints,
+                centerX - 130, startY + 36, 260);
 
-        addLabel(
-                "Mảnh Vỡ Quy Tắc: " + ruleFragments,
-                centerX - 130, startY + 85, 260
-        );
+        addLabel("Điểm thuộc tính: " + freePoints,
+                centerX - 130, startY + 54, 260);
 
-        addLabel(
-                "Tinh Thạch Linh Hồn: " + soulCrystals,
-                centerX - 130, startY + 106, 260
-        );
+        addLabel("Mảnh Vỡ Quy Tắc: " + ruleFragments,
+                centerX - 130, startY + 72, 260);
 
-        int attributeCost = level * 10;
+        addLabel("Tinh Thạch Linh Hồn: " + soulCrystals,
+                centerX - 130, startY + 90, 260);
 
-        addLabel(
-                "Giá tăng thuộc tính: " + attributeCost + " Điểm Linh Tính",
-                centerX - 155, startY + 130, 310
-        );
+        addLabel("Giá tăng thuộc tính: " + (level * 10) + " Linh Tính",
+                centerX - 150, startY + 108, 300);
 
-        addLabel(
-                "Mỗi điểm trên 10 mất 1 máu hiện tại",
-                centerX - 155, startY + 151, 310
-        );
+        addLabel("Điểm trên 10 mất 1 máu hiện tại",
+                centerX - 150, startY + 126, 300);
 
         addAttribute("Nhanh nhẹn", "agility",
-                agility, centerX, startY + 175);
+                agility, centerX, startY + 146);
 
         addAttribute("Thể lực", "stamina",
-                stamina, centerX, startY + 198);
+                stamina, centerX, startY + 164);
 
         addAttribute("Sức mạnh", "strength",
-                strength, centerX, startY + 221);
+                strength, centerX, startY + 182);
 
         addAttribute("Tinh thần", "spirit",
-                spirit, centerX, startY + 244);
+                spirit, centerX, startY + 200);
 
         addAttribute("Mị lực", "charisma",
-                charisma, centerX, startY + 267);
+                charisma, centerX, startY + 218);
 
-        addLabel(
-                "Máu: " + (int) health + "/" + (int) maxHealth,
-                centerX - 120, startY + 291, 240
-        );
+        addLabel("Máu: " + (int) health + "/" + (int) maxHealth,
+                centerX - 120, startY + 238, 240);
 
-        addLabel(
-                getWeakStatus(),
-                centerX - 160, startY + 313, 320
-        );
+        addLabel(getWeakStatus(),
+                centerX - 155, startY + 256, 310);
 
-        addLabel(
-                message,
-                centerX - 160, startY + 335, 320
-        );
+        addLabel(message,
+                centerX - 165, startY + 274, 330);
 
-        int levelUpSpiritCost = level * 100;
-        int levelUpFragmentCost = level;
+        int spiritCost = level * 100;
+        int fragmentCost = level;
 
         boolean maxLevel = level >= MAX_LEVEL;
 
-        String levelUpText;
-
-        if (maxLevel) {
-            levelUpText = "Đã đạt cấp tối đa";
-        } else {
-            levelUpText = "Tăng cấp: "
-                    + levelUpSpiritCost
-                    + " Linh Tính + "
-                    + levelUpFragmentCost
-                    + " Mảnh";
-        }
+        String levelUpText = maxLevel
+                ? "Đã đạt cấp tối đa"
+                : "Tăng cấp: " + spiritCost
+                + " Linh Tính + " + fragmentCost + " Mảnh";
 
         Button levelUpButton = Button.builder(
                 Component.literal(levelUpText),
@@ -286,25 +238,25 @@ public class FogCharacterScreen extends Screen {
                         new FogCharacterPayload("levelup")
                 )
         )
-        .bounds(centerX - 110, startY + 359, 220, 20)
+        .bounds(centerX - 110, startY + 294, 220, 20)
         .build();
 
         levelUpButton.active =
                 !maxLevel
-                && spiritPoints >= levelUpSpiritCost
-                && ruleFragments >= levelUpFragmentCost;
+                && spiritPoints >= spiritCost
+                && ruleFragments >= fragmentCost;
 
         addRenderableWidget(levelUpButton);
 
         addRenderableWidget(
                 Button.builder(
-                        Component.literal("Kỹ năng >>"),
+                        Component.literal("KỸ NĂNG >>"),
                         button -> {
                             skillPage = true;
                             refreshScreen();
                         }
                 )
-                .bounds(centerX - 110, startY + 383, 105, 20)
+                .bounds(centerX - 110, startY + 316, 105, 20)
                 .build()
         );
 
@@ -313,100 +265,61 @@ public class FogCharacterScreen extends Screen {
                         Component.literal("Đóng"),
                         button -> onClose()
                 )
-                .bounds(centerX + 5, startY + 383, 105, 20)
+                .bounds(centerX + 5, startY + 316, 105, 20)
                 .build()
         );
     }
 
-    // =====================================================
+    // =================================================
     // TRANG KỸ NĂNG
-    // =====================================================
+    // =================================================
 
     private void initSkillPage(int centerX) {
-        int startY = Math.max(8, (this.height - 390) / 2);
 
-        addLabel(
-                "BẢNG NÂNG CẤP KỸ NĂNG",
-                centerX - 145, startY, 290
-        );
+        int startY = Math.max(2, (this.height - 340) / 2);
 
-        addLabel(
-                "Điểm Linh Tính: " + spiritPoints,
-                centerX - 125, startY + 25, 250
-        );
+        addLabel("BẢNG NÂNG CẤP KỸ NĂNG",
+                centerX - 145, startY, 290);
 
-        addLabel(
-                "Tinh Thạch Linh Hồn: " + soulCrystals,
-                centerX - 125, startY + 47, 250
-        );
+        addLabel("Điểm Linh Tính: " + spiritPoints,
+                centerX - 125, startY + 20, 250);
 
-        addLabel(
-                "Chi phí nâng cấp dựa trên cấp kỹ năng hiện tại",
-                centerX - 165, startY + 72, 330
-        );
+        addLabel("Tinh Thạch Linh Hồn: " + soulCrystals,
+                centerX - 125, startY + 38, 250);
 
-        addSkill(
-                "Năng Lượng",
-                "energy",
-                energySkillLevel,
-                centerX,
-                startY + 105
-        );
+        addLabel("Chi phí: cấp kỹ năng x 100 Linh Tính",
+                centerX - 160, startY + 56, 320);
 
-        addSkill(
-                "Nhà Tù",
-                "cage",
-                cageSkillLevel,
-                centerX,
-                startY + 143
-        );
+        addSkill("Năng Lượng", "energy",
+                energySkillLevel, centerX, startY + 82);
 
-        addSkill(
-                "Thuần Hóa",
-                "tame",
-                tameSkillLevel,
-                centerX,
-                startY + 181
-        );
+        addSkill("Nhà Tù", "cage",
+                cageSkillLevel, centerX, startY + 114);
 
-        addSkill(
-                "Kết Hợp",
-                "combine",
-                combineSkillLevel,
-                centerX,
-                startY + 219
-        );
+        addSkill("Thuần Hóa", "tame",
+                tameSkillLevel, centerX, startY + 146);
 
-        addSkill(
-                "Cướp Đoạt",
-                "steal",
-                stealSkillLevel,
-                centerX,
-                startY + 257
-        );
+        addSkill("Kết Hợp", "combine",
+                combineSkillLevel, centerX, startY + 178);
 
-        addSkill(
-                "Tam Linh Hộ Thể",
-                "triple_spirit_guard",
-                tripleSpiritSkillLevel,
-                centerX,
-                startY + 295
-        );
+        addSkill("Cướp Đoạt", "steal",
+                stealSkillLevel, centerX, startY + 210);
 
-        addLabel(
-                message,
-                centerX - 165, startY + 337, 330
-        );
+        addSkill("Tam Linh Hộ Thể", "triple_spirit_guard",
+                tripleSpiritSkillLevel, centerX, startY + 242);
+
+        addLabel(message,
+                centerX - 165, startY + 274, 330);
 
         addRenderableWidget(
                 Button.builder(
-                        Component.literal("<< Thuộc tính"),
+                        Component.literal("<< THUỘC TÍNH"),
                         button -> {
                             skillPage = false;
                             refreshScreen();
                         }
                 )
-                .bounds(centerX - 110, startY + 365, 105, 20)
+                .bounds(centerX - 110, startY + 304, 105, 20)
                 .build()
         );
 
@@ -415,7 +328,7 @@ public class FogCharacterScreen extends Screen {
                         Component.literal("Đóng"),
                         button -> onClose()
                 )
-                .bounds(centerX + 5, startY + 365, 105, 20)
+                .bounds(centerX + 5, startY + 304, 105, 20)
                 .build()
         );
     }
@@ -431,22 +344,22 @@ public class FogCharacterScreen extends Screen {
         int crystalCost = skillLevel;
 
         addLabel(
-                name + " - Cấp " + skillLevel,
-                centerX - 155,
+                name + ": Cấp " + skillLevel,
+                centerX - 205,
                 y,
-                155
+                200
         );
 
         Button upgradeButton = Button.builder(
                 Component.literal(
-                        "Nâng cấp (" + spiritCost + " LT, "
-                                + crystalCost + " Tinh Thạch)"
+                        "Nâng cấp: " + spiritCost + " LT, "
+                                + crystalCost + " Tinh Thạch"
                 ),
                 button -> ClientPacketDistributor.sendToServer(
                         new FogCharacterPayload("upgrade|" + skillId)
                 )
         )
-        .bounds(centerX + 5, y, 175, 20)
+        .bounds(centerX + 5, y, 210, 20)
         .build();
 
         upgradeButton.active =
@@ -456,9 +369,37 @@ public class FogCharacterScreen extends Screen {
         addRenderableWidget(upgradeButton);
     }
 
-    // =====================================================
-    // THUỘC TÍNH
-    // =====================================================
+    // =================================================
+    // NÚT TĂNG THUỘC TÍNH
+    // =================================================
+
+    private void addAttribute(
+            String name,
+            String key,
+            int value,
+            int centerX,
+            int y
+    ) {
+        addLabel(
+                name + ": " + value,
+                centerX - 130,
+                y,
+                180
+        );
+
+        Button increaseButton = Button.builder(
+                Component.literal("Tăng"),
+                button -> ClientPacketDistributor.sendToServer(
+                        new FogCharacterPayload("add|" + key)
+                )
+        )
+        .bounds(centerX + 55, y, 55, 18)
+        .build();
+
+        increaseButton.active = spiritPoints >= level * 10;
+
+        addRenderableWidget(increaseButton);
+    }
 
     private String getWeakStatus() {
         if (level == 1) {
@@ -482,39 +423,11 @@ public class FogCharacterScreen extends Screen {
                 Component.literal(text),
                 button -> {}
         )
-        .bounds(x, y, width, 20)
+        .bounds(x, y, width, 18)
         .build();
 
         label.active = false;
         addRenderableWidget(label);
-    }
-
-    private void addAttribute(
-            String name,
-            String key,
-            int value,
-            int centerX,
-            int y
-    ) {
-        addLabel(
-                name + ": " + value,
-                centerX - 130,
-                y,
-                180
-        );
-
-        Button increaseButton = Button.builder(
-                Component.literal("+"),
-                button -> ClientPacketDistributor.sendToServer(
-                        new FogCharacterPayload("add|" + key)
-                )
-        )
-        .bounds(centerX + 55, y, 35, 20)
-        .build();
-
-        increaseButton.active = spiritPoints >= level * 10;
-
-        addRenderableWidget(increaseButton);
     }
 
     @Override

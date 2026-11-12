@@ -81,11 +81,13 @@ public final class FogDomainAbilityData extends SavedData {
     );
 
     public static final int STARTING_LEVEL = 1;
-public static final int MAX_CHARACTER_LEVEL = 20;
+    public static final int MAX_CHARACTER_LEVEL = 20;
     public static final int STARTING_ATTRIBUTE = 5;
     public static final int STARTING_FREE_POINTS = 0;
 
     public static final double MAX_ENERGY = 100.0D;
+
+    // ==================== CODEC ====================
 
     private static final Codec<Map<String, List<String>>> ABILITIES_CODEC =
             Codec.unboundedMap(Codec.STRING, Codec.STRING.listOf());
@@ -288,7 +290,9 @@ public static final int MAX_CHARACTER_LEVEL = 20;
             });
         }
 
-        if (loadedEnergy != null) energy.putAll(loadedEnergy);
+        if (loadedEnergy != null) {
+            energy.putAll(loadedEnergy);
+        }
 
         if (loadedCooldowns != null) {
             loadedCooldowns.forEach((id, map) -> {
@@ -335,7 +339,9 @@ public static final int MAX_CHARACTER_LEVEL = 20;
                 new ArrayList<>(new LinkedHashSet<>(list))
         );
 
-        if (migrated) setDirty();
+        if (migrated) {
+            setDirty();
+        }
     }
 
     private static void copyLists(
@@ -450,84 +456,85 @@ public static final int MAX_CHARACTER_LEVEL = 20;
             }
         }
 
-        if (changed) setDirty();
+        if (changed) {
+            setDirty();
+        }
     }
+
+    // ==================== CẤP ĐỘ NHÂN VẬT ====================
 
     public int getCharacterLevel(UUID playerId) {
-    if (playerId == null) return STARTING_LEVEL;
+        if (playerId == null) return STARTING_LEVEL;
 
-    initializeCharacter(playerId);
+        initializeCharacter(playerId);
 
-    return characterLevels.getOrDefault(
-            key(playerId),
-            STARTING_LEVEL
-    );
-}
-
-public void setCharacterLevel(UUID playerId, int level) {
-    if (playerId == null) return;
-
-    characterLevels.put(
-            key(playerId),
-            Math.max(1, Math.min(MAX_CHARACTER_LEVEL, level))
-    );
-
-    setDirty();
-}
-
-// ==================== TĂNG CẤP NHÂN VẬT ====================
-
-public int getLevelUpSpiritPointCost(UUID playerId) {
-    int level = getCharacterLevel(playerId);
-
-    if (level >= MAX_CHARACTER_LEVEL) return 0;
-
-    return level * 100;
-}
-
-public int getLevelUpRuleFragmentCost(UUID playerId) {
-    int level = getCharacterLevel(playerId);
-
-    if (level >= MAX_CHARACTER_LEVEL) return 0;
-
-    return level;
-}
-
-public boolean upgradeSkill(UUID playerId, String skillId, int soulCrystalCost) {
-    if (playerId == null
-            || skillId == null
-            || skillId.isBlank()) {
-        return false;
+        return characterLevels.getOrDefault(
+                key(playerId),
+                STARTING_LEVEL
+        );
     }
 
-    initializeCharacter(playerId);
+    public void setCharacterLevel(UUID playerId, int level) {
+        if (playerId == null) return;
 
-    int currentSkillLevel = Math.max(1, getSkillLevel(playerId, skillId));
+        characterLevels.put(
+                key(playerId),
+                Math.max(1, Math.min(MAX_CHARACTER_LEVEL, level))
+        );
 
-    // Chi phí tăng theo cấp kỹ năng hiện tại.
-    int requiredSoulCrystals = currentSkillLevel;
-    int requiredSpiritPoints = currentSkillLevel * 100;
-
-    // Kiểm tra đủ cả hai loại tài nguyên trước khi trừ.
-    if (getSoulCrystals(playerId) < requiredSoulCrystals
-            || getSpiritPoints(playerId) < requiredSpiritPoints) {
-        return false;
+        setDirty();
     }
 
-    if (!consumeSoulCrystals(playerId, requiredSoulCrystals)) {
-        return false;
+    // ==================== TĂNG CẤP NHÂN VẬT ====================
+
+    public int getLevelUpSpiritPointCost(UUID playerId) {
+        int level = getCharacterLevel(playerId);
+
+        if (level >= MAX_CHARACTER_LEVEL) return 0;
+
+        return level * 100;
     }
 
-    if (!consumeSpiritPoints(playerId, requiredSpiritPoints)) {
-        // Hoàn lại tinh thạch nếu không trừ được Điểm Linh Tính.
-        addSoulCrystals(playerId, requiredSoulCrystals);
-        return false;
+    public int getLevelUpRuleFragmentCost(UUID playerId) {
+        int level = getCharacterLevel(playerId);
+
+        if (level >= MAX_CHARACTER_LEVEL) return 0;
+
+        return level;
     }
 
-    setSkillLevel(playerId, skillId, currentSkillLevel + 1);
+    public boolean levelUp(UUID playerId) {
+        if (playerId == null) return false;
 
-    return true;
-}
+        initializeCharacter(playerId);
+
+        int currentLevel = getCharacterLevel(playerId);
+
+        if (currentLevel >= MAX_CHARACTER_LEVEL) {
+            return false;
+        }
+
+        int spiritCost = getLevelUpSpiritPointCost(playerId);
+        int fragmentCost = getLevelUpRuleFragmentCost(playerId);
+
+        if (getSpiritPoints(playerId) < spiritCost
+                || getRuleFragments(playerId) < fragmentCost) {
+            return false;
+        }
+
+        if (!consumeSpiritPoints(playerId, spiritCost)) {
+            return false;
+        }
+
+        if (!consumeRuleFragments(playerId, fragmentCost)) {
+            addSpiritPoints(playerId, spiritCost);
+            return false;
+        }
+
+        setCharacterLevel(playerId, currentLevel + 1);
+
+        return true;
+    }
 
     // ==================== THUỘC TÍNH ====================
 
@@ -554,8 +561,6 @@ public boolean upgradeSkill(UUID playerId, String skillId, int soulCrystalCost) 
 
         int stamina = getAttribute(playerId, "stamina");
 
-        // Thể lực 5 = 20 máu.
-        // Mỗi điểm Thể lực tăng thêm 5 máu tối đa.
         return Math.max(1.0D, 20.0D + (stamina - 5) * 5.0D);
     }
 
@@ -632,8 +637,6 @@ public boolean upgradeSkill(UUID playerId, String skillId, int soulCrystalCost) 
 
         if (availablePoints < totalCost) return false;
 
-        // Từ điểm thuộc tính thứ 11 trở đi,
-        // mỗi điểm tăng thêm sẽ mất 1 máu hiện tại.
         int healthCost = Math.max(
                 0,
                 newAttribute - Math.max(currentAttribute, 10)
@@ -644,14 +647,12 @@ public boolean upgradeSkill(UUID playerId, String skillId, int soulCrystalCost) 
         if (currentHealth <= healthCost) return false;
 
         spiritPoints.put(id, availablePoints - (int) totalCost);
-
         attributes.get(id).put(attribute, newAttribute);
 
         if (healthCost > 0) {
             player.setHealth(currentHealth - healthCost);
         }
 
-        // Nếu tăng Thể lực, cập nhật máu tối đa.
         if ("stamina".equals(attribute)) {
             applyStaminaMaxHealth(player);
         }
@@ -837,7 +838,6 @@ public boolean upgradeSkill(UUID playerId, String skillId, int soulCrystalCost) 
         boolean isTubi = playerName != null
                 && PLAYER_TUBI.equalsIgnoreCase(playerName);
 
-        // tubi2531 có hai năng lực đặc biệt.
         if (isTubi) {
             String specialAbilities = SKILL_STEAL + "," + SKILL_COMBINE;
 
@@ -868,7 +868,6 @@ public boolean upgradeSkill(UUID playerId, String skillId, int soulCrystalCost) 
             return;
         }
 
-        // Người chơi bình thường chỉ được chọn một lần.
         if (innateAbilities.containsKey(id)) return;
 
         int index = ThreadLocalRandom.current().nextInt(
@@ -1006,6 +1005,14 @@ public boolean upgradeSkill(UUID playerId, String skillId, int soulCrystalCost) 
         return true;
     }
 
+    /**
+     * Nâng cấp kỹ năng:
+     * Điểm Linh Tính = cấp kỹ năng hiện tại x 100.
+     * Tinh Thạch Linh Hồn = cấp kỹ năng hiện tại.
+     *
+     * Ví dụ cấp 1 lên cấp 2:
+     * 100 Điểm Linh Tính và 1 Tinh Thạch Linh Hồn.
+     */
     public boolean upgradeSkill(
             UUID playerId,
             String skillId,
@@ -1013,24 +1020,39 @@ public boolean upgradeSkill(UUID playerId, String skillId, int soulCrystalCost) 
     ) {
         if (playerId == null
                 || skillId == null
-                || skillId.isBlank()
-                || soulCrystalCost <= 0) {
+                || skillId.isBlank()) {
             return false;
         }
 
         initializeCharacter(playerId);
 
-        if (!consumeSoulCrystals(playerId, soulCrystalCost)) {
+        int currentSkillLevel = Math.max(
+                1,
+                getSkillLevel(playerId, skillId)
+        );
+
+        int requiredSoulCrystals = currentSkillLevel;
+        int requiredSpiritPoints = currentSkillLevel * 100;
+
+        if (getSoulCrystals(playerId) < requiredSoulCrystals
+                || getSpiritPoints(playerId) < requiredSpiritPoints) {
             return false;
         }
 
-        setSkillLevel(
+        if (!consumeSoulCrystals(playerId, requiredSoulCrystals)) {
+            return false;
+        }
+
+        if (!consumeSpiritPoints(playerId, requiredSpiritPoints)) {
+            addSoulCrystals(playerId, requiredSoulCrystals);
+            return false;
+        }
+
+        return setSkillLevel(
                 playerId,
                 skillId,
-                getSkillLevel(playerId, skillId) + 1
+                currentSkillLevel + 1
         );
-
-        return true;
     }
 
     // ==================== SỨC MẠNH KỸ NĂNG CŨ ====================
@@ -1282,69 +1304,64 @@ public boolean upgradeSkill(UUID playerId, String skillId, int soulCrystalCost) 
 
     // ==================== NĂNG LƯỢNG ====================
 
-/**
- * Tinh thần 5: năng lượng tối đa 100.
- * Mỗi điểm Tinh thần trên 5 tăng 2% năng lượng tối đa.
- *
- * Ví dụ:
- * Tinh thần 5  = 100 năng lượng.
- * Tinh thần 10 = 110 năng lượng.
- * Tinh thần 20 = 130 năng lượng.
- */
-public double getMaxEnergy(UUID playerId) {
-    if (playerId == null) return MAX_ENERGY;
+    /**
+     * Tinh thần 5: năng lượng tối đa 100.
+     * Mỗi điểm Tinh thần trên 5 tăng 2% năng lượng tối đa.
+     */
+    public double getMaxEnergy(UUID playerId) {
+        if (playerId == null) return MAX_ENERGY;
 
-    int spirit = getAttribute(playerId, "spirit");
+        int spirit = getAttribute(playerId, "spirit");
 
-    double bonus = Math.max(0, spirit - 5) * 0.02D;
+        double bonus = Math.max(0, spirit - 5) * 0.02D;
 
-    return MAX_ENERGY * (1.0D + bonus);
-}
+        return MAX_ENERGY * (1.0D + bonus);
+    }
 
-public double getEnergy(UUID playerId) {
-    if (playerId == null) return MAX_ENERGY;
+    public double getEnergy(UUID playerId) {
+        if (playerId == null) return MAX_ENERGY;
 
-    return energy.getOrDefault(
-            key(playerId),
-            getMaxEnergy(playerId)
-    );
-}
+        return energy.getOrDefault(
+                key(playerId),
+                getMaxEnergy(playerId)
+        );
+    }
 
-public void setEnergy(UUID playerId, double amount) {
-    if (playerId == null) return;
+    public void setEnergy(UUID playerId, double amount) {
+        if (playerId == null) return;
 
-    double maxEnergy = getMaxEnergy(playerId);
+        double maxEnergy = getMaxEnergy(playerId);
 
-    energy.put(
-            key(playerId),
-            Math.max(0.0D, Math.min(maxEnergy, amount))
-    );
+        energy.put(
+                key(playerId),
+                Math.max(0.0D, Math.min(maxEnergy, amount))
+        );
 
-    setDirty();
-}
+        setDirty();
+    }
 
-public boolean consumeEnergy(UUID playerId, double amount) {
-    if (playerId == null) return false;
+    public boolean consumeEnergy(UUID playerId, double amount) {
+        if (playerId == null) return false;
 
-    if (amount <= 0.0D) return true;
+        if (amount <= 0.0D) return true;
 
-    double current = getEnergy(playerId);
+        double current = getEnergy(playerId);
 
-    if (current < amount) return false;
+        if (current < amount) return false;
 
-    setEnergy(playerId, current - amount);
+        setEnergy(playerId, current - amount);
 
-    return true;
-}
+        return true;
+    }
 
-public void regenerateEnergy(UUID playerId, double amount) {
-    if (playerId == null || amount <= 0.0D) return;
+    public void regenerateEnergy(UUID playerId, double amount) {
+        if (playerId == null || amount <= 0.0D) return;
 
-    setEnergy(
-            playerId,
-            getEnergy(playerId) + amount
-    );
-}
+        setEnergy(
+                playerId,
+                getEnergy(playerId) + amount
+        );
+    }
 
     // ==================== HỒI CHIÊU ====================
 

@@ -23,14 +23,21 @@ public final class FogDomainEnergyTick {
             return;
         }
 
+        FogDomainAbilityData data =
+                FogDomainAbilityData.get(server);
+
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            if (!player.getName().getString().equalsIgnoreCase("tubi2531")) {
+
+            // Giữ nguyên cơ chế hồi năng lượng riêng cho tubi2531.
+            if (!player.getName().getString()
+                    .equalsIgnoreCase("tubi2531")) {
                 continue;
             }
 
-            FogDomainAbilityData data = FogDomainAbilityData.get(server);
+            data.initializeCharacter(player.getUUID());
 
-            // Hồi 1 năng lượng mỗi giây, tối đa 100.
+            // Hồi 1 năng lượng mỗi giây.
+            // Giới hạn tối đa tự động phụ thuộc vào chỉ số Tinh thần.
             data.regenerateEnergy(player.getUUID(), 1.0D);
         }
     }

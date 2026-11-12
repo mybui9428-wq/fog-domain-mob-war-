@@ -195,8 +195,8 @@ public class ExampleModClient {
             return;
         }
 
-        if (minecraft.options.hideGui) {
-            return;
+        if (minecraft.gui.getGui() == null) {
+    return;
         }
 
         float health = minecraft.player.getHealth();

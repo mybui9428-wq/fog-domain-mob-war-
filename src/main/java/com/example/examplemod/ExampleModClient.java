@@ -195,10 +195,6 @@ public class ExampleModClient {
             return;
         }
 
-        if (minecraft.gui.getGui() == null) {
-    return;
-        }
-
         float health = minecraft.player.getHealth();
         float maxHealth = minecraft.player.getMaxHealth();
 

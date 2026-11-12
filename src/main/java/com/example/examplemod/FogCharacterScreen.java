@@ -24,15 +24,105 @@ public class FogCharacterScreen extends Screen {
     private static float health = 20;
     private static float maxHealth = 20;
 
+    private static int energySkillLevel = 1;
+    private static int cageSkillLevel = 1;
+    private static int tameSkillLevel = 1;
+    private static int combineSkillLevel = 1;
+    private static int stealSkillLevel = 1;
+    private static int tripleSpiritSkillLevel = 1;
+
     private static String message = "";
 
     private static final int MAX_LEVEL = 20;
 
+    private boolean skillPage = false;
+
     public FogCharacterScreen() {
-        super(Component.literal("Bảng thuộc tính nhân vật"));
+        super(Component.literal("Bảng nhân vật"));
     }
 
+    // Đồng bộ dữ liệu cũ.
     public static void updateData(
+            int newLevel,
+            int newSpiritPoints,
+            int newFreePoints,
+            int newRuleFragments,
+            int newSoulCrystals,
+            int newAgility,
+            int newStamina,
+            int newStrength,
+            int newSpirit,
+            int newCharisma,
+            float newHealth,
+            float newMaxHealth,
+            String newMessage
+    ) {
+        updateCommonData(
+                newLevel,
+                newSpiritPoints,
+                newFreePoints,
+                newRuleFragments,
+                newSoulCrystals,
+                newAgility,
+                newStamina,
+                newStrength,
+                newSpirit,
+                newCharisma,
+                newHealth,
+                newMaxHealth,
+                newMessage
+        );
+    }
+
+    // Đồng bộ dữ liệu mới, bao gồm cấp độ kỹ năng.
+    public static void updateData(
+            int newLevel,
+            int newSpiritPoints,
+            int newFreePoints,
+            int newRuleFragments,
+            int newSoulCrystals,
+            int newAgility,
+            int newStamina,
+            int newStrength,
+            int newSpirit,
+            int newCharisma,
+            float newHealth,
+            float newMaxHealth,
+            String newMessage,
+            int newEnergySkillLevel,
+            int newCageSkillLevel,
+            int newTameSkillLevel,
+            int newCombineSkillLevel,
+            int newStealSkillLevel,
+            int newTripleSpiritSkillLevel
+    ) {
+        updateCommonData(
+                newLevel,
+                newSpiritPoints,
+                newFreePoints,
+                newRuleFragments,
+                newSoulCrystals,
+                newAgility,
+                newStamina,
+                newStrength,
+                newSpirit,
+                newCharisma,
+                newHealth,
+                newMaxHealth,
+                newMessage
+        );
+
+        energySkillLevel = Math.max(1, newEnergySkillLevel);
+        cageSkillLevel = Math.max(1, newCageSkillLevel);
+        tameSkillLevel = Math.max(1, newTameSkillLevel);
+        combineSkillLevel = Math.max(1, newCombineSkillLevel);
+        stealSkillLevel = Math.max(1, newStealSkillLevel);
+        tripleSpiritSkillLevel = Math.max(1, newTripleSpiritSkillLevel);
+
+        refreshOpenScreen();
+    }
+
+    private static void updateCommonData(
             int newLevel,
             int newSpiritPoints,
             int newFreePoints,
@@ -63,13 +153,19 @@ public class FogCharacterScreen extends Screen {
         maxHealth = newMaxHealth;
         message = newMessage;
 
+        refreshOpenScreen();
+    }
+
+    private static void refreshOpenScreen() {
         Minecraft minecraft = Minecraft.getInstance();
 
-        if (minecraft.gui.screen() instanceof FogCharacterScreen screen) {
-            screen.refreshScreen();
-        } else {
-            minecraft.gui.setScreen(new FogCharacterScreen());
-        }
+        minecraft.execute(() -> {
+            if (minecraft.gui.screen() instanceof FogCharacterScreen screen) {
+                screen.refreshScreen();
+            } else {
+                minecraft.gui.setScreen(new FogCharacterScreen());
+            }
+        });
     }
 
     private void refreshScreen() {
@@ -79,9 +175,20 @@ public class FogCharacterScreen extends Screen {
 
     @Override
     protected void init() {
-
         int centerX = this.width / 2;
 
+        if (skillPage) {
+            initSkillPage(centerX);
+        } else {
+            initAttributePage(centerX);
+        }
+    }
+
+    // =====================================================
+    // TRANG THUỘC TÍNH
+    // =====================================================
+
+    private void initAttributePage(int centerX) {
         int startY = Math.max(4, (this.height - 440) / 2);
 
         addLabel(
@@ -126,30 +233,20 @@ public class FogCharacterScreen extends Screen {
                 centerX - 155, startY + 151, 310
         );
 
-        addAttribute(
-                "Nhanh nhẹn", "agility",
-                agility, centerX, startY + 175
-        );
+        addAttribute("Nhanh nhẹn", "agility",
+                agility, centerX, startY + 175);
 
-        addAttribute(
-                "Thể lực", "stamina",
-                stamina, centerX, startY + 198
-        );
+        addAttribute("Thể lực", "stamina",
+                stamina, centerX, startY + 198);
 
-        addAttribute(
-                "Sức mạnh", "strength",
-                strength, centerX, startY + 221
-        );
+        addAttribute("Sức mạnh", "strength",
+                strength, centerX, startY + 221);
 
-        addAttribute(
-                "Tinh thần", "spirit",
-                spirit, centerX, startY + 244
-        );
+        addAttribute("Tinh thần", "spirit",
+                spirit, centerX, startY + 244);
 
-        addAttribute(
-                "Mị lực", "charisma",
-                charisma, centerX, startY + 267
-        );
+        addAttribute("Mị lực", "charisma",
+                charisma, centerX, startY + 267);
 
         addLabel(
                 "Máu: " + (int) health + "/" + (int) maxHealth,
@@ -165,8 +262,6 @@ public class FogCharacterScreen extends Screen {
                 message,
                 centerX - 160, startY + 335, 320
         );
-
-        // ==================== NÚT TĂNG CẤP ====================
 
         int levelUpSpiritCost = level * 100;
         int levelUpFragmentCost = level;
@@ -201,20 +296,171 @@ public class FogCharacterScreen extends Screen {
 
         addRenderableWidget(levelUpButton);
 
-        // ==================== NÚT ĐÓNG ====================
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Kỹ năng >>"),
+                        button -> {
+                            skillPage = true;
+                            refreshScreen();
+                        }
+                )
+                .bounds(centerX - 110, startY + 383, 105, 20)
+                .build()
+        );
 
         addRenderableWidget(
                 Button.builder(
                         Component.literal("Đóng"),
                         button -> onClose()
                 )
-                .bounds(centerX - 50, startY + 383, 100, 20)
+                .bounds(centerX + 5, startY + 383, 105, 20)
                 .build()
         );
     }
 
-    private String getWeakStatus() {
+    // =====================================================
+    // TRANG KỸ NĂNG
+    // =====================================================
 
+    private void initSkillPage(int centerX) {
+        int startY = Math.max(8, (this.height - 390) / 2);
+
+        addLabel(
+                "BẢNG NÂNG CẤP KỸ NĂNG",
+                centerX - 145, startY, 290
+        );
+
+        addLabel(
+                "Điểm Linh Tính: " + spiritPoints,
+                centerX - 125, startY + 25, 250
+        );
+
+        addLabel(
+                "Tinh Thạch Linh Hồn: " + soulCrystals,
+                centerX - 125, startY + 47, 250
+        );
+
+        addLabel(
+                "Chi phí nâng cấp dựa trên cấp kỹ năng hiện tại",
+                centerX - 165, startY + 72, 330
+        );
+
+        addSkill(
+                "Năng Lượng",
+                "energy",
+                energySkillLevel,
+                centerX,
+                startY + 105
+        );
+
+        addSkill(
+                "Nhà Tù",
+                "cage",
+                cageSkillLevel,
+                centerX,
+                startY + 143
+        );
+
+        addSkill(
+                "Thuần Hóa",
+                "tame",
+                tameSkillLevel,
+                centerX,
+                startY + 181
+        );
+
+        addSkill(
+                "Kết Hợp",
+                "combine",
+                combineSkillLevel,
+                centerX,
+                startY + 219
+        );
+
+        addSkill(
+                "Cướp Đoạt",
+                "steal",
+                stealSkillLevel,
+                centerX,
+                startY + 257
+        );
+
+        addSkill(
+                "Tam Linh Hộ Thể",
+                "triple_spirit_guard",
+                tripleSpiritSkillLevel,
+                centerX,
+                startY + 295
+        );
+
+        addLabel(
+                message,
+                centerX - 165, startY + 337, 330
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("<< Thuộc tính"),
+                        button -> {
+                            skillPage = false;
+                            refreshScreen();
+                        }
+                )
+                .bounds(centerX - 110, startY + 365, 105, 20)
+                .build()
+        );
+
+        addRenderableWidget(
+                Button.builder(
+                        Component.literal("Đóng"),
+                        button -> onClose()
+                )
+                .bounds(centerX + 5, startY + 365, 105, 20)
+                .build()
+        );
+    }
+
+    private void addSkill(
+            String name,
+            String skillId,
+            int skillLevel,
+            int centerX,
+            int y
+    ) {
+        int spiritCost = skillLevel * 100;
+        int crystalCost = skillLevel;
+
+        addLabel(
+                name + " - Cấp " + skillLevel,
+                centerX - 155,
+                y,
+                155
+        );
+
+        Button upgradeButton = Button.builder(
+                Component.literal(
+                        "Nâng cấp (" + spiritCost + " LT, "
+                                + crystalCost + " Tinh Thạch)"
+                ),
+                button -> ClientPacketDistributor.sendToServer(
+                        new FogCharacterPayload("upgrade|" + skillId)
+                )
+        )
+        .bounds(centerX + 5, y, 175, 20)
+        .build();
+
+        upgradeButton.active =
+                spiritPoints >= spiritCost
+                && soulCrystals >= crystalCost;
+
+        addRenderableWidget(upgradeButton);
+    }
+
+    // =====================================================
+    // THUỘC TÍNH
+    // =====================================================
+
+    private String getWeakStatus() {
         if (level == 1) {
             return "Thuộc tính yếu khi dưới 5";
         }

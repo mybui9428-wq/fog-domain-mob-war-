@@ -493,43 +493,38 @@ public int getLevelUpRuleFragmentCost(UUID playerId) {
     return level;
 }
 
-public boolean levelUp(UUID playerId) {
-    if (playerId == null) return false;
+public boolean upgradeSkill(UUID playerId, String skillId, int soulCrystalCost) {
+    if (playerId == null
+            || skillId == null
+            || skillId.isBlank()) {
+        return false;
+    }
 
     initializeCharacter(playerId);
 
-    int currentLevel = getCharacterLevel(playerId);
+    int currentSkillLevel = Math.max(1, getSkillLevel(playerId, skillId));
 
-    if (currentLevel >= MAX_CHARACTER_LEVEL) {
+    // Chi phí tăng theo cấp kỹ năng hiện tại.
+    int requiredSoulCrystals = currentSkillLevel;
+    int requiredSpiritPoints = currentSkillLevel * 100;
+
+    // Kiểm tra đủ cả hai loại tài nguyên trước khi trừ.
+    if (getSoulCrystals(playerId) < requiredSoulCrystals
+            || getSpiritPoints(playerId) < requiredSpiritPoints) {
         return false;
     }
 
-    int spiritCost = getLevelUpSpiritPointCost(playerId);
-    int fragmentCost = getLevelUpRuleFragmentCost(playerId);
-
-    if (getSpiritPoints(playerId) < spiritCost) {
+    if (!consumeSoulCrystals(playerId, requiredSoulCrystals)) {
         return false;
     }
 
-    if (getRuleFragments(playerId) < fragmentCost) {
+    if (!consumeSpiritPoints(playerId, requiredSpiritPoints)) {
+        // Hoàn lại tinh thạch nếu không trừ được Điểm Linh Tính.
+        addSoulCrystals(playerId, requiredSoulCrystals);
         return false;
     }
 
-    String id = key(playerId);
-
-    spiritPoints.put(
-            id,
-            getSpiritPoints(playerId) - spiritCost
-    );
-
-    ruleFragments.put(
-            id,
-            getRuleFragments(playerId) - fragmentCost
-    );
-
-    characterLevels.put(id, currentLevel + 1);
-
-    setDirty();
+    setSkillLevel(playerId, skillId, currentSkillLevel + 1);
 
     return true;
 }

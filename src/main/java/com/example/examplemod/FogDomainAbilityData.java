@@ -461,6 +461,34 @@ public final class FogDomainAbilityData extends SavedData {
         }
     }
 
+    // ==================== CẤP ĐỘ NHÂN VẬT ====================
+
+public int getCharacterLevel(UUID playerId) {
+    if (playerId == null) {
+        return STARTING_LEVEL;
+    }
+
+    initializeCharacter(playerId);
+
+    return characterLevels.getOrDefault(
+            key(playerId),
+            STARTING_LEVEL
+    );
+}
+
+public void setCharacterLevel(UUID playerId, int level) {
+    if (playerId == null) {
+        return;
+    }
+
+    characterLevels.put(
+            key(playerId),
+            Math.max(1, Math.min(MAX_CHARACTER_LEVEL, level))
+    );
+
+    setDirty();
+}
+    
     // ==================== ĐIỀU KIỆN TĂNG CẤP ====================
 
 /**

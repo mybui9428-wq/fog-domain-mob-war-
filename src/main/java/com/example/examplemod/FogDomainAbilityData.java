@@ -461,28 +461,44 @@ public final class FogDomainAbilityData extends SavedData {
         }
     }
 
-    // ==================== CẤP ĐỘ NHÂN VẬT ====================
+    // ==================== ĐIỀU KIỆN TĂNG CẤP ====================
 
-    public int getCharacterLevel(UUID playerId) {
-        if (playerId == null) return STARTING_LEVEL;
+    /**
+     * Muốn tăng từ cấp hiện tại lên cấp tiếp theo,
+     * cả 5 chỉ số phải đạt cấp tiếp theo x 10.
+     *
+     * Ví dụ:
+     * Cấp 1 lên 2: mỗi chỉ số >= 10.
+     * Cấp 2 lên 3: mỗi chỉ số >= 20.
+     * Cấp 3 lên 4: mỗi chỉ số >= 30.
+     */
+    public int getRequiredAttributeForLevelUp(UUID playerId) {
+        int currentLevel = getCharacterLevel(playerId);
 
-        initializeCharacter(playerId);
+        if (currentLevel >= MAX_CHARACTER_LEVEL) {
+            return 0;
+        }
 
-        return characterLevels.getOrDefault(
-                key(playerId),
-                STARTING_LEVEL
-        );
+        return (currentLevel + 1) * 10;
     }
 
-    public void setCharacterLevel(UUID playerId, int level) {
-        if (playerId == null) return;
+    /**
+     * Kiểm tra cả 5 chỉ số đã đủ điều kiện tăng cấp chưa.
+     */
+    public boolean canLevelUpByAttributes(UUID playerId) {
+        if (playerId == null) return false;
 
-        characterLevels.put(
-                key(playerId),
-                Math.max(1, Math.min(MAX_CHARACTER_LEVEL, level))
-        );
+        int required = getRequiredAttributeForLevelUp(playerId);
 
-        setDirty();
+        if (required <= 0) return false;
+
+        for (String attribute : ATTRIBUTES) {
+            if (getAttribute(playerId, attribute) < required) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     // ==================== TĂNG CẤP NHÂN VẬT ====================
@@ -511,6 +527,11 @@ public final class FogDomainAbilityData extends SavedData {
         int currentLevel = getCharacterLevel(playerId);
 
         if (currentLevel >= MAX_CHARACTER_LEVEL) {
+            return false;
+        }
+
+        // Không đủ cả 5 chỉ số thì không được tăng cấp.
+        if (!canLevelUpByAttributes(playerId)) {
             return false;
         }
 

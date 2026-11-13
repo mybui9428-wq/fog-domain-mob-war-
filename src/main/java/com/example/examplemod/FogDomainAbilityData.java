@@ -463,43 +463,43 @@ public final class FogDomainAbilityData extends SavedData {
 
     // ==================== ĐIỀU KIỆN TĂNG CẤP ====================
 
-    /**
-     * Muốn tăng từ cấp hiện tại lên cấp tiếp theo,
-     * cả 5 chỉ số phải đạt cấp tiếp theo x 10.
-     *
-     * Ví dụ:
-     * Cấp 1 lên 2: mỗi chỉ số >= 10.
-     * Cấp 2 lên 3: mỗi chỉ số >= 20.
-     * Cấp 3 lên 4: mỗi chỉ số >= 30.
-     */
-    public int getRequiredAttributeForLevelUp(UUID playerId) {
-        int currentLevel = getCharacterLevel(playerId);
+/**
+ * Chỉ số yêu cầu để tăng lên cấp tiếp theo.
+ * Cấp 1 lên 2: cần 10.
+ * Cấp 2 lên 3: cần 20.
+ * ...
+ * Cấp 19 lên 20: cần 200.
+ */
+public int getRequiredAttributeForLevelUp(UUID playerId) {
+    if (playerId == null) return 0;
 
-        if (currentLevel >= MAX_CHARACTER_LEVEL) {
-            return 0;
-        }
+    int currentLevel = getCharacterLevel(playerId);
 
-        return (currentLevel + 1) * 10;
+    if (currentLevel >= MAX_CHARACTER_LEVEL) {
+        return 0;
     }
 
-    /**
-     * Kiểm tra cả 5 chỉ số đã đủ điều kiện tăng cấp chưa.
-     */
-    public boolean canLevelUpByAttributes(UUID playerId) {
-        if (playerId == null) return false;
+    return (currentLevel + 1) * 10;
+}
 
-        int required = getRequiredAttributeForLevelUp(playerId);
+/**
+ * Cả 5 chỉ số đều phải đạt yêu cầu.
+ */
+public boolean canLevelUpByAttributes(UUID playerId) {
+    if (playerId == null) return false;
 
-        if (required <= 0) return false;
+    int required = getRequiredAttributeForLevelUp(playerId);
 
-        for (String attribute : ATTRIBUTES) {
-            if (getAttribute(playerId, attribute) < required) {
-                return false;
-            }
+    if (required <= 0) return false;
+
+    for (String attribute : ATTRIBUTES) {
+        if (getAttribute(playerId, attribute) < required) {
+            return false;
         }
-
-        return true;
     }
+
+    return true;
+}
 
     // ==================== TĂNG CẤP NHÂN VẬT ====================
 

@@ -49,13 +49,10 @@ public record FogCharacterPayload(String data)
         );
     }
 
-    // MỞ BẢNG CHỈ SỐ TỪ LỆNH MINECRAFT
+    // MỞ BẢNG CHỈ SỐ
     public static void openCharacterScreen(ServerPlayer player) {
-
         FogDomainAbilityData data =
-                FogDomainAbilityData.get(
-                        player.level().getServer()
-                );
+                FogDomainAbilityData.get(player.level().getServer());
 
         data.initializeCharacter(player.getUUID());
 
@@ -70,7 +67,7 @@ public record FogCharacterPayload(String data)
         );
     }
 
-    // KIỂM TRA ID KỸ NĂNG ĐƯỢC PHÉP NÂNG CẤP
+    // KIỂM TRA KỸ NĂNG ĐƯỢC PHÉP NÂNG CẤP
     private static boolean isUpgradeableSkill(String skillId) {
         return switch (skillId) {
             case FogDomainAbilityData.SKILL_ENERGY,
@@ -99,9 +96,7 @@ public record FogCharacterPayload(String data)
         }
 
         FogDomainAbilityData data =
-                FogDomainAbilityData.get(
-                        player.level().getServer()
-                );
+                FogDomainAbilityData.get(player.level().getServer());
 
         data.initializeCharacter(player.getUUID());
 
@@ -132,20 +127,54 @@ public record FogCharacterPayload(String data)
 
             message = success
                     ? "Da tang " + attribute + "."
-                    : "Khong du dieu kien tang thuoc tinh.";
+                    : "Khong du Diem Linh Tinh hoac HP.";
 
         } else if (request.equals("levelup")) {
 
-            boolean success = data.levelUp(player.getUUID());
+            int playerLevel = data.getCharacterLevel(player.getUUID());
 
-            if (success) {
-                message = "Tang cap thanh cong! Cap moi: "
-                        + data.getCharacterLevel(player.getUUID());
-            } else if (data.getCharacterLevel(player.getUUID())
-                    >= FogDomainAbilityData.MAX_CHARACTER_LEVEL) {
+            if (playerLevel >= FogDomainAbilityData.MAX_CHARACTER_LEVEL) {
+
                 message = "Ban da dat cap toi da.";
+
+            } else if (!data.canLevelUpByAttributes(player.getUUID())) {
+
+                int required =
+                        data.getRequiredAttributeForLevelUp(player.getUUID());
+
+                message = "Ca 5 thuoc tinh phai dat toi thieu "
+                        + required + " moi duoc tang cap.";
+
             } else {
-                message = "Khong du Diem Linh Tinh hoac Manh Vo Quy Tac.";
+
+                int spiritCost =
+                        data.getLevelUpSpiritPointCost(player.getUUID());
+
+                int fragmentCost =
+                        data.getLevelUpRuleFragmentCost(player.getUUID());
+
+                if (data.getSpiritPoints(player.getUUID()) < spiritCost) {
+
+                    message = "Khong du Diem Linh Tinh! Can "
+                            + spiritCost + ".";
+
+                } else if (data.getRuleFragments(player.getUUID())
+                        < fragmentCost) {
+
+                    message = "Khong du Manh Vo Quy Tac! Can "
+                            + fragmentCost + ".";
+
+                } else {
+
+                    boolean success = data.levelUp(player.getUUID());
+
+                    if (success) {
+                        message = "Tang cap thanh cong! Cap moi: "
+                                + data.getCharacterLevel(player.getUUID());
+                    } else {
+                        message = "Tang cap that bai. Hay kiem tra lai dieu kien.";
+                    }
+                }
             }
 
         } else if (request.startsWith("upgrade|")) {
@@ -171,7 +200,7 @@ public record FogCharacterPayload(String data)
                 message = "Nang cap ky nang thanh cong! Cap moi: "
                         + data.getSkillLevel(player.getUUID(), skillId);
             } else {
-                message = "Khong du tai nguyen de nang cap! Can "
+                message = "Khong du tai nguyen! Can "
                         + (oldSkillLevel * 100)
                         + " Diem Linh Tinh va "
                         + oldSkillLevel
@@ -182,9 +211,7 @@ public record FogCharacterPayload(String data)
             return;
         }
 
-        context.reply(
-                createUpdate(data, player, message)
-        );
+        context.reply(createUpdate(data, player, message));
     }
 
     // TẠO DỮ LIỆU GỬI VỀ CLIENT
@@ -198,28 +225,23 @@ public record FogCharacterPayload(String data)
         String response = String.join("|",
                 "update",
 
-                // Thông tin nhân vật
                 String.valueOf(data.getCharacterLevel(id)),
                 String.valueOf(data.getSpiritPoints(id)),
                 String.valueOf(data.getFreeStatPoints(id)),
                 String.valueOf(data.getRuleFragments(id)),
                 String.valueOf(data.getSoulCrystals(id)),
 
-                // Năm thuộc tính
                 String.valueOf(data.getAttribute(id, "agility")),
                 String.valueOf(data.getAttribute(id, "stamina")),
                 String.valueOf(data.getAttribute(id, "strength")),
                 String.valueOf(data.getAttribute(id, "spirit")),
                 String.valueOf(data.getAttribute(id, "charisma")),
 
-                // Máu
                 String.valueOf(player.getHealth()),
                 String.valueOf(player.getMaxHealth()),
 
-                // Thông báo
                 message,
 
-                // Cấp độ sáu kỹ năng
                 String.valueOf(data.getSkillLevel(
                         id, FogDomainAbilityData.SKILL_ENERGY
                 )),

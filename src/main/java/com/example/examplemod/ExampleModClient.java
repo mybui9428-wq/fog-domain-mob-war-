@@ -16,6 +16,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
@@ -29,11 +30,9 @@ public class ExampleModClient {
 
     private static String hudData = "";
 
+    // Lớp thanh máu mặc định của Minecraft.
     private static final Identifier VANILLA_HEALTH_LAYER =
-            Identifier.fromNamespaceAndPath(
-                    "minecraft",
-                    "health"
-            );
+            VanillaGuiLayers.PLAYER_HEALTH;
 
     public ExampleModClient(ModContainer container) {
         container.registerExtensionPoint(
@@ -111,7 +110,6 @@ public class ExampleModClient {
 
                     String[] parts = payload.data().split("\\|", -1);
 
-                    // 14 phần cũ + 6 cấp độ kỹ năng = 20 phần.
                     if (parts.length < 20
                             || !parts[0].equals("update")) {
                         return;
@@ -212,7 +210,7 @@ public class ExampleModClient {
     }
 
     /**
-     * Hiển thị máu bằng số ở vị trí thanh máu cũ.
+     * Hiển thị máu bằng số.
      */
     @SubscribeEvent
     public static void renderNumericHealth(
@@ -243,10 +241,6 @@ public class ExampleModClient {
 
         int screenHeight =
                 minecraft.getWindow().getGuiScaledHeight();
-
-        int color = health <= maxHealth * 0.25F
-                ? 0xFFFF5555
-                : 0xFFFFFFFF;
 
         var textRenderer = graphics.textRenderer(
                 GuiGraphicsExtractor.HoveredTextEffects.NONE

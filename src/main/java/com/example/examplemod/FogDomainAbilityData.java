@@ -492,11 +492,11 @@ public void setCharacterLevel(UUID playerId, int level) {
     // ==================== ĐIỀU KIỆN TĂNG CẤP ====================
 
 /**
- * Chỉ số yêu cầu để tăng lên cấp tiếp theo.
- * Cấp 1 lên 2: cần 10.
- * Cấp 2 lên 3: cần 20.
+ * Cấp 1 lên 2: cần mỗi thuộc tính đạt 10.
+ * Cấp 2 lên 3: cần mỗi thuộc tính đạt 20.
+ * Cấp 3 lên 4: cần mỗi thuộc tính đạt 30.
  * ...
- * Cấp 19 lên 20: cần 200.
+ * Cấp 19 lên 20: cần mỗi thuộc tính đạt 190.
  */
 public int getRequiredAttributeForLevelUp(UUID playerId) {
     if (playerId == null) return 0;
@@ -507,11 +507,11 @@ public int getRequiredAttributeForLevelUp(UUID playerId) {
         return 0;
     }
 
-    return (currentLevel + 1) * 10;
+    return currentLevel * 10;
 }
 
 /**
- * Cả 5 chỉ số đều phải đạt yêu cầu.
+ * Cả 5 thuộc tính đều phải đạt mức yêu cầu.
  */
 public boolean canLevelUpByAttributes(UUID playerId) {
     if (playerId == null) return false;
@@ -527,7 +527,7 @@ public boolean canLevelUpByAttributes(UUID playerId) {
     }
 
     return true;
-}
+        }
 
     // ==================== TĂNG CẤP NHÂN VẬT ====================
 

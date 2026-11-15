@@ -3,6 +3,8 @@ package com.example.examplemod;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -15,29 +17,38 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 public final class FogDomainMinionAI {
 
     private static final double TARGET_RANGE = 10.0D;
     private static final double RETURN_DISTANCE = 32.0D;
     private static final double TELEPORT_BEHIND_DISTANCE = 2.5D;
+
     private static final float ATTACK_DAMAGE = 4.0F;
     private static final long ATTACK_INTERVAL = 20L;
 
-    // UUID của linh thể -> UUID chủ nhân.
+    // Máu dưới 25% sẽ kích hoạt triệu hồi quân thay thế.
+    private static final float REPLACEMENT_HEALTH_PERCENT = 0.25F;
+
+    // UUID linh thể -> UUID chủ nhân.
     private static final Map<UUID, UUID> OWNERS = new HashMap<>();
 
-    // Thời điểm được phép đánh tiếp.
+    // Thời gian được phép tấn công tiếp.
     private static final Map<UUID, Long> ATTACK_TIMES = new HashMap<>();
 
-    // Đánh dấu bộ xương đã triệu hồi quân.
-    private static final Set<UUID> SUMMONED = new HashSet<>();
+    // Bộ Xương Nhiều Tay đã triệu hồi 7 quân ban đầu.
+    private static final Set<UUID> INITIAL_SUMMONED = new HashSet<>();
+
+    // Bộ Xương Nhiều Tay -> danh sách Thây Ma Linh Hồn.
+    private static final Map<UUID, Set<UUID>> SOUL_ZOMBIE_GROUPS =
+            new HashMap<>();
+
+    // Đánh dấu Thây Ma Linh Hồn đã được thay thế.
+    private static final Set<UUID> REPLACED_ZOMBIES = new HashSet<>();
 
     private FogDomainMinionAI() {
     }
 
-    // Gắn chủ nhân cho linh thể khi triệu hồi.
     public static void bindOwner(Entity minion, ServerPlayer owner) {
         if (minion == null || owner == null) return;
 
@@ -57,16 +68,25 @@ public final class FogDomainMinionAI {
 
         OWNERS.remove(id);
         ATTACK_TIMES.remove(id);
-        SUMMONED.remove(id);
+        REPLACED_ZOMBIES.remove(id);
+
+        INITIAL_SUMMONED.remove(id);
+        SOUL_ZOMBIE_GROUPS.remove(id);
+
+        // Xóa Thây Ma Linh Hồn khỏi danh sách của Bộ Xương.
+        for (Set<UUID> group : SOUL_ZOMBIE_GROUPS.values()) {
+            group.remove(id);
+        }
     }
 
-    // AI dùng chung cho cả ba linh thể chính và Thây Ma Linh Hồn.
     public static void tickMinion(Mob minion) {
+
         if (minion == null || minion.level().isClientSide()) return;
 
         if (!(minion.level() instanceof ServerLevel level)) return;
 
         UUID ownerId = getOwnerId(minion);
+
         if (ownerId == null) return;
 
         ServerPlayer owner = level.getServer()
@@ -75,14 +95,10 @@ public final class FogDomainMinionAI {
 
         if (owner == null || !owner.isAlive()
                 || owner.level() != level) {
+
             minion.setTarget(null);
             minion.getNavigation().stop();
             return;
-        }
-
-        // Bộ Xương Nhiều Tay triệu hồi 5–7 Thây Ma Linh Hồn.
-        if (minion instanceof MultiArmedSkeletonEntity) {
-            summonSoulZombies(minion, owner, level);
         }
 
         // Không để linh thể đi quá xa chủ nhân.
@@ -112,7 +128,7 @@ public final class FogDomainMinionAI {
             return;
         }
 
-        // Tìm tất cả sinh vật sống trong bán kính 10 khối quanh chủ nhân.
+        // Tìm sinh vật sống trong bán kính 10 khối quanh chủ nhân.
         AABB searchBox = owner.getBoundingBox().inflate(TARGET_RANGE);
 
         LivingEntity target = level.getEntitiesOfClass(
@@ -126,14 +142,55 @@ public final class FogDomainMinionAI {
                 ))
                 .orElse(null);
 
+        // -----------------------------------------
+        // BỘ XƯƠNG NHIỀU TAY
+        // -----------------------------------------
+        if (minion instanceof MultiArmedSkeletonEntity) {
+
+            if (target != null) {
+
+                minion.setTarget(target);
+                minion.getNavigation().moveTo(target, 1.25D);
+
+                // Khống chế mục tiêu trước khi triệu hồi.
+                controlTarget(target);
+
+                // Chỉ triệu hồi 7 con sau khi đã khống chế.
+                if (INITIAL_SUMMONED.add(minion.getUUID())) {
+
+                    summonSoulZombies(
+                            minion,
+                            owner,
+                            level,
+                            7
+                    );
+                }
+            }
+
+            // Sau lần triệu hồi đầu tiên, luôn duy trì đội quân.
+            if (INITIAL_SUMMONED.contains(minion.getUUID())) {
+
+                maintainSoulZombieArmy(
+                        minion,
+                        owner,
+                        level
+                );
+            }
+        }
+
         if (target == null) {
+
             minion.setTarget(null);
             minion.getNavigation().stop();
             return;
         }
 
-        minion.setTarget(target);
-        minion.getNavigation().moveTo(target, 1.25D);
+        // Các linh thể khác vẫn tấn công mục tiêu bình thường.
+        if (!(minion instanceof MultiArmedSkeletonEntity)) {
+
+            minion.setTarget(target);
+            minion.getNavigation().moveTo(target, 1.25D);
+        }
 
         // Tấn công khi ở đủ gần.
         double attackDistance = minion.getBbWidth()
@@ -145,10 +202,12 @@ public final class FogDomainMinionAI {
             long now = level.getGameTime();
 
             long nextAttack = ATTACK_TIMES.getOrDefault(
-                    minion.getUUID(), 0L
+                    minion.getUUID(),
+                    0L
             );
 
             if (now >= nextAttack) {
+
                 target.hurtServer(
                         level,
                         minion.damageSources().mobAttack(minion),
@@ -163,17 +222,44 @@ public final class FogDomainMinionAI {
         }
     }
 
+    // Khống chế mục tiêu.
+    private static void controlTarget(LivingEntity target) {
+
+        if (target == null || !target.isAlive()) return;
+
+        // Làm chậm cấp độ cao trong 2 giây.
+        target.addEffect(
+                new MobEffectInstance(
+                        MobEffects.SLOWNESS,
+                        40,
+                        10,
+                        false,
+                        false,
+                        true
+                )
+        );
+
+        // Ngăn mục tiêu di chuyển trong thời gian khống chế.
+        target.setDeltaMovement(Vec3.ZERO);
+
+        if (target instanceof Mob targetMob) {
+            targetMob.getNavigation().stop();
+            targetMob.setTarget(null);
+        }
+    }
+
     private static boolean isValidTarget(
             LivingEntity entity,
             Mob minion,
             ServerPlayer owner
     ) {
+
         if (entity == null || !entity.isAlive()
                 || entity.isRemoved()) {
             return false;
         }
 
-        // Tuyệt đối không tấn công chủ nhân.
+        // Không tấn công chủ nhân.
         if (entity.getUUID().equals(owner.getUUID())) {
             return false;
         }
@@ -188,7 +274,7 @@ public final class FogDomainMinionAI {
             return false;
         }
 
-        // Không đánh các linh thể cùng chủ nhân.
+        // Không đánh linh thể cùng chủ nhân.
         UUID otherOwner = OWNERS.get(entity.getUUID());
 
         if (owner.getUUID().equals(otherOwner)) {
@@ -198,46 +284,117 @@ public final class FogDomainMinionAI {
         return true;
     }
 
+    // Triệu hồi số lượng Thây Ma Linh Hồn.
     private static void summonSoulZombies(
             Mob skeleton,
             ServerPlayer owner,
-            ServerLevel level
+            ServerLevel level,
+            int amount
     ) {
+
         UUID skeletonId = skeleton.getUUID();
 
-        if (SUMMONED.contains(skeletonId)) return;
-
-        SUMMONED.add(skeletonId);
-
-        int amount = ThreadLocalRandom.current().nextInt(5, 8);
+        Set<UUID> group = SOUL_ZOMBIE_GROUPS.computeIfAbsent(
+                skeletonId,
+                key -> new HashSet<>()
+        );
 
         for (int i = 0; i < amount; i++) {
+
             var soulZombie = FogDomainEntities.SOUL_ZOMBIE
-        .get()
-        .create(
-                level,
-                net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED
-        );
+                    .get()
+                    .create(
+                            level,
+                            net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED
+                    );
 
             if (soulZombie == null) continue;
 
             double angle = (Math.PI * 2.0D * i) / amount;
-            double x = skeleton.getX() + Math.cos(angle) * 1.5D;
-            double z = skeleton.getZ() + Math.sin(angle) * 1.5D;
+
+            double x = skeleton.getX()
+                    + Math.cos(angle) * 2.0D;
+
+            double z = skeleton.getZ()
+                    + Math.sin(angle) * 2.0D;
 
             soulZombie.snapTo(
-        x,
-        skeleton.getY(),
-        z,
-        skeleton.getYRot(),
-        0.0F
-);
+                    x,
+                    skeleton.getY(),
+                    z,
+                    skeleton.getYRot(),
+                    0.0F
+            );
 
             soulZombie.setPersistenceRequired();
 
             if (level.addFreshEntity(soulZombie)) {
+
                 bindOwner(soulZombie, owner);
+
+                group.add(soulZombie.getUUID());
             }
+        }
+    }
+
+    // Duy trì đội quân và triệu hồi quân thay thế.
+    private static void maintainSoulZombieArmy(
+            Mob skeleton,
+            ServerPlayer owner,
+            ServerLevel level
+    ) {
+
+        UUID skeletonId = skeleton.getUUID();
+
+        Set<UUID> group = SOUL_ZOMBIE_GROUPS.computeIfAbsent(
+                skeletonId,
+                key -> new HashSet<>()
+        );
+
+        int healthyCount = 0;
+
+        for (UUID zombieId : new HashSet<>(group)) {
+
+            Entity entity = level.getEntity(zombieId);
+
+            if (!(entity instanceof LivingEntity zombie)
+                    || !zombie.isAlive()
+                    || zombie.isRemoved()) {
+
+                group.remove(zombieId);
+                REPLACED_ZOMBIES.remove(zombieId);
+                continue;
+            }
+
+            float maxHealth = zombie.getMaxHealth();
+
+            if (maxHealth <= 0.0F) continue;
+
+            float healthPercent = zombie.getHealth() / maxHealth;
+
+            // Nếu quân còn trên 25% máu thì vẫn tính là quân khỏe.
+            if (healthPercent > REPLACEMENT_HEALTH_PERCENT) {
+
+                healthyCount++;
+
+            } else {
+
+                // Quân yếu sắp chết: đánh dấu để thay thế.
+                REPLACED_ZOMBIES.add(zombieId);
+            }
+        }
+
+        // Bổ sung quân để luôn có 7 con khỏe mạnh.
+        int needed = 7 - healthyCount;
+
+        if (needed > 0) {
+
+            summonSoulZombies(
+                    skeleton,
+                    owner,
+                    level,
+                    needed
+            );
         }
     }
 }

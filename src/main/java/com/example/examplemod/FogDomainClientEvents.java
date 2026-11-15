@@ -1,8 +1,6 @@
 
 package com.example.examplemod;
 
-import net.minecraft.client.model.geom.ModelLayers;
-import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.Identifier;
 
 import net.neoforged.api.distmarker.Dist;
@@ -12,7 +10,6 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 
 @EventBusSubscriber(
         modid = ExampleMod.MODID,
-        bus = EventBusSubscriber.Bus.MOD,
         value = Dist.CLIENT
 )
 public class FogDomainClientEvents {

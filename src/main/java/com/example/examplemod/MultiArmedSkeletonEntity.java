@@ -12,6 +12,7 @@ public class MultiArmedSkeletonEntity extends PathfinderMob {
             Level level
     ) {
         super(entityType, level);
+
         this.setPersistenceRequired();
         this.setNoGravity(true);
     }
@@ -21,11 +22,15 @@ public class MultiArmedSkeletonEntity extends PathfinderMob {
         super.tick();
 
         if (!this.level().isClientSide()) {
-            // Giữ chuyển động bay nhẹ.
+
+            // Tự chiến đấu và triệu hồi Thây Ma Linh Hồn.
+            FogDomainMinionAI.tickMinion(this);
+
+            // Giữ cơ thể bay lơ lửng.
             this.setDeltaMovement(
-                    this.getDeltaMovement().x * 0.95,
-                    Math.sin(this.tickCount * 0.08) * 0.025,
-                    this.getDeltaMovement().z * 0.95
+                    this.getDeltaMovement().x * 0.95D,
+                    Math.sin(this.tickCount * 0.08D) * 0.025D,
+                    this.getDeltaMovement().z * 0.95D
             );
         }
     }

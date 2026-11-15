@@ -722,6 +722,12 @@ private static int summonTripleSpirit(ServerPlayer player) {
                                         cast(context.getSource()
                                                 .getPlayerOrException())))
 
+                       .then(Commands.literal("triple")
+                              .executes(context ->
+                                    summonTripleSpirit(
+                        context.getSource().getPlayerOrException()
+                                                  )))
+
                         .then(Commands.literal("slte")
                                 .executes(context ->
                                         selectTamed(context.getSource()

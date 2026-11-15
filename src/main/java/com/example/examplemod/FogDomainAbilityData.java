@@ -20,6 +20,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
+// ==================== CLASS ====================
+
+public class FogDomainAbilityData extends SavedData {
+
+    public static final String DATA_NAME = "fog_domain_abilities";
+
     // ==================== DANH SÁCH KỸ NĂNG ====================
 
     @Deprecated
@@ -208,7 +214,7 @@ import java.util.concurrent.ThreadLocalRandom;
                     )
             );
 
-    // ==================== DỮ LIỆU CŨ ====================
+    // ==================== DỮ LIỆU ====================
 
     private final Map<String, List<String>> abilities = new HashMap<>();
     private final Map<String, Map<String, Double>> powers = new HashMap<>();
@@ -221,8 +227,6 @@ import java.util.concurrent.ThreadLocalRandom;
     private final Map<String, Double> energy = new HashMap<>();
     private final Map<String, Map<String, Long>> cooldowns = new HashMap<>();
 
-    // ==================== DỮ LIỆU NHÂN VẬT ====================
-
     private final Map<String, Integer> characterLevels = new HashMap<>();
     private final Map<String, Map<String, Integer>> attributes = new HashMap<>();
     private final Map<String, Integer> freeStatPoints = new HashMap<>();
@@ -231,6 +235,8 @@ import java.util.concurrent.ThreadLocalRandom;
     private final Map<String, Integer> soulCrystals = new HashMap<>();
     private final Map<String, Map<String, Integer>> skillLevels = new HashMap<>();
     private final Map<String, String> innateAbilities = new HashMap<>();
+
+    // ==================== KHỞI TẠO ====================
 
     public FogDomainAbilityData() {
     }
@@ -318,7 +324,6 @@ import java.util.concurrent.ThreadLocalRandom;
             });
         }
 
-        // Chuyển dữ liệu intelligence cũ sang stamina.
         boolean migrated = false;
 
         for (Map<String, Integer> playerAttributes : attributes.values()) {
@@ -463,71 +468,55 @@ import java.util.concurrent.ThreadLocalRandom;
 
     // ==================== CẤP ĐỘ NHÂN VẬT ====================
 
-public int getCharacterLevel(UUID playerId) {
-    if (playerId == null) {
-        return STARTING_LEVEL;
+    public int getCharacterLevel(UUID playerId) {
+        if (playerId == null) return STARTING_LEVEL;
+
+        initializeCharacter(playerId);
+
+        return characterLevels.getOrDefault(
+                key(playerId),
+                STARTING_LEVEL
+        );
     }
 
-    initializeCharacter(playerId);
+    public void setCharacterLevel(UUID playerId, int level) {
+        if (playerId == null) return;
 
-    return characterLevels.getOrDefault(
-            key(playerId),
-            STARTING_LEVEL
-    );
-}
+        characterLevels.put(
+                key(playerId),
+                Math.max(1, Math.min(MAX_CHARACTER_LEVEL, level))
+        );
 
-public void setCharacterLevel(UUID playerId, int level) {
-    if (playerId == null) {
-        return;
+        setDirty();
     }
 
-    characterLevels.put(
-            key(playerId),
-            Math.max(1, Math.min(MAX_CHARACTER_LEVEL, level))
-    );
-
-    setDirty();
-}
-    
     // ==================== ĐIỀU KIỆN TĂNG CẤP ====================
 
-/**
- * Cấp 1 lên 2: cần mỗi thuộc tính đạt 10.
- * Cấp 2 lên 3: cần mỗi thuộc tính đạt 20.
- * Cấp 3 lên 4: cần mỗi thuộc tính đạt 30.
- * ...
- * Cấp 19 lên 20: cần mỗi thuộc tính đạt 190.
- */
-public int getRequiredAttributeForLevelUp(UUID playerId) {
-    if (playerId == null) return 0;
+    public int getRequiredAttributeForLevelUp(UUID playerId) {
+        if (playerId == null) return 0;
 
-    int currentLevel = getCharacterLevel(playerId);
+        int currentLevel = getCharacterLevel(playerId);
 
-    if (currentLevel >= MAX_CHARACTER_LEVEL) {
-        return 0;
+        if (currentLevel >= MAX_CHARACTER_LEVEL) return 0;
+
+        return currentLevel * 10;
     }
 
-    return currentLevel * 10;
-}
+    public boolean canLevelUpByAttributes(UUID playerId) {
+        if (playerId == null) return false;
 
-/**
- * Cả 5 thuộc tính đều phải đạt mức yêu cầu.
- */
-public boolean canLevelUpByAttributes(UUID playerId) {
-    if (playerId == null) return false;
+        int required = getRequiredAttributeForLevelUp(playerId);
 
-    int required = getRequiredAttributeForLevelUp(playerId);
+        if (required <= 0) return false;
 
-    if (required <= 0) return false;
-
-    for (String attribute : ATTRIBUTES) {
-        if (getAttribute(playerId, attribute) < required) {
-            return false;
+        for (String attribute : ATTRIBUTES) {
+            if (getAttribute(playerId, attribute) < required) {
+                return false;
+            }
         }
+
+        return true;
     }
-
-    return true;
-        }
 
     // ==================== TĂNG CẤP NHÂN VẬT ====================
 
@@ -554,14 +543,9 @@ public boolean canLevelUpByAttributes(UUID playerId) {
 
         int currentLevel = getCharacterLevel(playerId);
 
-        if (currentLevel >= MAX_CHARACTER_LEVEL) {
-            return false;
-        }
+        if (currentLevel >= MAX_CHARACTER_LEVEL) return false;
 
-        // Không đủ cả 5 chỉ số thì không được tăng cấp.
-        if (!canLevelUpByAttributes(playerId)) {
-            return false;
-        }
+        if (!canLevelUpByAttributes(playerId)) return false;
 
         int spiritCost = getLevelUpSpiritPointCost(playerId);
         int fragmentCost = getLevelUpRuleFragmentCost(playerId);
@@ -571,9 +555,7 @@ public boolean canLevelUpByAttributes(UUID playerId) {
             return false;
         }
 
-        if (!consumeSpiritPoints(playerId, spiritCost)) {
-            return false;
-        }
+        if (!consumeSpiritPoints(playerId, spiritCost)) return false;
 
         if (!consumeRuleFragments(playerId, fragmentCost)) {
             addSpiritPoints(playerId, spiritCost);
@@ -581,7 +563,6 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         }
 
         setCharacterLevel(playerId, currentLevel + 1);
-
         return true;
     }
 
@@ -628,16 +609,13 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         }
     }
 
-    // ==================== KIỂM TRA THUỘC TÍNH YẾU ====================
+    // ==================== THUỘC TÍNH YẾU ====================
 
     public int getWeakAttributeThreshold(UUID playerId) {
-    if (playerId == null) {
-        return 5;
-    }
+        if (playerId == null) return 5;
 
-    int level = getCharacterLevel(playerId);
-
-    return level * 5;
+        int level = getCharacterLevel(playerId);
+        return level * 5;
     }
 
     public boolean isAttributeWeak(UUID playerId, String attribute) {
@@ -647,14 +625,14 @@ public boolean canLevelUpByAttributes(UUID playerId) {
 
         int threshold = getWeakAttributeThreshold(playerId);
 
-        if (threshold < 0) return false;
-
         return getAttribute(playerId, attribute) < threshold;
     }
 
     public int getAttributePointCost(UUID playerId) {
         return getCharacterLevel(playerId) * 10;
     }
+
+    // ==================== TĂNG THUỘC TÍNH ====================
 
     public boolean increaseAttribute(
             LivingEntity player,
@@ -756,6 +734,8 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         return true;
     }
 
+    // ==================== ĐIỂM THUỘC TÍNH MIỄN PHÍ ====================
+
     public int getFreeStatPoints(UUID playerId) {
         if (playerId == null) return 0;
 
@@ -778,7 +758,7 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         setDirty();
     }
 
-    // ==================== TÀI NGUYÊN ====================
+    // ==================== ĐIỂM LINH TÍNH ====================
 
     public int getSpiritPoints(UUID playerId) {
         if (playerId == null) return 0;
@@ -815,6 +795,8 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         return true;
     }
 
+    // ==================== MẢNH VỠ QUY TẮC ====================
+
     public int getRuleFragments(UUID playerId) {
         if (playerId == null) return 0;
 
@@ -844,6 +826,8 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         setDirty();
         return true;
     }
+
+    // ==================== TINH THẠCH LINH HỒN ====================
 
     public int getSoulCrystals(UUID playerId) {
         if (playerId == null) return 0;
@@ -1055,14 +1039,6 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         return true;
     }
 
-    /**
-     * Nâng cấp kỹ năng:
-     * Điểm Linh Tính = cấp kỹ năng hiện tại x 100.
-     * Tinh Thạch Linh Hồn = cấp kỹ năng hiện tại.
-     *
-     * Ví dụ cấp 1 lên cấp 2:
-     * 100 Điểm Linh Tính và 1 Tinh Thạch Linh Hồn.
-     */
     public boolean upgradeSkill(
             UUID playerId,
             String skillId,
@@ -1105,7 +1081,7 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         );
     }
 
-    // ==================== SỨC MẠNH KỸ NĂNG CŨ ====================
+    // ==================== SỨC MẠNH KỸ NĂNG ====================
 
     public void initializePower(UUID entityId, boolean isController) {
         if (entityId == null) return;
@@ -1223,12 +1199,8 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         return getAbilities(playerId).size();
     }
 
-        // ==================== CƯỚP ĐOẠT ====================
+    // ==================== CƯỚP ĐOẠT ====================
 
-    /**
-     * Dạng bị động:
-     * Khi giết sinh vật, nhận toàn bộ kỹ năng và năng lực của nó.
-     */
     public void stealAllCreatureAbilities(
             UUID playerId,
             UUID creatureId,
@@ -1239,22 +1211,13 @@ public boolean canLevelUpByAttributes(UUID playerId) {
             return;
         }
 
-        // Lưu loại sinh vật đã hấp thụ.
         addAbility(playerId, entityTypeId);
-
-        // Nhận toàn bộ kỹ năng của sinh vật.
         unlockCreatureSkills(playerId, entityTypeId);
-
-        // Nhận toàn bộ sức mạnh kỹ năng của sinh vật.
         transferCreaturePowers(playerId, creatureId);
 
         setDirty();
     }
 
-    /**
-     * Dạng chủ động:
-     * Nhận ngẫu nhiên 1 hoặc 2 kỹ năng của sinh vật mục tiêu.
-     */
     public List<String> stealRandomCreatureAbilities(
             UUID playerId,
             String entityTypeId
@@ -1268,11 +1231,8 @@ public boolean canLevelUpByAttributes(UUID playerId) {
                 FogDomainCreatureSkills.getSkills(entityTypeId)
         );
 
-        if (targetSkills.isEmpty()) {
-            return List.of();
-        }
+        if (targetSkills.isEmpty()) return List.of();
 
-        // Trộn danh sách để chọn ngẫu nhiên.
         java.util.Collections.shuffle(targetSkills);
 
         int amount = ThreadLocalRandom.current().nextBoolean() ? 1 : 2;
@@ -1317,10 +1277,9 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         }
 
         setDirty();
-
         return List.copyOf(stolen);
     }
-    
+
     // ==================== KỸ NĂNG SINH VẬT ====================
 
     public int unlockCreatureSkills(UUID playerId, String entityTypeId) {
@@ -1450,17 +1409,12 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         return nextSkill;
     }
 
-    // ==================== NĂNG LƯỢNG ====================
+    // ==================== NĂNG LƯỢNG CŨ ====================
 
-    /**
-     * Tinh thần 5: năng lượng tối đa 100.
-     * Mỗi điểm Tinh thần trên 5 tăng 2% năng lượng tối đa.
-     */
     public double getMaxEnergy(UUID playerId) {
         if (playerId == null) return MAX_ENERGY;
 
         int spirit = getAttribute(playerId, "spirit");
-
         double bonus = Math.max(0, spirit - 5) * 0.02D;
 
         return MAX_ENERGY * (1.0D + bonus);
@@ -1498,7 +1452,6 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         if (current < amount) return false;
 
         setEnergy(playerId, current - amount);
-
         return true;
     }
 
@@ -1513,11 +1466,6 @@ public boolean canLevelUpByAttributes(UUID playerId) {
 
     // ==================== HỒI CHIÊU ====================
 
-        /**
-     * Tinh thần 5: hồi chiêu giữ nguyên.
-     * Mỗi điểm tinh thần tăng thêm: giảm hồi chiêu theo công thức 1%.
-     * Tinh thần thấp hơn 5: hồi chiêu lâu hơn.
-     */
     public double getCooldownMultiplier(UUID playerId) {
         if (playerId == null) return 1.0D;
 
@@ -1528,9 +1476,6 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         return Math.max(0.1D, multiplier);
     }
 
-    /**
-     * Tính thời gian hồi chiêu thực tế sau khi áp dụng Tinh Thần.
-     */
     public long getModifiedCooldownTicks(
             UUID playerId,
             long baseDurationTicks
@@ -1544,7 +1489,7 @@ public boolean canLevelUpByAttributes(UUID playerId) {
                 (long) Math.ceil(baseDurationTicks / multiplier)
         );
     }
-    
+
     public boolean isOnCooldown(
             UUID playerId,
             String skillId,
@@ -1567,8 +1512,8 @@ public boolean canLevelUpByAttributes(UUID playerId) {
 
         return Math.max(0L, expiry - currentGameTime);
     }
-    
-       public void startCooldown(
+
+    public void startCooldown(
             UUID playerId,
             String skillId,
             long currentGameTime,
@@ -1596,5 +1541,5 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         );
 
         setDirty();
-       }
-      }
+    }
+}

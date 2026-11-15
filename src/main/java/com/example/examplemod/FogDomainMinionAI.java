@@ -213,8 +213,11 @@ public final class FogDomainMinionAI {
 
         for (int i = 0; i < amount; i++) {
             var soulZombie = FogDomainEntities.SOUL_ZOMBIE
-                    .get()
-                    .create(level);
+        .get()
+        .create(
+                level,
+                net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED
+        );
 
             if (soulZombie == null) continue;
 

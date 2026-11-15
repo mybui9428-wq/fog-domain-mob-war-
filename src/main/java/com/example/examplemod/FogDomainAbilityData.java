@@ -631,12 +631,13 @@ public boolean canLevelUpByAttributes(UUID playerId) {
     // ==================== KIỂM TRA THUỘC TÍNH YẾU ====================
 
     public int getWeakAttributeThreshold(UUID playerId) {
-        int level = getCharacterLevel(playerId);
+    if (playerId == null) {
+        return 5;
+    }
 
-        if (level == 1) return 5;
-        if (level == 2) return 10;
+    int level = getCharacterLevel(playerId);
 
-        return -1;
+    return level * 5;
     }
 
     public boolean isAttributeWeak(UUID playerId, String attribute) {

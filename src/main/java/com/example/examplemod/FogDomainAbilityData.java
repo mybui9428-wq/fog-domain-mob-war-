@@ -20,12 +20,14 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
-public final class FogDomainAbilityData extends SavedData {
+    // ==================== DANH SÁCH KỸ NĂNG ====================
 
-    private static final String DATA_NAME = "fog_domain_abilities";
-
+    @Deprecated
     public static final String SKILL_ENERGY = "energy";
+
     public static final String SKILL_CAGE = "cage";
+
+    @Deprecated
     public static final String SKILL_TAME = "tame";
 
     @Deprecated
@@ -36,9 +38,7 @@ public final class FogDomainAbilityData extends SavedData {
     public static final String SKILL_TRIPLE_SPIRIT = "triple_spirit_guard";
 
     public static final List<String> SKILLS = List.of(
-            SKILL_ENERGY,
             SKILL_CAGE,
-            SKILL_TAME,
             SKILL_COMBINE,
             SKILL_STEAL,
             SKILL_TRIPLE_SPIRIT
@@ -1223,6 +1223,104 @@ public boolean canLevelUpByAttributes(UUID playerId) {
         return getAbilities(playerId).size();
     }
 
+        // ==================== CƯỚP ĐOẠT ====================
+
+    /**
+     * Dạng bị động:
+     * Khi giết sinh vật, nhận toàn bộ kỹ năng và năng lực của nó.
+     */
+    public void stealAllCreatureAbilities(
+            UUID playerId,
+            UUID creatureId,
+            String entityTypeId
+    ) {
+        if (playerId == null || creatureId == null
+                || entityTypeId == null || entityTypeId.isBlank()) {
+            return;
+        }
+
+        // Lưu loại sinh vật đã hấp thụ.
+        addAbility(playerId, entityTypeId);
+
+        // Nhận toàn bộ kỹ năng của sinh vật.
+        unlockCreatureSkills(playerId, entityTypeId);
+
+        // Nhận toàn bộ sức mạnh kỹ năng của sinh vật.
+        transferCreaturePowers(playerId, creatureId);
+
+        setDirty();
+    }
+
+    /**
+     * Dạng chủ động:
+     * Nhận ngẫu nhiên 1 hoặc 2 kỹ năng của sinh vật mục tiêu.
+     */
+    public List<String> stealRandomCreatureAbilities(
+            UUID playerId,
+            String entityTypeId
+    ) {
+        if (playerId == null || entityTypeId == null
+                || entityTypeId.isBlank()) {
+            return List.of();
+        }
+
+        List<String> targetSkills = new ArrayList<>(
+                FogDomainCreatureSkills.getSkills(entityTypeId)
+        );
+
+        if (targetSkills.isEmpty()) {
+            return List.of();
+        }
+
+        // Trộn danh sách để chọn ngẫu nhiên.
+        java.util.Collections.shuffle(targetSkills);
+
+        int amount = ThreadLocalRandom.current().nextBoolean() ? 1 : 2;
+        amount = Math.min(amount, targetSkills.size());
+
+        String playerKey = key(playerId);
+
+        List<String> owned = creatureSkills.computeIfAbsent(
+                playerKey,
+                ignored -> new ArrayList<>()
+        );
+
+        Map<String, List<String>> sources =
+                creatureSkillSources.computeIfAbsent(
+                        playerKey,
+                        ignored -> new HashMap<>()
+                );
+
+        List<String> stolen = new ArrayList<>();
+
+        for (int i = 0; i < amount; i++) {
+            String skillId = targetSkills.get(i);
+
+            List<String> skillSources = sources.computeIfAbsent(
+                    skillId,
+                    ignored -> new ArrayList<>()
+            );
+
+            if (!skillSources.contains(entityTypeId)) {
+                skillSources.add(entityTypeId);
+            }
+
+            if (!owned.contains(skillId)) {
+                owned.add(skillId);
+                stolen.add(skillId);
+            }
+        }
+
+        if (!owned.isEmpty()
+                && !selectedCreatureSkills.containsKey(playerKey)) {
+            selectedCreatureSkills.put(playerKey, owned.get(0));
+        }
+
+        setDirty();
+
+        return List.copyOf(stolen);
+    }
+    
     // ==================== KỸ NĂNG SINH VẬT ====================
 
     public int unlockCreatureSkills(UUID playerId, String entityTypeId) {
@@ -1415,6 +1513,38 @@ public boolean canLevelUpByAttributes(UUID playerId) {
 
     // ==================== HỒI CHIÊU ====================
 
+        /**
+     * Tinh thần 5: hồi chiêu giữ nguyên.
+     * Mỗi điểm tinh thần tăng thêm: giảm hồi chiêu theo công thức 1%.
+     * Tinh thần thấp hơn 5: hồi chiêu lâu hơn.
+     */
+    public double getCooldownMultiplier(UUID playerId) {
+        if (playerId == null) return 1.0D;
+
+        int spirit = getAttribute(playerId, "spirit");
+
+        double multiplier = 1.0D + (spirit - 5) * 0.01D;
+
+        return Math.max(0.1D, multiplier);
+    }
+
+    /**
+     * Tính thời gian hồi chiêu thực tế sau khi áp dụng Tinh Thần.
+     */
+    public long getModifiedCooldownTicks(
+            UUID playerId,
+            long baseDurationTicks
+    ) {
+        if (baseDurationTicks <= 0L) return 0L;
+
+        double multiplier = getCooldownMultiplier(playerId);
+
+        return Math.max(
+                1L,
+                (long) Math.ceil(baseDurationTicks / multiplier)
+        );
+    }
+    
     public boolean isOnCooldown(
             UUID playerId,
             String skillId,
@@ -1437,31 +1567,34 @@ public boolean canLevelUpByAttributes(UUID playerId) {
 
         return Math.max(0L, expiry - currentGameTime);
     }
-
-    public void startCooldown(
+    
+       public void startCooldown(
             UUID playerId,
             String skillId,
             long currentGameTime,
             long durationTicks
     ) {
-        if (playerId == null || skillId == null || durationTicks <= 0L) {
+        if (playerId == null || skillId == null
+                || durationTicks <= 0L) {
             return;
         }
 
+        long actualDuration = getModifiedCooldownTicks(
+                playerId,
+                durationTicks
+        );
+
         Map<String, Long> playerCooldowns =
-                cooldowns.computeIfAbsent(key(playerId), ignored -> new HashMap<>());
+                cooldowns.computeIfAbsent(
+                        key(playerId),
+                        ignored -> new HashMap<>()
+                );
 
-        playerCooldowns.put(skillId, currentGameTime + durationTicks);
+        playerCooldowns.put(
+                skillId,
+                currentGameTime + actualDuration
+        );
+
         setDirty();
-    }
-
-    public double getTotalPower(UUID entityId) {
-        double total = 0.0D;
-
-        for (String skill : SKILLS) {
-            total += getPower(entityId, skill);
-        }
-
-        return total;
-    }
-}
+       }
+      }

@@ -15,7 +15,6 @@ public class IceSpiritEntity extends PathfinderMob {
 
         this.setNoGravity(true);
         this.setPersistenceRequired();
-        this.setMaxUpStep(1.0F);
     }
 
     @Override

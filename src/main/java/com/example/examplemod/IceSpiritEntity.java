@@ -12,20 +12,29 @@ public class IceSpiritEntity extends PathfinderMob {
             Level level
     ) {
         super(entityType, level);
+
         this.setNoGravity(true);
         this.setPersistenceRequired();
+        this.setMaxUpStep(1.0F);
     }
 
     @Override
     public void tick() {
         super.tick();
 
-        // Linh Hồn Băng luôn bay lơ lửng.
         if (!this.level().isClientSide()) {
+
+            // AI tự tìm mục tiêu, chiến đấu và quay về chủ nhân.
+            FogDomainMinionAI.tickMinion(this);
+
+            // Giữ Linh Hồn Băng bay lơ lửng.
+            double verticalMovement =
+                    Math.sin(this.tickCount * 0.08D) * 0.025D;
+
             this.setDeltaMovement(
-                    this.getDeltaMovement().x * 0.9,
-                    Math.sin(this.tickCount * 0.08) * 0.025,
-                    this.getDeltaMovement().z * 0.9
+                    this.getDeltaMovement().x * 0.9D,
+                    verticalMovement,
+                    this.getDeltaMovement().z * 0.9D
             );
         }
     }

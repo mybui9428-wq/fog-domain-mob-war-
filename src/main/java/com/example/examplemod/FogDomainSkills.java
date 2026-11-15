@@ -393,6 +393,108 @@ private static int cast(ServerPlayer player) {
     return 1;
 }
 
+private static int summonTripleSpirit(ServerPlayer player) {
+    if (!isController(player)) {
+        player.sendSystemMessage(Component.literal(
+                "Bạn không phải người điều khiển lĩnh vực."));
+        return 0;
+    }
+
+    ServerLevel level = (ServerLevel) player.level();
+
+    // Tạo Linh Hồn Băng.
+    IceSpiritEntity iceSpirit = FogDomainEntities.ICE_SPIRIT
+            .get()
+            .create(
+                    level,
+                    net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED
+            );
+
+    // Tạo Thây Ma Băng.
+    IceZombieEntity iceZombie = FogDomainEntities.ICE_ZOMBIE
+            .get()
+            .create(
+                    level,
+                    net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED
+            );
+
+    // Tạo Bộ Xương Nhiều Tay.
+    MultiArmedSkeletonEntity skeleton =
+            FogDomainEntities.MULTI_ARMED_SKELETON
+                    .get()
+                    .create(
+                            level,
+                            net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED
+                    );
+
+    if (iceSpirit == null || iceZombie == null || skeleton == null) {
+        player.sendSystemMessage(Component.literal(
+                "Triệu hồi thất bại: không tạo được đầy đủ ba linh thể."));
+        return 0;
+    }
+
+    // Vị trí triệu hồi xung quanh chủ nhân.
+    iceSpirit.snapTo(
+            player.getX() + 2.0D,
+            player.getY() + 1.0D,
+            player.getZ(),
+            player.getYRot(),
+            0.0F
+    );
+
+    iceZombie.snapTo(
+            player.getX() - 2.0D,
+            player.getY(),
+            player.getZ(),
+            player.getYRot(),
+            0.0F
+    );
+
+    skeleton.snapTo(
+            player.getX(),
+            player.getY() + 1.0D,
+            player.getZ() - 2.0D,
+            player.getYRot(),
+            0.0F
+    );
+
+    // Đánh dấu không tự biến mất và gắn chủ nhân trước khi thêm vào thế giới.
+    iceSpirit.setPersistenceRequired();
+    iceZombie.setPersistenceRequired();
+    skeleton.setPersistenceRequired();
+
+    FogDomainMinionAI.bindOwner(iceSpirit, player);
+    FogDomainMinionAI.bindOwner(iceZombie, player);
+    FogDomainMinionAI.bindOwner(skeleton, player);
+
+    boolean spiritAdded = level.addFreshEntity(iceSpirit);
+    boolean zombieAdded = level.addFreshEntity(iceZombie);
+    boolean skeletonAdded = level.addFreshEntity(skeleton);
+
+    if (!spiritAdded || !zombieAdded || !skeletonAdded) {
+        if (spiritAdded) iceSpirit.discard();
+        if (zombieAdded) iceZombie.discard();
+        if (skeletonAdded) skeleton.discard();
+
+        FogDomainMinionAI.removeMinion(iceSpirit);
+        FogDomainMinionAI.removeMinion(iceZombie);
+        FogDomainMinionAI.removeMinion(skeleton);
+
+        player.sendSystemMessage(Component.literal(
+                "Triệu hồi không hoàn tất. Hãy thử lại."));
+        return 0;
+    }
+
+    player.sendSystemMessage(Component.literal(
+            "Tam Linh Hộ Thể đã được triệu hồi!"));
+
+    player.sendSystemMessage(Component.literal(
+            "Linh Hồn Băng, Thây Ma Băng và Bộ Xương Nhiều Tay "
+                    + "đã nhận bạn làm chủ nhân."));
+
+    return 1;
+}
+
     private static int selectTamed(ServerPlayer player) {
         if (!isController(player)) {
             player.sendSystemMessage(Component.literal(

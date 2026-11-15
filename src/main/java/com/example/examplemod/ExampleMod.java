@@ -114,7 +114,8 @@ public class ExampleMod {
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
-
+        FogDomainEntities.register(modEventBus);
+    
         NeoForge.EVENT_BUS.register(this);
 
         // Đăng ký lệnh nhập hồn.

@@ -5,6 +5,9 @@ import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -115,6 +118,7 @@ public class ExampleMod {
         ITEMS.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
         FogDomainEntities.register(modEventBus);
+        modEventBus.addListener(this::createEntityAttributes);
     
         NeoForge.EVENT_BUS.register(this);
 
@@ -130,7 +134,54 @@ public class ExampleMod {
                 Config.SPEC
         );
     }
+    
+     private void createEntityAttributes(EntityAttributeCreationEvent event) {
 
+    // Linh Hồn Băng
+    event.put(
+            FogDomainEntities.ICE_SPIRIT.get(),
+            Mob.createMobAttributes()
+                    .add(Attributes.MAX_HEALTH, 30.0D)
+                    .add(Attributes.MOVEMENT_SPEED, 0.30D)
+                    .add(Attributes.ATTACK_DAMAGE, 6.0D)
+                    .add(Attributes.FOLLOW_RANGE, 32.0D)
+                    .build()
+    );
+
+    // Thây Ma Băng
+    event.put(
+            FogDomainEntities.ICE_ZOMBIE.get(),
+            Mob.createMobAttributes()
+                    .add(Attributes.MAX_HEALTH, 50.0D)
+                    .add(Attributes.MOVEMENT_SPEED, 0.28D)
+                    .add(Attributes.ATTACK_DAMAGE, 8.0D)
+                    .add(Attributes.FOLLOW_RANGE, 32.0D)
+                    .build()
+    );
+
+    // Bộ Xương Nhiều Tay
+    event.put(
+            FogDomainEntities.MULTI_ARMED_SKELETON.get(),
+            Mob.createMobAttributes()
+                    .add(Attributes.MAX_HEALTH, 40.0D)
+                    .add(Attributes.MOVEMENT_SPEED, 0.30D)
+                    .add(Attributes.ATTACK_DAMAGE, 7.0D)
+                    .add(Attributes.FOLLOW_RANGE, 32.0D)
+                    .build()
+    );
+
+    // Thây Ma Linh Hồn
+    event.put(
+            FogDomainEntities.SOUL_ZOMBIE.get(),
+            Mob.createMobAttributes()
+                    .add(Attributes.MAX_HEALTH, 20.0D)
+                    .add(Attributes.MOVEMENT_SPEED, 0.32D)
+                    .add(Attributes.ATTACK_DAMAGE, 4.0D)
+                    .add(Attributes.FOLLOW_RANGE, 32.0D)
+                    .build()
+    );
+}
+    
     private void commonSetup(FMLCommonSetupEvent event) {
         LOGGER.info("HELLO FROM COMMON SETUP");
 

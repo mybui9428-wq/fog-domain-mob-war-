@@ -1,4 +1,3 @@
-
 package com.example.examplemod;
 
 import net.minecraft.server.MinecraftServer;

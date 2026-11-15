@@ -225,13 +225,13 @@ public final class FogDomainMinionAI {
             double x = skeleton.getX() + Math.cos(angle) * 1.5D;
             double z = skeleton.getZ() + Math.sin(angle) * 1.5D;
 
-            soulZombie.moveTo(
-                    x,
-                    skeleton.getY(),
-                    z,
-                    skeleton.getYRot(),
-                    0.0F
-            );
+            soulZombie.snapTo(
+        x,
+        skeleton.getY(),
+        z,
+        skeleton.getYRot(),
+        0.0F
+);
 
             soulZombie.setPersistenceRequired();
 

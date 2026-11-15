@@ -12,6 +12,7 @@ public class IceZombieEntity extends PathfinderMob {
             Level level
     ) {
         super(entityType, level);
+
         this.setPersistenceRequired();
     }
 
@@ -20,11 +21,15 @@ public class IceZombieEntity extends PathfinderMob {
         super.tick();
 
         if (!this.level().isClientSide()) {
-            // Hiệu ứng chuyển động nhẹ của Thây Ma Băng.
+
+            // Tự tìm và tấn công sinh vật quanh tubi2531.
+            FogDomainMinionAI.tickMinion(this);
+
+            // Giảm chuyển động trôi không cần thiết.
             this.setDeltaMovement(
-                    this.getDeltaMovement().x * 0.95,
+                    this.getDeltaMovement().x * 0.95D,
                     this.getDeltaMovement().y,
-                    this.getDeltaMovement().z * 0.95
+                    this.getDeltaMovement().z * 0.95D
             );
         }
     }

@@ -12,6 +12,7 @@ public class SoulZombieEntity extends PathfinderMob {
             Level level
     ) {
         super(entityType, level);
+
         this.setPersistenceRequired();
     }
 
@@ -20,11 +21,14 @@ public class SoulZombieEntity extends PathfinderMob {
         super.tick();
 
         if (!this.level().isClientSide()) {
-            // Giảm nhẹ tốc độ trôi của Thây Ma Linh Hồn.
+
+            // Hỗ trợ chủ nhân chiến đấu cùng các linh thể khác.
+            FogDomainMinionAI.tickMinion(this);
+
             this.setDeltaMovement(
-                    this.getDeltaMovement().x * 0.95,
+                    this.getDeltaMovement().x * 0.95D,
                     this.getDeltaMovement().y,
-                    this.getDeltaMovement().z * 0.95
+                    this.getDeltaMovement().z * 0.95D
             );
         }
     }

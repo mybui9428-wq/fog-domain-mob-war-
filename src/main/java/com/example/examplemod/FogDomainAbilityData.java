@@ -1102,7 +1102,21 @@ public class FogDomainAbilityData extends SavedData {
 
         if (changed) setDirty();
     }
+    
+public double getTotalPower(UUID entityId) {
+    if (entityId == null) {
+        return 0.0D;
+    }
 
+    double total = 0.0D;
+
+    for (String skill : SKILLS) {
+        total += getPower(entityId, skill);
+    }
+
+    return total;
+}
+    
     public double getPower(UUID entityId, String skill) {
         if (entityId == null || skill == null) return 0.0D;
 

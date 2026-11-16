@@ -21,15 +21,7 @@ public class SoulZombieEntity extends PathfinderMob {
         super.tick();
 
         if (!this.level().isClientSide()) {
-
-            // Hỗ trợ chủ nhân chiến đấu cùng các linh thể khác.
             FogDomainMinionAI.tickMinion(this);
-
-            this.setDeltaMovement(
-                    this.getDeltaMovement().x * 0.95D,
-                    this.getDeltaMovement().y,
-                    this.getDeltaMovement().z * 0.95D
-            );
         }
     }
 }

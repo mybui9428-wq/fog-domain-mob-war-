@@ -21,16 +21,7 @@ public class IceZombieEntity extends PathfinderMob {
         super.tick();
 
         if (!this.level().isClientSide()) {
-
-            // Tự tìm và tấn công sinh vật quanh tubi2531.
             FogDomainMinionAI.tickMinion(this);
-
-            // Giảm chuyển động trôi không cần thiết.
-            this.setDeltaMovement(
-                    this.getDeltaMovement().x * 0.95D,
-                    this.getDeltaMovement().y,
-                    this.getDeltaMovement().z * 0.95D
-            );
         }
     }
 }

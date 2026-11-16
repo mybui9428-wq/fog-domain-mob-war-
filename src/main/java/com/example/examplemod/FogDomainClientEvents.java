@@ -1,6 +1,7 @@
 
 package com.example.examplemod;
 
+import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.resources.Identifier;
 
 import net.neoforged.api.distmarker.Dist;
@@ -19,10 +20,10 @@ public class FogDomainClientEvents {
             EntityRenderersEvent.RegisterRenderers event
     ) {
 
-        // Linh Hồn Băng
+        // LINH HỒN BĂNG - mô hình skeleton, texture stray.
         event.registerEntityRenderer(
                 FogDomainEntities.ICE_SPIRIT.get(),
-                context -> new FogDomainEntityRenderer<>(
+                context -> new FogDomainSkeletonRenderer<>(
                         context,
                         Identifier.parse(
                                 "minecraft:textures/entity/skeleton/stray.png"
@@ -30,21 +31,22 @@ public class FogDomainClientEvents {
                 )
         );
 
-        // Thây Ma Băng
+        // THÂY MA BĂNG - mô hình zombie.
         event.registerEntityRenderer(
                 FogDomainEntities.ICE_ZOMBIE.get(),
-                context -> new FogDomainEntityRenderer<>(
+                context -> new FogDomainZombieRenderer<>(
                         context,
+                        ModelLayers.ZOMBIE,
                         Identifier.parse(
                                 "minecraft:textures/entity/zombie/zombie.png"
                         )
                 )
         );
 
-        // Bộ Xương Nhiều Tay
+        // BỘ XƯƠNG NHIỀU TAY - mô hình skeleton.
         event.registerEntityRenderer(
                 FogDomainEntities.MULTI_ARMED_SKELETON.get(),
-                context -> new FogDomainEntityRenderer<>(
+                context -> new FogDomainSkeletonRenderer<>(
                         context,
                         Identifier.parse(
                                 "minecraft:textures/entity/skeleton/skeleton.png"
@@ -52,11 +54,12 @@ public class FogDomainClientEvents {
                 )
         );
 
-        // Thây Ma Linh Hồn
+        // THÂY MA LINH HỒN - mô hình zombie husk.
         event.registerEntityRenderer(
                 FogDomainEntities.SOUL_ZOMBIE.get(),
-                context -> new FogDomainEntityRenderer<>(
+                context -> new FogDomainZombieRenderer<>(
                         context,
+                        ModelLayers.ZOMBIE,
                         Identifier.parse(
                                 "minecraft:textures/entity/zombie/husk.png"
                         )
@@ -64,7 +67,7 @@ public class FogDomainClientEvents {
         );
 
         ExampleMod.LOGGER.info(
-                "FOG DOMAIN ENTITY RENDERERS REGISTERED"
+                "FOG DOMAIN CUSTOM ENTITY RENDERERS REGISTERED"
         );
     }
 }

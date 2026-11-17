@@ -287,8 +287,6 @@ public final class MobWarAI {
                 || target.level() != level
                 || isController(attacker)
                 || isController(target)
-                || isTamed(attacker)
-                || isTamed(target)
                 || !(target instanceof Mob
                 || target instanceof ServerPlayer)
                 || !inDomain(level, attacker)

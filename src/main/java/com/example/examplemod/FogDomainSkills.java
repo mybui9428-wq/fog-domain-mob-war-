@@ -491,8 +491,4 @@ public final class FogDomainSkills {
         return SKILLS[selectedSkill];
     }
 
-    // Giữ phương thức tương thích với HUD cũ nếu còn nơi gọi.
-    public static int getTamedCount(UUID playerId) {
-        return 0;
-    }
 }

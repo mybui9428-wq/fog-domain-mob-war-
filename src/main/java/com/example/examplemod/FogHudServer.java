@@ -72,9 +72,6 @@ public final class FogHudServer {
         int abilityCount =
                 data.getAbilityCount(player.getUUID());
 
-        int tamedCount =
-                FogDomainSkills.getTamedCount(player.getUUID());
-
         StringBuilder hud = new StringBuilder();
 
         hud.append("Mob War: ")
@@ -99,11 +96,6 @@ public final class FogHudServer {
 
         hud.append("Nang luc da hap thu: ")
                 .append(abilityCount)
-                .append('\n');
-
-        hud.append("Sinh vat no dich: ")
-                .append(tamedCount)
-                .append("/5")
                 .append('\n');
 
         hud.append("Ky nang: ")

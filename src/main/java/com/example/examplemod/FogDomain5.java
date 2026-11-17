@@ -17,11 +17,6 @@ import java.util.UUID;
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class FogDomain5 {
 
-    private static final int MAX_TIER = 7;
-
-    private static final Map<UUID, Integer> TIERS =
-            new HashMap<>();
-
     private static final Map<UUID, Boolean> ACTIVE =
             new HashMap<>();
 
@@ -33,8 +28,10 @@ public final class FogDomain5 {
                 .equalsIgnoreCase("tubi2531");
     }
 
+    // Giữ phương thức tương thích với những file cũ còn gọi đến.
+    // Lĩnh vực hiện tại không còn hệ thống tầng.
     public static int getTier(UUID playerId) {
-        return TIERS.getOrDefault(playerId, 1);
+        return 1;
     }
 
     public static boolean isActive(UUID playerId) {
@@ -51,7 +48,6 @@ public final class FogDomain5 {
         event.getDispatcher().register(
                 Commands.literal("fogdomain5")
 
-                        // Mở bảng nhân vật cho mọi người chơi.
                         .then(Commands.literal("character")
                                 .executes(context -> {
 
@@ -67,36 +63,11 @@ public final class FogDomain5 {
                                     return Command.SINGLE_SUCCESS;
                                 }))
 
-                        // Các lệnh lĩnh vực chỉ dành cho tubi2531.
                         .requires(source ->
                                 source.getEntity() instanceof ServerPlayer player
                                         && isController(player))
 
-                        .then(Commands.literal("ability")
-                                .executes(context -> {
-
-                                    ServerPlayer player =
-                                            context.getSource()
-                                                    .getPlayerOrException();
-
-                                    int current = getTier(player.getUUID());
-
-                                    int nextTier = current >= MAX_TIER
-                                            ? 1
-                                            : current + 1;
-
-                                    TIERS.put(player.getUUID(), nextTier);
-
-                                    context.getSource().sendSuccess(
-                                            () -> Component.literal(
-                                                    "Đã chọn Lĩnh Vực Thôn Phệ tầng "
-                                                            + nextTier + "/7."),
-                                            false
-                                    );
-
-                                    return Command.SINGLE_SUCCESS;
-                                }))
-
+                        // Bật lĩnh vực, không tạo hồ nước.
                         .then(Commands.literal("start")
                                 .executes(context -> {
 
@@ -113,31 +84,18 @@ public final class FogDomain5 {
                                         return 0;
                                     }
 
-                                    int changed =
-                                            FogDomain5Terrain.createPool(player);
-
-                                    if (changed <= 0) {
-                                        context.getSource().sendFailure(
-                                                Component.literal(
-                                                        "Không tạo được hồ. "
-                                                        + "Hãy thử ở khu vực đã tải chunk."));
-                                        return 0;
-                                    }
-
                                     setActive(id, true);
 
                                     context.getSource().sendSuccess(
                                             () -> Component.literal(
-                                                    "Đã bật Lĩnh Vực Thôn Phệ tầng "
-                                                            + getTier(id) + "/7."
-                                                            + " Đã tạo hồ và thay đổi "
-                                                            + changed + " block."),
+                                                    "Đã bật Lĩnh Vực Thôn Phệ."),
                                             false
                                     );
 
                                     return Command.SINGLE_SUCCESS;
                                 }))
 
+                        // Tắt lĩnh vực.
                         .then(Commands.literal("stop")
                                 .executes(context -> {
 
@@ -154,22 +112,18 @@ public final class FogDomain5 {
                                         return 0;
                                     }
 
-                                    int restored =
-                                            FogDomain5Terrain.restorePool(player);
-
                                     setActive(id, false);
 
                                     context.getSource().sendSuccess(
                                             () -> Component.literal(
-                                                    "Đã tắt Lĩnh Vực Thôn Phệ. "
-                                                    + "Đã khôi phục "
-                                                    + restored + " block."),
+                                                    "Đã tắt Lĩnh Vực Thôn Phệ."),
                                             false
                                     );
 
                                     return Command.SINGLE_SUCCESS;
                                 }))
 
+                        // Kiểm tra trạng thái.
                         .then(Commands.literal("status")
                                 .executes(context -> {
 
@@ -186,8 +140,6 @@ public final class FogDomain5 {
                                     context.getSource().sendSuccess(
                                             () -> Component.literal(
                                                     "LĨNH VỰC THÔN PHỆ"
-                                                            + "\nTầng: "
-                                                            + getTier(id) + "/7"
                                                             + "\nTrạng thái: "
                                                             + status),
                                             false

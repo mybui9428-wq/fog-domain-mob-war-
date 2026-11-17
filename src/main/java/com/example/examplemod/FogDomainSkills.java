@@ -328,8 +328,6 @@ private static int cast(ServerPlayer player) {
     // Kỹ năng thứ 4: Thôn Phệ Vạn Vật.
     // Hút tất cả sinh vật và người chơi phía trước.
     if (selectedSkill == 3) {
-        return FogDomainBlackHole.startMass(player) ? 1 : 0;
-    }
 
     LivingEntity target = findTarget(player);
 

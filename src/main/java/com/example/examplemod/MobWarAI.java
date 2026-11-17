@@ -80,10 +80,6 @@ public final class MobWarAI {
                 <= RADIUS * RADIUS;
     }
 
-    private static boolean isTamed(Entity entity) {
-        return FogDomainTaming.isTamed(entity);
-    }
-
     private static List<LivingEntity> scanEntities(ServerLevel level) {
 
         List<LivingEntity> result = new ArrayList<>();
@@ -105,7 +101,6 @@ public final class MobWarAI {
                         entity.isAlive()
                         && !entity.isRemoved()
                         && !isController(entity)
-                        && !isTamed(entity)
                         && (entity instanceof Mob
                         || entity instanceof ServerPlayer)
                         && controller.distanceToSqr(entity)

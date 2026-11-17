@@ -104,8 +104,7 @@ public class MobWarCombatGoal extends Goal {
 
         if (!(mob.level() instanceof ServerLevel level)
                 || !MobWarCommands.enabled
-                || !MobWarAI.inDomain(level, mob)
-                || FogDomainTaming.isTamed(mob)) {
+                || !MobWarAI.inDomain(level, mob)) {
             return null;
         }
 
@@ -153,7 +152,6 @@ public class MobWarCombatGoal extends Goal {
         if (!MobWarCommands.enabled
                 || !mob.isAlive()
                 || mob.isRemoved()
-                || FogDomainTaming.isTamed(mob)
                 || !(mob.level() instanceof ServerLevel level)
                 || !MobWarAI.inDomain(level, mob)) {
             return false;
@@ -181,7 +179,6 @@ public class MobWarCombatGoal extends Goal {
         return MobWarCommands.enabled
                 && mob.isAlive()
                 && !mob.isRemoved()
-                && !FogDomainTaming.isTamed(mob)
                 && validTarget(mob.getTarget());
     }
 

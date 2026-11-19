@@ -1,0 +1,20 @@
+{
+  "layers": {
+    "humanoid": [
+      {
+        "texture": "minecraft:netherite",
+        "dyeable": {
+          "color_when_undyed": 3670257
+        }
+      }
+    ],
+    "humanoid_leggings": [
+      {
+        "texture": "minecraft:netherite",
+        "dyeable": {
+          "color_when_undyed": 3670257
+        }
+      }
+    ]
+  }
+}

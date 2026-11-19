@@ -100,6 +100,10 @@ public class ExampleMod {
                                 output.accept(FogArmorItems.CHESTPLATE.get());
                                 output.accept(FogArmorItems.LEGGINGS.get());
                                 output.accept(FogArmorItems.BOOTS.get());
+                                output.accept(FogWeaponItems.SWORD.get());
+                                output.accept(FogWeaponItems.SPEAR.get());
+                                output.accept(FogWeaponItems.SHIELD.get());
+                                output.accept(FogWeaponItems.BOW.get());
                             })
                             .build()
             );
@@ -121,6 +125,7 @@ public class ExampleMod {
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
         FogArmorItems.register(modEventBus);
+        FogWeaponItems.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
         FogDomainEntities.register(modEventBus);
         modEventBus.addListener(this::createEntityAttributes);

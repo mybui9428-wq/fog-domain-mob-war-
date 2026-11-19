@@ -110,7 +110,7 @@ public final class FogArmorEffects {
         return 1;
     }
 
-    private static int soundwave(ServerPlayer player) {
+    static int soundwave(ServerPlayer player) {
         if (!isController(player) || !hasChestplate(player)) {
             player.sendSystemMessage(Component.literal("Bạn cần mặc Áo Sóng Âm để sử dụng kỹ năng."));
             return 0;
@@ -161,7 +161,7 @@ public final class FogArmorEffects {
         return 1;
     }
 
-    private static int dash(ServerPlayer player) {
+    static int dash(ServerPlayer player) {
         if (!isController(player) || !hasLeggings(player)) {
             player.sendSystemMessage(Component.literal("Bạn cần mặc Quần Ảnh Bộ để sử dụng kỹ năng."));
             return 0;
@@ -326,10 +326,6 @@ public final class FogArmorEffects {
         event.getDispatcher().register(Commands.literal("fogarmor")
                 .then(Commands.literal("activate")
                         .executes(c -> activate(c.getSource().getPlayerOrException())))
-                .then(Commands.literal("soundwave")
-                        .executes(c -> soundwave(c.getSource().getPlayerOrException())))
-                .then(Commands.literal("dash")
-                        .executes(c -> dash(c.getSource().getPlayerOrException())))
                 .then(Commands.literal("status")
                         .executes(c -> {
                             ServerPlayer player = c.getSource().getPlayerOrException();

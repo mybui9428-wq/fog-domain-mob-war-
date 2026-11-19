@@ -96,6 +96,10 @@ public class ExampleMod {
                                 output.accept(EXAMPLE_ITEM.get());
                                 output.accept(SOUL_CRYSTAL.get());
                                 output.accept(RULE_FRAGMENT.get());
+                                output.accept(FogArmorItems.CROWN.get());
+                                output.accept(FogArmorItems.CHESTPLATE.get());
+                                output.accept(FogArmorItems.LEGGINGS.get());
+                                output.accept(FogArmorItems.BOOTS.get());
                             })
                             .build()
             );
@@ -116,6 +120,7 @@ public class ExampleMod {
 
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
+        FogArmorItems.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
         FogDomainEntities.register(modEventBus);
         modEventBus.addListener(this::createEntityAttributes);

@@ -1,16 +1,18 @@
-
 {
   "itemGroup.examplemod": "Example Mod Tab",
   "block.examplemod.example_block": "Example Block",
   "item.examplemod.example_item": "Example Item",
   "item.examplemod.soul_crystal": "Soul Crystal",
   "item.examplemod.rule_fragment": "Rule Fragment",
-
   "examplemod.configuration.title": "Example Mod Configs",
   "examplemod.configuration.section.examplemod.common.toml": "Example Mod Configs",
   "examplemod.configuration.section.examplemod.common.toml.title": "Example Mod Configs",
   "examplemod.configuration.items": "Item List",
   "examplemod.configuration.logDirtBlock": "Log Dirt Block",
   "examplemod.configuration.magicNumberIntroduction": "Magic Number Text",
-  "examplemod.configuration.magicNumber": "Magic Number"
+  "examplemod.configuration.magicNumber": "Magic Number",
+  "item.examplemod.fog_sword": "Kiếm Kỳ Vật",
+  "item.examplemod.fog_spear": "Trường Thương Kỳ Vật",
+  "item.examplemod.fog_shield": "Khiên Kỳ Vật",
+  "item.examplemod.fog_bow": "Cung Kỳ Vật"
 }

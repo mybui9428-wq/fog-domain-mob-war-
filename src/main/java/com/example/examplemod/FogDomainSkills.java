@@ -41,7 +41,9 @@ public final class FogDomainSkills {
     private static int selectedSkill = 0;
 
     private static final String[] SKILLS = {
-            "Lồng nhốt"
+            "Lồng nhốt",
+            "Sóng Âm",
+            "Ảnh Bộ"
     };
 
     private static final class CageData {
@@ -216,6 +218,14 @@ public final class FogDomainSkills {
             player.sendSystemMessage(Component.literal(
                     "Bạn không phải người điều khiển lĩnh vực."));
             return 0;
+        }
+
+        // Ba kỹ năng dùng chung hệ thống chọn và kích hoạt.
+        if (selectedSkill == 1) {
+            return FogArmorEffects.soundwave(player);
+        }
+        if (selectedSkill == 2) {
+            return FogArmorEffects.dash(player);
         }
 
         LivingEntity target = findTarget(player);

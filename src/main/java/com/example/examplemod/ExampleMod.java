@@ -102,6 +102,7 @@ public class ExampleMod {
                                 output.accept(FogArmorItems.BOOTS.get());
                                 output.accept(FogWeaponItems.SWORD.get());
                                 output.accept(FogWeaponItems.SPEAR.get());
+                                output.accept(FogWeaponItems.LONG_SPEAR.get());
                                 output.accept(FogWeaponItems.SHIELD.get());
                                 output.accept(FogWeaponItems.BOW.get());
                             })

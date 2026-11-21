@@ -1,6 +1,6 @@
 {
-  "model": {
-    "type": "minecraft:model",
-    "model": "examplemod:item/fog_sword"
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "examplemod:item/fog_sword"
   }
 }

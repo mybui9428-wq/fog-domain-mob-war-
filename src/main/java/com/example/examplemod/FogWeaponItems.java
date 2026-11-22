@@ -2,6 +2,7 @@
 package com.example.examplemod;
 
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.util.Unit;
 import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ShieldItem;
@@ -19,7 +20,7 @@ public final class FogWeaponItems {
     private static final DeferredRegister.Items ITEMS =
             DeferredRegister.createItems(ExampleMod.MODID);
 
-    // Trường Đao.
+    // Trường Đao: không thể bị phá hủy.
     public static final DeferredItem<Item> SWORD =
             ITEMS.registerItem(
                     "fog_sword",
@@ -28,19 +29,24 @@ public final class FogWeaponItems {
                                     ToolMaterial.NETHERITE,
                                     3.0F,
                                     -2.4F
-                            ).stacksTo(1)
+                            )
+                            .component(
+                                    DataComponents.UNBREAKABLE,
+                                    Unit.INSTANCE
+                            )
+                            .stacksTo(1)
                     )
             );
 
-    // Trường Thương Kỳ Vật: kiểu kiếm, vung chém bình thường.
+    // Trường Thương: sát thương 10, tốc độ đánh tăng.
     public static final DeferredItem<Item> LONG_SPEAR =
             ITEMS.registerItem(
                     "fog_long_spear",
                     p -> new Item(
                             p.sword(
                                     ToolMaterial.NETHERITE,
-                                    15.0F,
-                                    1.2F
+                                    10.0F,
+                                    2.0F
                             )
                             .component(
                                     DataComponents.ATTACK_RANGE,
@@ -53,25 +59,39 @@ public final class FogWeaponItems {
                                             1.0F
                                     )
                             )
+                            .component(
+                                    DataComponents.UNBREAKABLE,
+                                    Unit.INSTANCE
+                            )
                             .stacksTo(1)
                     )
             );
 
-    // Khiên.
+    // Khiên: không thể bị phá hủy.
     public static final DeferredItem<ShieldItem> SHIELD =
             ITEMS.registerItem(
                     "fog_shield",
                     p -> new ShieldItem(
-                            p.durability(1000).stacksTo(1)
+                            p.durability(1000)
+                                    .component(
+                                            DataComponents.UNBREAKABLE,
+                                            Unit.INSTANCE
+                                    )
+                                    .stacksTo(1)
                     )
             );
 
-    // Cung.
+    // Cung: không thể bị phá hủy.
     public static final DeferredItem<BowItem> BOW =
             ITEMS.registerItem(
                     "fog_bow",
                     p -> new BowItem(
-                            p.durability(800).stacksTo(1)
+                            p.durability(800)
+                                    .component(
+                                            DataComponents.UNBREAKABLE,
+                                            Unit.INSTANCE
+                                    )
+                                    .stacksTo(1)
                     )
             );
 

@@ -1,3 +1,4 @@
+
 package com.example.examplemod;
 
 import net.minecraft.server.level.ServerLevel;
@@ -9,7 +10,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 
 /**
- * Hiệu ứng phản sát thương của Khiên Kỳ Vật.
+ * Hiệu ứng phòng thủ và phản sát thương của Khiên Kỳ Vật.
  */
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class FogWeaponEffects {
@@ -22,30 +23,34 @@ public final class FogWeaponEffects {
 
     @SubscribeEvent
     public static void onIncomingDamage(LivingIncomingDamageEvent event) {
+
         if (REFLECTING.get()) {
             return;
         }
 
+        // Chỉ xử lý người chơi.
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
 
-        // Chỉ kích hoạt khi người chơi đang giơ đúng Khiên Kỳ Vật để đỡ đòn.
+        // Phải đang giơ đúng Khiên Kỳ Vật.
         if (!player.isBlocking()
                 || !player.getUseItem().is(FogWeaponItems.SHIELD.get())) {
             return;
         }
 
         float incomingDamage = event.getAmount();
+
         if (incomingDamage <= 0.0F) {
             return;
         }
 
-        // Khiên giảm 50% sát thương nhận vào.
-        event.setAmount(incomingDamage * 0.5F);
+        // Chặn hoàn toàn sát thương nhận vào.
+        event.setAmount(0.0F);
 
-        // Phản lại 50% sát thương gốc cho sinh vật/người chơi đã đánh.
+        // Phản lại 50% sát thương cho kẻ tấn công.
         Entity sourceEntity = event.getSource().getEntity();
+
         if (!(sourceEntity instanceof LivingEntity attacker)
                 || attacker == player
                 || !(player.level() instanceof ServerLevel level)) {
@@ -56,11 +61,13 @@ public final class FogWeaponEffects {
 
         try {
             REFLECTING.set(true);
+
             attacker.hurtServer(
                     level,
                     level.damageSources().thorns(player),
                     reflectedDamage
             );
+
         } finally {
             REFLECTING.set(false);
         }

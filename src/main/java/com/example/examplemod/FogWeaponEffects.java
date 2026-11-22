@@ -7,10 +7,10 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingShieldBlockEvent;
 
 /**
- * Hiệu ứng phòng thủ và phản sát thương của Khiên Kỳ Vật.
+ * Cơ chế phòng thủ của Khiên Kỳ Vật.
  */
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class FogWeaponEffects {
@@ -22,8 +22,9 @@ public final class FogWeaponEffects {
     }
 
     @SubscribeEvent
-    public static void onIncomingDamage(LivingIncomingDamageEvent event) {
+    public static void onShieldBlock(LivingShieldBlockEvent event) {
 
+        // Không xử lý đòn phản lại.
         if (REFLECTING.get()) {
             return;
         }
@@ -33,31 +34,38 @@ public final class FogWeaponEffects {
             return;
         }
 
-        // Phải đang giơ đúng Khiên Kỳ Vật.
+        // Phải đang sử dụng Khiên Kỳ Vật.
         if (!player.isBlocking()
                 || !player.getUseItem().is(FogWeaponItems.SHIELD.get())) {
             return;
         }
 
-        float incomingDamage = event.getAmount();
-
-        if (incomingDamage <= 0.0F) {
+        // Chỉ chặn khi đòn đánh thỏa điều kiện hướng đỡ của Minecraft.
+        if (!event.getOriginalBlock()) {
             return;
         }
 
-        // Chặn hoàn toàn sát thương nhận vào.
-        event.setAmount(0.0F);
+        float damage = event.getOriginalBlockedDamage();
 
-        // Phản lại 50% sát thương cho kẻ tấn công.
-        Entity sourceEntity = event.getSource().getEntity();
+        if (damage <= 0.0F) {
+            return;
+        }
 
-        if (!(sourceEntity instanceof LivingEntity attacker)
+        // Xác nhận chặn đòn hoàn toàn.
+        event.setBlocked(true);
+        event.setBlockedDamage(damage);
+
+        // Khiên không mất độ bền.
+        event.setShieldDamage(0);
+
+        // Phản lại 50% sát thương.
+        Entity source = event.getDamageSource().getEntity();
+
+        if (!(source instanceof LivingEntity attacker)
                 || attacker == player
                 || !(player.level() instanceof ServerLevel level)) {
             return;
         }
-
-        float reflectedDamage = incomingDamage * 0.5F;
 
         try {
             REFLECTING.set(true);
@@ -65,7 +73,7 @@ public final class FogWeaponEffects {
             attacker.hurtServer(
                     level,
                     level.damageSources().thorns(player),
-                    reflectedDamage
+                    damage * 0.5F
             );
 
         } finally {

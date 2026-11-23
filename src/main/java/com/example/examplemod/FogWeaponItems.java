@@ -1,6 +1,9 @@
 
 package com.example.examplemod;
 
+import java.util.List;
+import java.util.Optional;
+
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.util.Unit;
 import net.minecraft.world.item.BowItem;
@@ -8,6 +11,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.ToolMaterial;
 import net.minecraft.world.item.component.AttackRange;
+import net.minecraft.world.item.component.BlocksAttacks;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -20,7 +24,7 @@ public final class FogWeaponItems {
     private static final DeferredRegister.Items ITEMS =
             DeferredRegister.createItems(ExampleMod.MODID);
 
-    // Trường Đao: không thể bị phá hủy.
+    // Trường Đao.
     public static final DeferredItem<Item> SWORD =
             ITEMS.registerItem(
                     "fog_sword",
@@ -38,7 +42,7 @@ public final class FogWeaponItems {
                     )
             );
 
-    // Trường Thương: sát thương 10, tốc độ đánh tăng.
+    // Trường Thương.
     public static final DeferredItem<Item> LONG_SPEAR =
             ITEMS.registerItem(
                     "fog_long_spear",
@@ -67,7 +71,7 @@ public final class FogWeaponItems {
                     )
             );
 
-    // Khiên: không thể bị phá hủy.
+    // Khiên Kỳ Vật: chặn toàn bộ sát thương.
     public static final DeferredItem<ShieldItem> SHIELD =
             ITEMS.registerItem(
                     "fog_shield",
@@ -77,11 +81,34 @@ public final class FogWeaponItems {
                                             DataComponents.UNBREAKABLE,
                                             Unit.INSTANCE
                                     )
+                                    .component(
+                                            DataComponents.BLOCKS_ATTACKS,
+                                            new BlocksAttacks(
+                                                    0.0F,
+                                                    0.0F,
+                                                    List.of(
+                                                            new BlocksAttacks.DamageReduction(
+                                                                    180.0F,
+                                                                    Optional.empty(),
+                                                                    0.0F,
+                                                                    1.0F
+                                                            )
+                                                    ),
+                                                    new BlocksAttacks.ItemDamageFunction(
+                                                            0.0F,
+                                                            0.0F,
+                                                            0.0F
+                                                    ),
+                                                    Optional.empty(),
+                                                    Optional.empty(),
+                                                    Optional.empty()
+                                            )
+                                    )
                                     .stacksTo(1)
                     )
             );
 
-    // Cung: không thể bị phá hủy.
+    // Cung.
     public static final DeferredItem<BowItem> BOW =
             ITEMS.registerItem(
                     "fog_bow",

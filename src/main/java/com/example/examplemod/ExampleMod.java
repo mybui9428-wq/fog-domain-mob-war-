@@ -104,6 +104,7 @@ public class ExampleMod {
                                 output.accept(FogWeaponItems.LONG_SPEAR.get());
                                 output.accept(FogWeaponItems.SHIELD.get());
                                 output.accept(FogWeaponItems.BOW.get());
+                                output.accept(FogWeaponItems.BAT_DIET_LUU_ANH.get());
                             })
                             .build()
             );

@@ -1,20 +1,6 @@
 {
   "model": {
-    "type": "minecraft:condition",
-    "property": "minecraft:using_item",
-    "on_false": {
-      "type": "minecraft:model",
-      "model": "examplemod:item/fog_shield"
-    },
-    "on_true": {
-      "type": "minecraft:model",
-      "model": "examplemod:item/fog_shield"
-    },
-    "transformation": {
-      "left_rotation": [0, 0, 0, 1],
-      "right_rotation": [0, 0, 0, 1],
-      "scale": [1, -1, -1],
-      "translation": [0, 0, 0]
-    }
+    "type": "minecraft:model",
+    "model": "examplemod:item/fog_shield"
   }
 }

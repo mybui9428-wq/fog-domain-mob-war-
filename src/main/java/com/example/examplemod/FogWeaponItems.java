@@ -9,6 +9,9 @@ import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.item.ToolMaterial;
 import net.minecraft.world.item.component.AttackRange;
 import net.minecraft.world.item.component.UseEffects;
+import net.minecraft.world.item.component.BlocksAttacks;
+import java.util.List;
+import java.util.Optional;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -77,6 +80,30 @@ public final class FogWeaponItems {
                                     .component(
                                             DataComponents.UNBREAKABLE,
                                             Unit.INSTANCE
+                                    )
+                                    // Khôi phục cơ chế chặn đòn thật của khiên.
+                                    .component(
+                                            DataComponents.BLOCKS_ATTACKS,
+                                            new BlocksAttacks(
+                                                    0.0F,
+                                                    0.0F,
+                                                    List.of(
+                                                            new BlocksAttacks.DamageReduction(
+                                                                    180.0F,
+                                                                    Optional.empty(),
+                                                                    0.0F,
+                                                                    1.0F
+                                                            )
+                                                    ),
+                                                    new BlocksAttacks.ItemDamageFunction(
+                                                            0.0F,
+                                                            0.0F,
+                                                            0.0F
+                                                    ),
+                                                    Optional.empty(),
+                                                    Optional.empty(),
+                                                    Optional.empty()
+                                            )
                                     )
                                     // Không bị giảm tốc độ khi đang giơ khiên.
                                     .component(

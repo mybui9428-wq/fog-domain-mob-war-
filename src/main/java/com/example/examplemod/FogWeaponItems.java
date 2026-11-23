@@ -131,6 +131,19 @@ public final class FogWeaponItems {
                                     .stacksTo(1)
                     )
             );
+    
+    // Kỳ vật: Bất Diệt Lưu Ảnh.
+    public static final DeferredItem<Item> BAT_DIET_LUU_ANH =
+            ITEMS.registerItem(
+                    "bat_diet_luu_anh",
+                    p -> new Item(
+                            p.component(
+                                    DataComponents.UNBREAKABLE,
+                                    Unit.INSTANCE
+                            )
+                            .stacksTo(1)
+                    )
+            );
 
     private FogWeaponItems() {
     }

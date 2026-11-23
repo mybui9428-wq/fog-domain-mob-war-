@@ -1,14 +1,36 @@
 {
   "model": {
-    "type": "minecraft:condition",
-    "property": "minecraft:using_item",
-    "on_false": {
-      "type": "minecraft:model",
-      "model": "examplemod:item/fog_shield"
+    "type": "minecraft:select",
+    "property": "minecraft:display_context",
+    "fallback": {
+      "type": "minecraft:special",
+      "base": "minecraft:item/shield",
+      "model": {
+        "type": "minecraft:shield"
+      }
     },
-    "on_true": {
-      "type": "minecraft:model",
-      "model": "examplemod:item/fog_shield"
-    }
+    "cases": [
+      {
+        "when": "gui",
+        "model": {
+          "type": "minecraft:model",
+          "model": "examplemod:item/fog_shield"
+        }
+      },
+      {
+        "when": "ground",
+        "model": {
+          "type": "minecraft:model",
+          "model": "examplemod:item/fog_shield"
+        }
+      },
+      {
+        "when": "fixed",
+        "model": {
+          "type": "minecraft:model",
+          "model": "examplemod:item/fog_shield"
+        }
+      }
+    ]
   }
 }

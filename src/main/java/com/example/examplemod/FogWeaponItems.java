@@ -132,12 +132,18 @@ public final class FogWeaponItems {
                     )
             );
     
-    // Kỳ vật: Bất Diệt Lưu Ảnh.
+    
+    // Bất Diệt Lưu Ảnh: vũ khí cầm tay, không thể bị phá hủy.
     public static final DeferredItem<Item> BAT_DIET_LUU_ANH =
             ITEMS.registerItem(
                     "bat_diet_luu_anh",
                     p -> new Item(
-                            p.component(
+                            p.sword(
+                                    ToolMaterial.NETHERITE,
+                                    3.0F,
+                                    -2.4F
+                            )
+                            .component(
                                     DataComponents.UNBREAKABLE,
                                     Unit.INSTANCE
                             )

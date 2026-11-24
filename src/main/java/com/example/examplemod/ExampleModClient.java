@@ -110,7 +110,7 @@ public class ExampleModClient {
 
                     String[] parts = payload.data().split("\\|", -1);
 
-                    if (parts.length < 20
+                    if (parts.length < 22
                             || !parts[0].equals("update")) {
                         return;
                     }
@@ -156,6 +156,9 @@ public class ExampleModClient {
                         int tripleSpiritSkillLevel =
                                 Integer.parseInt(parts[19]);
 
+                        boolean tucThanhGia = Boolean.parseBoolean(parts[20]);
+                        int attributeMaximum = Integer.parseInt(parts[21]);
+
                         Minecraft.getInstance().execute(() -> {
                             FogCharacterScreen.updateData(
                                     level,
@@ -176,7 +179,9 @@ public class ExampleModClient {
                                     tameSkillLevel,
                                     combineSkillLevel,
                                     stealSkillLevel,
-                                    tripleSpiritSkillLevel
+                                    tripleSpiritSkillLevel,
+                                    tucThanhGia,
+                                    attributeMaximum
                             );
                         });
 

@@ -32,6 +32,8 @@ public class FogCharacterScreen extends Screen {
     private static int tripleSpiritSkillLevel = 1;
 
     private static String message = "";
+    private static boolean tucThanhGia = false;
+    private static int attributeMaximum = 15;
 
     private static final int MAX_LEVEL = 20;
 
@@ -84,7 +86,9 @@ public class FogCharacterScreen extends Screen {
             int newTameSkillLevel,
             int newCombineSkillLevel,
             int newStealSkillLevel,
-            int newTripleSpiritSkillLevel
+            int newTripleSpiritSkillLevel,
+            boolean newTucThanhGia,
+            int newAttributeMaximum
     ) {
         updateCommonData(
                 newLevel, newSpiritPoints, newFreePoints,
@@ -100,6 +104,8 @@ public class FogCharacterScreen extends Screen {
         combineSkillLevel = Math.max(1, newCombineSkillLevel);
         stealSkillLevel = Math.max(1, newStealSkillLevel);
         tripleSpiritSkillLevel = Math.max(1, newTripleSpiritSkillLevel);
+        tucThanhGia = newTucThanhGia;
+        attributeMaximum = Math.max(1, newAttributeMaximum);
 
         refreshOpenScreen();
     }
@@ -192,11 +198,12 @@ public class FogCharacterScreen extends Screen {
         addLabel("Tinh Thạch Linh Hồn: " + soulCrystals,
                 centerX - 130, startY + 90, 260);
 
-        addLabel("Giá tăng thuộc tính: " + (level * 10) + " Linh Tính",
-                centerX - 150, startY + 108, 300);
+        addLabel("Giới hạn mỗi chỉ số: " + attributeMaximum
+                        + (tucThanhGia ? " (Túc Thanh Giả)" : ""),
+                centerX - 155, startY + 108, 310);
 
-        addLabel("Điểm trên 10 mất 1 máu hiện tại",
-                centerX - 150, startY + 126, 300);
+        addLabel("Giá tăng: " + (level * 10) + " Linh Tính; trên 10 mất HP",
+                centerX - 155, startY + 126, 310);
 
         addAttribute("Nhanh nhẹn", "agility",
                 agility, centerX, startY + 146);
@@ -396,21 +403,15 @@ public class FogCharacterScreen extends Screen {
         .bounds(centerX + 55, y, 55, 18)
         .build();
 
-        increaseButton.active = spiritPoints >= level * 10;
+        increaseButton.active =
+                value < attributeMaximum
+                && spiritPoints >= level * 10;
 
         addRenderableWidget(increaseButton);
     }
 
     private String getWeakStatus() {
-        if (level == 1) {
-            return "Thuộc tính yếu khi dưới 5";
-        }
-
-        if (level == 2) {
-            return "Thuộc tính yếu khi dưới 10";
-        }
-
-        return "Không có ngưỡng thuộc tính yếu ở cấp này";
+        return "Thuộc tính yếu khi dưới " + (level * 5);
     }
 
     private void addLabel(

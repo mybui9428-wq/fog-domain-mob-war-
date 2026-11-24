@@ -34,6 +34,29 @@ public final class FogCharacterCommands {
                                     return 1;
                                 })
                         )
+                        .then(Commands.literal("awakentuc")
+                                .requires(source -> source.hasPermission(2))
+                                .executes(context -> {
+                                    ServerPlayer player =
+                                            context.getSource().getPlayerOrException();
+
+                                    FogDomainAbilityData data =
+                                            FogDomainAbilityData.get(player.level().getServer());
+
+                                    if (data.isTucThanhGia(player.getUUID())) {
+                                        player.sendSystemMessage(Component.literal(
+                                                "Ban da la Tuc Thanh Gia duy nhat."));
+                                    } else if (data.awakenTucThanhGia(player.getUUID())) {
+                                        player.sendSystemMessage(Component.literal(
+                                                "Thuc tinh Tuc Thanh Gia thanh cong. Ban la nguoi duy nhat."));
+                                        FogCharacterPayload.openCharacterScreen(player);
+                                    } else {
+                                        player.sendSystemMessage(Component.literal(
+                                                "The gioi da co mot Tuc Thanh Gia. Khong the thuc tinh nguoi thu hai."));
+                                    }
+                                    return 1;
+                                })
+                        )
                         .then(Commands.literal("help")
                                 .executes(context -> {
 

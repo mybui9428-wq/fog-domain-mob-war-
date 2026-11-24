@@ -147,6 +147,7 @@ public class FogDomainAbilityData extends SavedData {
     private static final Map<String, Map<String, Integer>> EMPTY_NESTED_INTEGER_MAP = Map.of();
     private static final Map<String, String> EMPTY_STRING_MAP = Map.of();
 
+
     public static final SavedDataType<FogDomainAbilityData> TYPE =
             new SavedDataType<>(
                     Identifier.fromNamespaceAndPath("examplemod", DATA_NAME),
@@ -207,7 +208,10 @@ public class FogDomainAbilityData extends SavedData {
 
                                     STRING_MAP_CODEC.optionalFieldOf(
                                             "innate_abilities", EMPTY_STRING_MAP)
-                                            .forGetter(data -> data.innateAbilities)
+                                            .forGetter(data -> data.innateAbilities),
+
+                                    Codec.STRING.optionalFieldOf("tuc_thanh_gia_uuid", "")
+                                            .forGetter(data -> data.tucThanhGiaUuid)
 
                             ).apply(instance, FogDomainAbilityData::new)
                     )
@@ -235,6 +239,9 @@ public class FogDomainAbilityData extends SavedData {
     private final Map<String, Map<String, Integer>> skillLevels = new HashMap<>();
     private final Map<String, String> innateAbilities = new HashMap<>();
 
+    // UUID duy nhất của Túc Thanh Giả; chuỗi rỗng nghĩa là chưa thức tỉnh.
+    private String tucThanhGiaUuid = "";
+
     // ==================== KHỞI TẠO ====================
 
     public FogDomainAbilityData() {
@@ -255,7 +262,8 @@ public class FogDomainAbilityData extends SavedData {
             Map<String, Integer> loadedRuleFragments,
             Map<String, Integer> loadedSoulCrystals,
             Map<String, Map<String, Integer>> loadedSkillLevels,
-            Map<String, String> loadedInnateAbilities
+            Map<String, String> loadedInnateAbilities,
+            String loadedTucThanhGiaUuid
     ) {
         copyLists(loadedAbilities, abilities);
         copyLists(loadedCreatureSkills, creatureSkills);
@@ -322,6 +330,9 @@ public class FogDomainAbilityData extends SavedData {
                 }
             });
         }
+
+        tucThanhGiaUuid = loadedTucThanhGiaUuid == null
+                ? "" : loadedTucThanhGiaUuid;
 
         boolean migrated = false;
 
@@ -565,6 +576,32 @@ public class FogDomainAbilityData extends SavedData {
         return true;
     }
 
+    // ==================== TÚC THANH GIẢ DUY NHẤT ====================
+
+    public boolean isTucThanhGia(UUID playerId) {
+        return playerId != null
+                && !tucThanhGiaUuid.isBlank()
+                && tucThanhGiaUuid.equals(playerId.toString());
+    }
+
+    /** Chỉ cho phép gán một UUID duy nhất; không thể ghi đè người đã thức tỉnh. */
+    public boolean awakenTucThanhGia(UUID playerId) {
+        if (playerId == null) return false;
+
+        if (!tucThanhGiaUuid.isBlank()) {
+            return tucThanhGiaUuid.equals(playerId.toString());
+        }
+
+        tucThanhGiaUuid = playerId.toString();
+        setDirty();
+        return true;
+    }
+
+    public int getAttributeMaximum(UUID playerId) {
+        int level = getCharacterLevel(playerId);
+        return (isTucThanhGia(playerId) ? 25 : 10) + (5 * level);
+    }
+
     // ==================== THUỘC TÍNH ====================
 
     public int getAttribute(UUID playerId, String attribute) {
@@ -655,6 +692,9 @@ public class FogDomainAbilityData extends SavedData {
 
         if (newAttribute < currentAttribute) return false;
 
+        // Giới hạn được kiểm tra ở máy chủ, không thể vượt bằng packet tự gửi.
+        if (newAttribute > getAttributeMaximum(playerId)) return false;
+
         int costPerPoint = getAttributePointCost(playerId);
         long totalCost = (long) costPerPoint * amount;
 
@@ -704,6 +744,10 @@ public class FogDomainAbilityData extends SavedData {
 
         int current = getAttribute(playerId, attribute);
         int newValue = current + amount;
+
+        if (newValue < current || newValue > getAttributeMaximum(playerId)) {
+            return false;
+        }
 
         int healthCost = Math.max(
                 0,

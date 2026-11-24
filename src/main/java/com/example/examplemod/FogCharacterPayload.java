@@ -259,7 +259,9 @@ public record FogCharacterPayload(String data)
                 )),
                 String.valueOf(data.getSkillLevel(
                         id, FogDomainAbilityData.SKILL_TRIPLE_SPIRIT
-                ))
+                )),
+                String.valueOf(data.isTucThanhGia(id)),
+                String.valueOf(data.getAttributeMaximum(id))
         );
 
         return new FogCharacterPayload(response);

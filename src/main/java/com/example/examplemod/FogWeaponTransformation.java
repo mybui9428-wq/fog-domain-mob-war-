@@ -5,18 +5,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
-
-import com.mojang.serialization.Codec;
-import com.mojang.serialization.DynamicOps;
 
 import net.minecraft.commands.Commands;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -128,12 +125,9 @@ public final class FogWeaponTransformation {
 
         merged.putString(MARKER, "true");
 
-        if (artifactData.contains(ABSORBED_ITEMS)) {
-            merged.put(
-        ABSORBED_ITEMS,
-        artifactData.getList(ABSORBED_ITEMS).copy()
-);
-        }
+        artifactData.getList(ABSORBED_ITEMS).ifPresent(list ->
+                merged.put(ABSORBED_ITEMS, list.copy())
+        );
 
         stack.set(
                 DataComponents.CUSTOM_DATA,
@@ -142,11 +136,12 @@ public final class FogWeaponTransformation {
     }
 
     private static ListTag getAbsorbedList(ItemStack artifact) {
-    CompoundTag data = getArtifactData(artifact);
+        CompoundTag data = getArtifactData(artifact);
 
-    return data.getList(ABSORBED_ITEMS);
+        return data.getList(ABSORBED_ITEMS)
+                .orElseGet(ListTag::new);
     }
-    
+
     private static List<ItemStack> getAbsorbedStacks(
             ServerPlayer player,
             ItemStack artifact
@@ -156,12 +151,10 @@ public final class FogWeaponTransformation {
         ListTag list = getAbsorbedList(artifact);
 
         for (int i = 0; i < list.size(); i++) {
-            Tag saved = list.get(i);
-
             ItemStack.CODEC.parse(
                     player.level().registryAccess()
                             .createSerializationContext(NbtOps.INSTANCE),
-                    saved
+                    list.get(i)
             ).result().ifPresent(stack -> {
                 if (!stack.isEmpty()) {
                     result.add(stack.copyWithCount(1));
@@ -329,28 +322,29 @@ public final class FogWeaponTransformation {
 
         ItemStack oneItem = held.copyWithCount(1);
 
-        var encoded = ItemStack.CODEC.encodeStart(
+        Optional<CompoundTag> encoded = ItemStack.CODEC.encodeStart(
                 player.level().registryAccess()
                         .createSerializationContext(NbtOps.INSTANCE),
                 oneItem
-        ).result();
+        ).result().filter(CompoundTag.class::isInstance)
+                .map(CompoundTag.class::cast);
 
-        if (encoded.isEmpty()
-                || !(encoded.get() instanceof CompoundTag savedItem)) {
+        if (encoded.isEmpty()) {
             send(player, "Khong the luu vat pham nay.");
             return 0;
         }
 
         CompoundTag artifactData = getArtifactData(artifact);
 
-        ListTag absorbed = artifactData.getList(ABSORBED_ITEMS);
+        ListTag absorbed = artifactData.getList(ABSORBED_ITEMS)
+                .orElseGet(ListTag::new);
 
-        absorbed.add(savedItem);
+        absorbed.add(encoded.get());
         artifactData.put(ABSORBED_ITEMS, absorbed);
 
         saveArtifactData(artifact, artifactData);
 
-        // Chỉ trừ một vật phẩm khỏi chồng đồ đang cầm.
+        // Chỉ hấp thụ một vật phẩm.
         held.shrink(1);
 
         player.getInventory().setChanged();
@@ -363,7 +357,7 @@ public final class FogWeaponTransformation {
         return 1;
     }
 
-    // Hiển thị các vật phẩm đã hấp thụ.
+    // Hiển thị danh sách vật phẩm đã hấp thụ.
     private static int listAbsorbed(ServerPlayer player) {
 
         ItemStack artifact = getArtifact(player);
@@ -423,7 +417,7 @@ public final class FogWeaponTransformation {
             replacement = new ItemStack(form.item().get());
         }
 
-        // Giữ dấu hiệu và toàn bộ danh sách hấp thụ.
+        // Giữ dấu hiệu và danh sách vật phẩm đã hấp thụ.
         saveArtifactData(replacement, artifactData);
 
         player.getInventory().setItem(slot, replacement);

@@ -24,11 +24,14 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class FogWeaponTransformation {
 
+    // Dấu hiệu nhận biết Bất Diệt Lưu Ảnh.
     private static final String MARKER =
             "fog_domain_bat_diet_luu_anh";
 
+    // Bán kính dịch chuyển.
     private static final double TELEPORT_RADIUS = 1000.0;
 
+    // Lưu vũ khí đang được chọn của từng người chơi.
     private static final Map<UUID, Integer> SELECTED =
             new HashMap<>();
 
@@ -37,29 +40,24 @@ public final class FogWeaponTransformation {
             Supplier<? extends Item> item
     ) {}
 
-    // Thứ tự chọn vũ khí.
+    // Thứ tự chuyển đổi vũ khí.
     private static final List<WeaponForm> WEAPONS = List.of(
-
             new WeaponForm(
                     "Trường Đao",
                     () -> FogWeaponItems.SWORD.get()
             ),
-
             new WeaponForm(
                     "Khiên",
                     () -> FogWeaponItems.SHIELD.get()
             ),
-
             new WeaponForm(
                     "Trường Thương",
                     () -> FogWeaponItems.LONG_SPEAR.get()
             ),
-
             new WeaponForm(
                     "Cung",
                     () -> FogWeaponItems.BOW.get()
             ),
-
             new WeaponForm(
                     "Bất Diệt Lưu Ảnh",
                     () -> FogWeaponItems.BAT_DIET_LUU_ANH.get()
@@ -71,34 +69,29 @@ public final class FogWeaponTransformation {
 
     // Chỉ tubi2531 được sử dụng.
     private static boolean isController(ServerPlayer player) {
-        return player.getName().getString()
+        return player.getName()
+                .getString()
                 .equalsIgnoreCase("tubi2531");
     }
 
-    // Lấy vũ khí đang được chọn.
     private static int getSelected(ServerPlayer player) {
         return SELECTED.getOrDefault(player.getUUID(), 0);
     }
 
-    public static String getSelectedWeaponName(
-            ServerPlayer player
-    ) {
+    public static String getSelectedWeaponName(ServerPlayer player) {
         return WEAPONS.get(getSelected(player)).name();
     }
 
-    // Đăng ký các lệnh.
+    // Đăng ký lệnh.
     @SubscribeEvent
-    public static void registerCommands(
-            RegisterCommandsEvent event
-    ) {
+    public static void registerCommands(RegisterCommandsEvent event) {
 
         event.getDispatcher().register(
                 Commands.literal("batdiet")
 
-                        // Lệnh chọn vũ khí.
+                        // /batdiet select
                         .then(Commands.literal("select")
                                 .executes(context -> {
-
                                     ServerPlayer player =
                                             context.getSource()
                                                     .getPlayerOrException();
@@ -132,10 +125,9 @@ public final class FogWeaponTransformation {
                                 })
                         )
 
-                        // Lệnh biến đổi vũ khí.
+                        // /batdiet transform
                         .then(Commands.literal("transform")
                                 .executes(context -> {
-
                                     ServerPlayer player =
                                             context.getSource()
                                                     .getPlayerOrException();
@@ -153,10 +145,9 @@ public final class FogWeaponTransformation {
                                 })
                         )
 
-                        // Lệnh dịch chuyển.
+                        // /batdiet teleport
                         .then(Commands.literal("teleport")
                                 .executes(context -> {
-
                                     ServerPlayer player =
                                             context.getSource()
                                                     .getPlayerOrException();
@@ -176,20 +167,17 @@ public final class FogWeaponTransformation {
         );
     }
 
-    // Kiểm tra vật phẩm có phải hình dạng của
-    // Bất Diệt Lưu Ảnh hay không.
+    // Kiểm tra vật phẩm có dấu hiệu Bất Diệt Lưu Ảnh không.
     private static boolean isTransformed(ItemStack stack) {
-
         CustomData data =
                 stack.get(DataComponents.CUSTOM_DATA);
 
         return data != null
-        && data.copyTag().contains(MARKER);
+                && data.copyTag().contains(MARKER);
     }
 
-    // Đánh dấu vật phẩm thuộc Bất Diệt Lưu Ảnh.
+    // Đánh dấu vật phẩm là hình thái của Bất Diệt Lưu Ảnh.
     private static void markAsArtifact(ItemStack stack) {
-
         CustomData.update(
                 DataComponents.CUSTOM_DATA,
                 stack,
@@ -213,7 +201,6 @@ public final class FogWeaponTransformation {
 
             if (stack.is(FogWeaponItems.BAT_DIET_LUU_ANH.get())
                     || isTransformed(stack)) {
-
                 return i;
             }
         }
@@ -221,7 +208,7 @@ public final class FogWeaponTransformation {
         return -1;
     }
 
-    // Biến đổi Bất Diệt Lưu Ảnh.
+    // Biến đổi Bất Diệt Lưu Ảnh ngay tại ô đồ cũ.
     private static int transform(ServerPlayer player) {
 
         int selected = getSelected(player);
@@ -230,13 +217,11 @@ public final class FogWeaponTransformation {
         int foundSlot = findArtifactSlot(player);
 
         if (foundSlot < 0) {
-
             player.sendSystemMessage(
                     Component.literal(
                             "Khong tim thay Bat Diet Luu Anh trong kho do."
                     )
             );
-
             return 0;
         }
 
@@ -245,7 +230,6 @@ public final class FogWeaponTransformation {
 
         markAsArtifact(replacement);
 
-        // Giữ nguyên ô chứa vật phẩm.
         player.getInventory().setItem(
                 foundSlot,
                 replacement
@@ -263,11 +247,8 @@ public final class FogWeaponTransformation {
         return 1;
     }
 
-    // Dịch chuyển đến vật phẩm Bất Diệt Lưu Ảnh
-    // đang rơi hoặc nằm trên mặt đất.
-    private static int teleportToArtifact(
-            ServerPlayer player
-    ) {
+    // Tìm Bất Diệt Lưu Ảnh đang rơi trên mặt đất.
+    private static int teleportToArtifact(ServerPlayer player) {
 
         double radius = TELEPORT_RADIUS;
 
@@ -275,6 +256,7 @@ public final class FogWeaponTransformation {
                 player.getX() - radius,
                 player.getY() - radius,
                 player.getZ() - radius,
+
                 player.getX() + radius,
                 player.getY() + radius,
                 player.getZ() + radius
@@ -283,22 +265,25 @@ public final class FogWeaponTransformation {
         ItemEntity nearest = null;
         double nearestDistance = Double.MAX_VALUE;
 
-        for (ItemEntity entity : player.level().getEntitiesOfClass(
-        ItemEntity.class,
-        searchArea
-)) {
+        for (ItemEntity entity :
+                player.level().getEntitiesOfClass(
+                        ItemEntity.class,
+                        searchArea
+                )) {
 
-            // Chỉ tìm vật phẩm thuộc Bất Diệt Lưu Ảnh.
-            if (!stack.is(
-                    FogWeaponItems.BAT_DIET_LUU_ANH.get()
-            ) && !isTransformed(stack)) {
+            // Lấy vật phẩm đang nằm trong thực thể ItemEntity.
+            ItemStack stack = entity.getItem();
+
+            // Chỉ tìm Bất Diệt Lưu Ảnh hoặc hình thái đã biến đổi.
+            if (!stack.is(FogWeaponItems.BAT_DIET_LUU_ANH.get())
+                    && !isTransformed(stack)) {
                 continue;
             }
 
             double dx = entity.getX() - player.getX();
             double dz = entity.getZ() - player.getZ();
 
-            // Tính khoảng cách hình tròn trên mặt phẳng ngang.
+            // Tính khoảng cách theo mặt phẳng X-Z.
             double distance = dx * dx + dz * dz;
 
             if (distance <= radius * radius
@@ -310,17 +295,16 @@ public final class FogWeaponTransformation {
         }
 
         if (nearest == null) {
-
             player.sendSystemMessage(
                     Component.literal(
-                            "Khong tim thay Bat Diet Luu Anh trong ban kinh 1000 block."
+                            "Khong tim thay Bat Diet Luu Anh "
+                                    + "tren mat dat trong ban kinh 1000 block."
                     )
             );
-
             return 0;
         }
 
-        // Dịch chuyển đến gần vật phẩm.
+        // Dịch chuyển đến vị trí vật phẩm.
         player.teleportTo(
                 nearest.getX(),
                 nearest.getY() + 1.0,

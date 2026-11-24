@@ -130,12 +130,9 @@ public final class FogWeaponTransformation {
 
         if (artifactData.contains(ABSORBED_ITEMS)) {
             merged.put(
-                    ABSORBED_ITEMS,
-                    artifactData.getList(
-                            ABSORBED_ITEMS,
-                            Tag.TAG_COMPOUND
-                    ).copy()
-            );
+        ABSORBED_ITEMS,
+        artifactData.getList(ABSORBED_ITEMS).copy()
+);
         }
 
         stack.set(
@@ -145,14 +142,11 @@ public final class FogWeaponTransformation {
     }
 
     private static ListTag getAbsorbedList(ItemStack artifact) {
-        CompoundTag data = getArtifactData(artifact);
+    CompoundTag data = getArtifactData(artifact);
 
-        return data.getList(
-                ABSORBED_ITEMS,
-                Tag.TAG_COMPOUND
-        );
+    return data.getList(ABSORBED_ITEMS);
     }
-
+    
     private static List<ItemStack> getAbsorbedStacks(
             ServerPlayer player,
             ItemStack artifact
@@ -349,10 +343,7 @@ public final class FogWeaponTransformation {
 
         CompoundTag artifactData = getArtifactData(artifact);
 
-        ListTag absorbed = artifactData.getList(
-                ABSORBED_ITEMS,
-                Tag.TAG_COMPOUND
-        );
+        ListTag absorbed = artifactData.getList(ABSORBED_ITEMS);
 
         absorbed.add(savedItem);
         artifactData.put(ABSORBED_ITEMS, absorbed);

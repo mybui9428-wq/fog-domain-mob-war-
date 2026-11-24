@@ -9,7 +9,6 @@ import java.util.function.Supplier;
 
 import net.minecraft.commands.Commands;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -185,10 +184,7 @@ public final class FogWeaponTransformation {
                 stack.get(DataComponents.CUSTOM_DATA);
 
         return data != null
-                && data.copyTag().contains(
-                        MARKER,
-                        Tag.TAG_STRING
-                );
+        && data.copyTag().contains(MARKER);
     }
 
     // Đánh dấu vật phẩm thuộc Bất Diệt Lưu Ảnh.
@@ -287,13 +283,10 @@ public final class FogWeaponTransformation {
         ItemEntity nearest = null;
         double nearestDistance = Double.MAX_VALUE;
 
-        for (ItemEntity entity :
-                player.serverLevel().getEntitiesOfClass(
-                        ItemEntity.class,
-                        searchArea
-                )) {
-
-            ItemStack stack = entity.getItem();
+        for (ItemEntity entity : player.level().getEntitiesOfClass(
+        ItemEntity.class,
+        searchArea
+)) {
 
             // Chỉ tìm vật phẩm thuộc Bất Diệt Lưu Ảnh.
             if (!stack.is(

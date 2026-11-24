@@ -1,14 +1,22 @@
 
 package com.example.examplemod;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DynamicOps;
+
 import net.minecraft.commands.Commands;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -24,176 +32,60 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class FogWeaponTransformation {
 
-    // Dấu hiệu nhận biết Bất Diệt Lưu Ảnh.
     private static final String MARKER =
             "fog_domain_bat_diet_luu_anh";
 
-    // Bán kính dịch chuyển.
+    private static final String ABSORBED_ITEMS =
+            "fog_domain_absorbed_items";
+
     private static final double TELEPORT_RADIUS = 1000.0;
 
-    // Lưu vũ khí đang được chọn của từng người chơi.
     private static final Map<UUID, Integer> SELECTED =
             new HashMap<>();
 
     private record WeaponForm(
             String name,
-            Supplier<? extends Item> item
+            Supplier<? extends Item> item,
+            ItemStack storedStack
     ) {}
 
-    // Thứ tự chuyển đổi vũ khí.
-    private static final List<WeaponForm> WEAPONS = List.of(
-            new WeaponForm(
-                    "Trường Đao",
-                    () -> FogWeaponItems.SWORD.get()
-            ),
-            new WeaponForm(
-                    "Khiên",
-                    () -> FogWeaponItems.SHIELD.get()
-            ),
-            new WeaponForm(
-                    "Trường Thương",
-                    () -> FogWeaponItems.LONG_SPEAR.get()
-            ),
-            new WeaponForm(
-                    "Cung",
-                    () -> FogWeaponItems.BOW.get()
-            ),
-            new WeaponForm(
-                    "Bất Diệt Lưu Ảnh",
-                    () -> FogWeaponItems.BAT_DIET_LUU_ANH.get()
-            )
+    private static final List<WeaponForm> FIXED_WEAPONS = List.of(
+            new WeaponForm("Trường Đao",
+                    () -> FogWeaponItems.SWORD.get(), null),
+            new WeaponForm("Khiên",
+                    () -> FogWeaponItems.SHIELD.get(), null),
+            new WeaponForm("Trường Thương",
+                    () -> FogWeaponItems.LONG_SPEAR.get(), null),
+            new WeaponForm("Cung",
+                    () -> FogWeaponItems.BOW.get(), null),
+            new WeaponForm("Bất Diệt Lưu Ảnh",
+                    () -> FogWeaponItems.BAT_DIET_LUU_ANH.get(), null)
     );
 
     private FogWeaponTransformation() {
     }
 
-    // Chỉ tubi2531 được sử dụng.
     private static boolean isController(ServerPlayer player) {
-        return player.getName()
-                .getString()
+        return player.getName().getString()
                 .equalsIgnoreCase("tubi2531");
     }
 
-    private static int getSelected(ServerPlayer player) {
-        return SELECTED.getOrDefault(player.getUUID(), 0);
+    private static void send(ServerPlayer player, String message) {
+        player.sendSystemMessage(Component.literal(message));
     }
 
-    public static String getSelectedWeaponName(ServerPlayer player) {
-        return WEAPONS.get(getSelected(player)).name();
-    }
-
-    // Đăng ký lệnh.
-    @SubscribeEvent
-    public static void registerCommands(RegisterCommandsEvent event) {
-
-        event.getDispatcher().register(
-                Commands.literal("batdiet")
-
-                        // /batdiet select
-                        .then(Commands.literal("select")
-                                .executes(context -> {
-                                    ServerPlayer player =
-                                            context.getSource()
-                                                    .getPlayerOrException();
-
-                                    if (!isController(player)) {
-                                        player.sendSystemMessage(
-                                                Component.literal(
-                                                        "Ban khong co quyen su dung lenh nay."
-                                                )
-                                        );
-                                        return 0;
-                                    }
-
-                                    int next =
-                                            (getSelected(player) + 1)
-                                                    % WEAPONS.size();
-
-                                    SELECTED.put(
-                                            player.getUUID(),
-                                            next
-                                    );
-
-                                    player.sendSystemMessage(
-                                            Component.literal(
-                                                    "Da chon vu khi: "
-                                                            + WEAPONS.get(next).name()
-                                            )
-                                    );
-
-                                    return 1;
-                                })
-                        )
-
-                        // /batdiet transform
-                        .then(Commands.literal("transform")
-                                .executes(context -> {
-                                    ServerPlayer player =
-                                            context.getSource()
-                                                    .getPlayerOrException();
-
-                                    if (!isController(player)) {
-                                        player.sendSystemMessage(
-                                                Component.literal(
-                                                        "Ban khong co quyen su dung lenh nay."
-                                                )
-                                        );
-                                        return 0;
-                                    }
-
-                                    return transform(player);
-                                })
-                        )
-
-                        // /batdiet teleport
-                        .then(Commands.literal("teleport")
-                                .executes(context -> {
-                                    ServerPlayer player =
-                                            context.getSource()
-                                                    .getPlayerOrException();
-
-                                    if (!isController(player)) {
-                                        player.sendSystemMessage(
-                                                Component.literal(
-                                                        "Ban khong co quyen su dung lenh nay."
-                                                )
-                                        );
-                                        return 0;
-                                    }
-
-                                    return teleportToArtifact(player);
-                                })
-                        )
-        );
-    }
-
-    // Kiểm tra vật phẩm có dấu hiệu Bất Diệt Lưu Ảnh không.
     private static boolean isTransformed(ItemStack stack) {
-        CustomData data =
-                stack.get(DataComponents.CUSTOM_DATA);
+        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
 
-        return data != null
-                && data.copyTag().contains(MARKER);
+        return data != null && data.copyTag().contains(MARKER);
     }
 
-    // Đánh dấu vật phẩm là hình thái của Bất Diệt Lưu Ảnh.
-    private static void markAsArtifact(ItemStack stack) {
-        CustomData.update(
-                DataComponents.CUSTOM_DATA,
-                stack,
-                tag -> tag.putString(MARKER, "true")
-        );
-    }
-
-    // Tìm Bất Diệt Lưu Ảnh trong kho đồ.
     private static int findArtifactSlot(ServerPlayer player) {
-
         for (int i = 0;
              i < player.getInventory().getContainerSize();
              i++) {
 
-            ItemStack stack =
-                    player.getInventory().getItem(i);
+            ItemStack stack = player.getInventory().getItem(i);
 
             if (stack.isEmpty()) {
                 continue;
@@ -208,41 +100,347 @@ public final class FogWeaponTransformation {
         return -1;
     }
 
-    // Biến đổi Bất Diệt Lưu Ảnh ngay tại ô đồ cũ.
-    private static int transform(ServerPlayer player) {
+    private static ItemStack getArtifact(ServerPlayer player) {
+        int slot = findArtifactSlot(player);
 
-        int selected = getSelected(player);
-        WeaponForm form = WEAPONS.get(selected);
+        if (slot < 0) {
+            return ItemStack.EMPTY;
+        }
 
-        int foundSlot = findArtifactSlot(player);
+        return player.getInventory().getItem(slot);
+    }
 
-        if (foundSlot < 0) {
-            player.sendSystemMessage(
-                    Component.literal(
-                            "Khong tim thay Bat Diet Luu Anh trong kho do."
-                    )
+    private static CompoundTag getArtifactData(ItemStack stack) {
+        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+
+        if (data == null) {
+            return new CompoundTag();
+        }
+
+        return data.copyTag();
+    }
+
+    private static void saveArtifactData(
+            ItemStack stack,
+            CompoundTag artifactData
+    ) {
+        CompoundTag merged = getArtifactData(stack);
+
+        merged.putString(MARKER, "true");
+
+        if (artifactData.contains(ABSORBED_ITEMS)) {
+            merged.put(
+                    ABSORBED_ITEMS,
+                    artifactData.getList(
+                            ABSORBED_ITEMS,
+                            Tag.TAG_COMPOUND
+                    ).copy()
             );
+        }
+
+        stack.set(
+                DataComponents.CUSTOM_DATA,
+                CustomData.of(merged)
+        );
+    }
+
+    private static ListTag getAbsorbedList(ItemStack artifact) {
+        CompoundTag data = getArtifactData(artifact);
+
+        return data.getList(
+                ABSORBED_ITEMS,
+                Tag.TAG_COMPOUND
+        );
+    }
+
+    private static List<ItemStack> getAbsorbedStacks(
+            ServerPlayer player,
+            ItemStack artifact
+    ) {
+        List<ItemStack> result = new ArrayList<>();
+
+        ListTag list = getAbsorbedList(artifact);
+
+        for (int i = 0; i < list.size(); i++) {
+            Tag saved = list.get(i);
+
+            ItemStack.CODEC.parse(
+                    player.level().registryAccess()
+                            .createSerializationContext(NbtOps.INSTANCE),
+                    saved
+            ).result().ifPresent(stack -> {
+                if (!stack.isEmpty()) {
+                    result.add(stack.copyWithCount(1));
+                }
+            });
+        }
+
+        return result;
+    }
+
+    private static List<WeaponForm> getForms(ServerPlayer player) {
+        List<WeaponForm> forms = new ArrayList<>(FIXED_WEAPONS);
+
+        ItemStack artifact = getArtifact(player);
+
+        if (!artifact.isEmpty()) {
+            List<ItemStack> absorbed =
+                    getAbsorbedStacks(player, artifact);
+
+            for (ItemStack stack : absorbed) {
+                forms.add(new WeaponForm(
+                        stack.getHoverName().getString(),
+                        null,
+                        stack
+                ));
+            }
+        }
+
+        return forms;
+    }
+
+    private static int getSelected(ServerPlayer player) {
+        List<WeaponForm> forms = getForms(player);
+
+        int selected = SELECTED.getOrDefault(
+                player.getUUID(),
+                0
+        );
+
+        return Math.floorMod(selected, forms.size());
+    }
+
+    public static String getSelectedWeaponName(ServerPlayer player) {
+        List<WeaponForm> forms = getForms(player);
+        return forms.get(getSelected(player)).name();
+    }
+
+    @SubscribeEvent
+    public static void registerCommands(RegisterCommandsEvent event) {
+
+        event.getDispatcher().register(
+                Commands.literal("batdiet")
+
+                        .then(Commands.literal("select")
+                                .executes(context -> {
+                                    ServerPlayer player =
+                                            context.getSource()
+                                                    .getPlayerOrException();
+
+                                    if (!isController(player)) {
+                                        send(player, "Ban khong co quyen su dung lenh nay.");
+                                        return 0;
+                                    }
+
+                                    List<WeaponForm> forms = getForms(player);
+
+                                    int next = (getSelected(player) + 1)
+                                            % forms.size();
+
+                                    SELECTED.put(player.getUUID(), next);
+
+                                    send(player,
+                                            "Da chon hinh thai: "
+                                                    + forms.get(next).name());
+
+                                    return 1;
+                                })
+                        )
+
+                        .then(Commands.literal("transform")
+                                .executes(context -> {
+                                    ServerPlayer player =
+                                            context.getSource()
+                                                    .getPlayerOrException();
+
+                                    if (!isController(player)) {
+                                        send(player, "Ban khong co quyen su dung lenh nay.");
+                                        return 0;
+                                    }
+
+                                    return transform(player);
+                                })
+                        )
+
+                        .then(Commands.literal("teleport")
+                                .executes(context -> {
+                                    ServerPlayer player =
+                                            context.getSource()
+                                                    .getPlayerOrException();
+
+                                    if (!isController(player)) {
+                                        send(player, "Ban khong co quyen su dung lenh nay.");
+                                        return 0;
+                                    }
+
+                                    return teleportToArtifact(player);
+                                })
+                        )
+
+                        .then(Commands.literal("devour")
+                                .executes(context -> {
+                                    ServerPlayer player =
+                                            context.getSource()
+                                                    .getPlayerOrException();
+
+                                    if (!isController(player)) {
+                                        send(player, "Ban khong co quyen su dung lenh nay.");
+                                        return 0;
+                                    }
+
+                                    return devour(player);
+                                })
+                        )
+
+                        .then(Commands.literal("list")
+                                .executes(context -> {
+                                    ServerPlayer player =
+                                            context.getSource()
+                                                    .getPlayerOrException();
+
+                                    if (!isController(player)) {
+                                        send(player, "Ban khong co quyen su dung lenh nay.");
+                                        return 0;
+                                    }
+
+                                    return listAbsorbed(player);
+                                })
+                        )
+        );
+    }
+
+    // Hấp thụ đúng một vật phẩm trong tay chính.
+    private static int devour(ServerPlayer player) {
+
+        ItemStack artifact = getArtifact(player);
+
+        if (artifact.isEmpty()) {
+            send(player, "Ban can co Bat Diet Luu Anh trong tui do.");
             return 0;
         }
 
-        ItemStack replacement =
-                new ItemStack(form.item().get());
+        ItemStack held = player.getMainHandItem();
 
-        markAsArtifact(replacement);
+        if (held.isEmpty()) {
+            send(player, "Hay cam vat pham muon hap thu tren tay chinh.");
+            return 0;
+        }
 
-        player.getInventory().setItem(
-                foundSlot,
-                replacement
+        if (held == artifact
+                || held.is(FogWeaponItems.BAT_DIET_LUU_ANH.get())
+                || isTransformed(held)) {
+            send(player, "Khong the hap thu chinh Bat Diet Luu Anh.");
+            return 0;
+        }
+
+        ItemStack oneItem = held.copyWithCount(1);
+
+        var encoded = ItemStack.CODEC.encodeStart(
+                player.level().registryAccess()
+                        .createSerializationContext(NbtOps.INSTANCE),
+                oneItem
+        ).result();
+
+        if (encoded.isEmpty()
+                || !(encoded.get() instanceof CompoundTag savedItem)) {
+            send(player, "Khong the luu vat pham nay.");
+            return 0;
+        }
+
+        CompoundTag artifactData = getArtifactData(artifact);
+
+        ListTag absorbed = artifactData.getList(
+                ABSORBED_ITEMS,
+                Tag.TAG_COMPOUND
         );
+
+        absorbed.add(savedItem);
+        artifactData.put(ABSORBED_ITEMS, absorbed);
+
+        saveArtifactData(artifact, artifactData);
+
+        // Chỉ trừ một vật phẩm khỏi chồng đồ đang cầm.
+        held.shrink(1);
 
         player.getInventory().setChanged();
 
-        player.sendSystemMessage(
-                Component.literal(
-                        "Bat Diet Luu Anh da bien thanh: "
-                                + form.name()
-                )
-        );
+        send(player,
+                "Van Vat Thon Phe: Da hap thu "
+                        + oneItem.getHoverName().getString()
+                        + " (1 vat pham).");
+
+        return 1;
+    }
+
+    // Hiển thị các vật phẩm đã hấp thụ.
+    private static int listAbsorbed(ServerPlayer player) {
+
+        ItemStack artifact = getArtifact(player);
+
+        if (artifact.isEmpty()) {
+            send(player, "Khong tim thay Bat Diet Luu Anh trong tui do.");
+            return 0;
+        }
+
+        List<ItemStack> absorbed =
+                getAbsorbedStacks(player, artifact);
+
+        send(player, "===== VAT PHAM DA THON PHE =====");
+        send(player, "5 hinh thai co dinh: Truong Dao, Khien, Truong Thuong, Cung, Bat Diet Luu Anh.");
+
+        if (absorbed.isEmpty()) {
+            send(player, "Chua hap thu vat pham nao.");
+            return 1;
+        }
+
+        for (int i = 0; i < absorbed.size(); i++) {
+            send(player,
+                    (i + 6) + ". "
+                            + absorbed.get(i).getHoverName().getString());
+        }
+
+        send(player, "Tong so vat pham da hap thu: " + absorbed.size());
+
+        return 1;
+    }
+
+    // Biến đổi chính Bất Diệt Lưu Ảnh.
+    private static int transform(ServerPlayer player) {
+
+        int slot = findArtifactSlot(player);
+
+        if (slot < 0) {
+            send(player, "Khong tim thay Bat Diet Luu Anh trong tui do.");
+            return 0;
+        }
+
+        List<WeaponForm> forms = getForms(player);
+        int selected = getSelected(player);
+
+        WeaponForm form = forms.get(selected);
+
+        ItemStack original =
+                player.getInventory().getItem(slot);
+
+        CompoundTag artifactData = getArtifactData(original);
+
+        ItemStack replacement;
+
+        if (form.storedStack() != null) {
+            replacement = form.storedStack().copyWithCount(1);
+        } else {
+            replacement = new ItemStack(form.item().get());
+        }
+
+        // Giữ dấu hiệu và toàn bộ danh sách hấp thụ.
+        saveArtifactData(replacement, artifactData);
+
+        player.getInventory().setItem(slot, replacement);
+        player.getInventory().setChanged();
+
+        send(player,
+                "Bat Diet Luu Anh da bien thanh: "
+                        + form.name());
 
         return 1;
     }
@@ -256,7 +454,6 @@ public final class FogWeaponTransformation {
                 player.getX() - radius,
                 player.getY() - radius,
                 player.getZ() - radius,
-
                 player.getX() + radius,
                 player.getY() + radius,
                 player.getZ() + radius
@@ -271,10 +468,8 @@ public final class FogWeaponTransformation {
                         searchArea
                 )) {
 
-            // Lấy vật phẩm đang nằm trong thực thể ItemEntity.
             ItemStack stack = entity.getItem();
 
-            // Chỉ tìm Bất Diệt Lưu Ảnh hoặc hình thái đã biến đổi.
             if (!stack.is(FogWeaponItems.BAT_DIET_LUU_ANH.get())
                     && !isTransformed(stack)) {
                 continue;
@@ -283,39 +478,28 @@ public final class FogWeaponTransformation {
             double dx = entity.getX() - player.getX();
             double dz = entity.getZ() - player.getZ();
 
-            // Tính khoảng cách theo mặt phẳng X-Z.
             double distance = dx * dx + dz * dz;
 
             if (distance <= radius * radius
                     && distance < nearestDistance) {
-
                 nearest = entity;
                 nearestDistance = distance;
             }
         }
 
         if (nearest == null) {
-            player.sendSystemMessage(
-                    Component.literal(
-                            "Khong tim thay Bat Diet Luu Anh "
-                                    + "tren mat dat trong ban kinh 1000 block."
-                    )
-            );
+            send(player,
+                    "Khong tim thay Bat Diet Luu Anh tren mat dat trong ban kinh 1000 block.");
             return 0;
         }
 
-        // Dịch chuyển đến vị trí vật phẩm.
         player.teleportTo(
                 nearest.getX(),
                 nearest.getY() + 1.0,
                 nearest.getZ()
         );
 
-        player.sendSystemMessage(
-                Component.literal(
-                        "Khong Gian Trieu Hoi: Dich chuyen thanh cong!"
-                )
-        );
+        send(player, "Khong Gian Trieu Hoi: Dich chuyen thanh cong!");
 
         return 1;
     }

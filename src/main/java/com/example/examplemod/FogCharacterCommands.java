@@ -5,6 +5,8 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
+import net.minecraft.server.permissions.PermissionCheck;
+import net.minecraft.server.permissions.Permissions;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -35,7 +37,9 @@ public final class FogCharacterCommands {
                                 })
                         )
                         .then(Commands.literal("awakentuc")
-                                .requires(source -> source.hasPermission(2))
+                                .requires(Commands.hasPermission(
+    new PermissionCheck.Require(Permissions.COMMANDS_GAMEMASTER)
+))
                                 .executes(context -> {
                                     ServerPlayer player =
                                             context.getSource().getPlayerOrException();

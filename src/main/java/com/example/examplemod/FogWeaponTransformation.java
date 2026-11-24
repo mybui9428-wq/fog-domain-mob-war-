@@ -16,7 +16,9 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
@@ -25,6 +27,7 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.living.LivingGetProjectileEvent;
 
 @EventBusSubscriber(modid = ExampleMod.MODID)
 public final class FogWeaponTransformation {
@@ -200,6 +203,18 @@ public final class FogWeaponTransformation {
     public static String getSelectedWeaponName(ServerPlayer player) {
         List<WeaponForm> forms = getForms(player);
         return forms.get(getSelected(player)).name();
+    }
+
+    // Giữ dữ liệu Bất Diệt Lưu Ảnh trên mũi tên khi cung lấy đạn.
+    @SubscribeEvent
+    public static void preserveArtifactArrow(LivingGetProjectileEvent event) {
+        ItemStack projectile = event.getProjectileItemStack();
+
+        if (projectile != null && !projectile.isEmpty()
+                && isTransformed(projectile)) {
+            // Sao chép cả CustomData để mũi tên sau khi bắn vẫn nhận diện được.
+            event.setProjectileItemStack(projectile.copy());
+        }
     }
 
     @SubscribeEvent
@@ -430,7 +445,7 @@ public final class FogWeaponTransformation {
         return 1;
     }
 
-    // Tìm Bất Diệt Lưu Ảnh đang rơi trên mặt đất.
+    // Tìm Bất Diệt Lưu Ảnh đang rơi hoặc đang là mũi tên đã bắn.
     private static int teleportToArtifact(ServerPlayer player) {
 
         double radius = TELEPORT_RADIUS;
@@ -444,9 +459,10 @@ public final class FogWeaponTransformation {
                 player.getZ() + radius
         );
 
-        ItemEntity nearest = null;
+        Entity nearest = null;
         double nearestDistance = Double.MAX_VALUE;
 
+        // Tìm vật phẩm rơi trên mặt đất.
         for (ItemEntity entity :
                 player.level().getEntitiesOfClass(
                         ItemEntity.class,
@@ -460,10 +476,7 @@ public final class FogWeaponTransformation {
                 continue;
             }
 
-            double dx = entity.getX() - player.getX();
-            double dz = entity.getZ() - player.getZ();
-
-            double distance = dx * dx + dz * dz;
+            double distance = player.distanceToSqr(entity);
 
             if (distance <= radius * radius
                     && distance < nearestDistance) {
@@ -472,20 +485,45 @@ public final class FogWeaponTransformation {
             }
         }
 
+        // Tìm cả mũi tên Bất Diệt Lưu Ảnh đã bắn.
+        for (AbstractArrow arrow :
+                player.level().getEntitiesOfClass(
+                        AbstractArrow.class,
+                        searchArea
+                )) {
+
+            ItemStack pickupStack = arrow.getPickupItemStackOrigin();
+
+            if (pickupStack.isEmpty() || !isTransformed(pickupStack)) {
+                continue;
+            }
+
+            double distance = player.distanceToSqr(arrow);
+
+            if (distance <= radius * radius
+                    && distance < nearestDistance) {
+                nearest = arrow;
+                nearestDistance = distance;
+            }
+        }
+
         if (nearest == null) {
             send(player,
-                    "Khong tim thay Bat Diet Luu Anh tren mat dat trong ban kinh 1000 block.");
+                    "Khong tim thay Bat Diet Luu Anh hoac mui ten cua no trong ban kinh 1000 block.");
             return 0;
         }
 
+        // Chỉ dịch chuyển đến vị trí; không thu hồi vật phẩm/mũi tên.
         player.teleportTo(
                 nearest.getX(),
                 nearest.getY() + 1.0,
                 nearest.getZ()
         );
 
-        send(player, "Khong Gian Trieu Hoi: Dich chuyen thanh cong!");
+        send(player,
+                "Khong Gian Trieu Hoi: Da dich chuyen den vi tri Bat Diet Luu Anh!");
 
         return 1;
     }
+
 }

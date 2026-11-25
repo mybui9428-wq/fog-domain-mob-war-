@@ -49,6 +49,20 @@ public class FogDomainAbilityData extends SavedData {
             SKILL_TRIPLE_SPIRIT
     );
 
+    // Các kỹ năng riêng được mở khóa khi trở thành Túc Thanh Giả.
+    public static final List<String> TUC_THANH_GIA_SKILLS = List.of(
+            "thien_hoa",
+            "chan_thuc_chi_nhan",
+            "cam_tuyet_khong_che",
+            "tich_diet_chi_hoa",
+            "vo_vat_bat_tram",
+            "tuyet_menh_nhat_dao",
+            "hoi_thanh",
+            "ta_se_khong_chet",
+            "bat_huu_chien",
+            "cuong_hoa"
+    );
+
     // ==================== 10 NĂNG LỰC BẨM SINH ====================
 
     public static final String INNATE_SPIRIT_RETURN = "spirit_return";
@@ -581,6 +595,26 @@ public class FogDomainAbilityData extends SavedData {
         return playerId != null
                 && !tucThanhGiaUuid.isBlank()
                 && tucThanhGiaUuid.equals(playerId.toString());
+    }
+
+    /**
+     * Kiểm tra đủ 5 điều kiện thức tỉnh. hasArtifact phải được xác định từ túi đồ
+     * bởi nơi gọi hàm; không tin dữ liệu do client tự gửi.
+     */
+    public boolean canAwakenTucThanhGia(UUID playerId, boolean hasArtifact) {
+        if (playerId == null || !tucThanhGiaUuid.isBlank() || !hasArtifact) {
+            return false;
+        }
+
+        initializeCharacter(playerId);
+
+        return getCharacterLevel(playerId) < 5
+                && getAttribute(playerId, "agility") > 30
+                && getAttribute(playerId, "stamina") > 30
+                && getAttribute(playerId, "strength") > 30
+                && getAttribute(playerId, "spirit") > 30
+                && getAttribute(playerId, "charisma") < 20
+                && getSpiritPoints(playerId) >= 10_000;
     }
 
     /** Chỉ cho phép gán một UUID duy nhất; không thể ghi đè người đã thức tỉnh. */

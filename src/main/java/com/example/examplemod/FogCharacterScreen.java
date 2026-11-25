@@ -217,8 +217,13 @@ public class FogCharacterScreen extends Screen {
         addAttribute("Tinh thần", "spirit",
                 spirit, centerX, startY + 200);
 
-        addAttribute("Mị lực", "charisma",
-                charisma, centerX, startY + 218);
+        if (!tucThanhGia) {
+            addAttribute("Mị lực", "charisma",
+                    charisma, centerX, startY + 218);
+        } else {
+            addLabel("Mị lực: Đã loại bỏ khi thức tỉnh",
+                    centerX - 130, startY + 218, 260);
+        }
 
         addLabel("Máu: " + (int) health + "/" + (int) maxHealth,
                 centerX - 120, startY + 238, 240);

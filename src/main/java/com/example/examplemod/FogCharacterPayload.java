@@ -81,25 +81,24 @@ public record FogCharacterPayload(String data)
     }
 
     private static boolean hasTucThanhGiaArtifact(ServerPlayer player) {
-        for (var stack : player.getInventory().items) {
-            if (stack.is(FogWeaponItems.SWORD.get())
-                    || stack.is(FogWeaponItems.LONG_SPEAR.get())
-                    || stack.is(FogWeaponItems.SHIELD.get())
-                    || stack.is(FogWeaponItems.BOW.get())
-                    || stack.is(FogWeaponItems.BAT_DIET_LUU_ANH.get())) {
+        // Inventory.items là private trong phiên bản NeoForge này.
+        // Duyệt các slot qua API công khai getContainerSize()/getItem().
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            if (isTucThanhGiaArtifact(player.getInventory().getItem(slot))) {
                 return true;
             }
         }
-        for (var stack : player.getInventory().offhand) {
-            if (stack.is(FogWeaponItems.SWORD.get())
-                    || stack.is(FogWeaponItems.LONG_SPEAR.get())
-                    || stack.is(FogWeaponItems.SHIELD.get())
-                    || stack.is(FogWeaponItems.BOW.get())
-                    || stack.is(FogWeaponItems.BAT_DIET_LUU_ANH.get())) {
-                return true;
-            }
-        }
-        return false;
+
+        // Tay phụ được truy cập riêng qua API của LivingEntity.
+        return isTucThanhGiaArtifact(player.getOffhandItem());
+    }
+
+    private static boolean isTucThanhGiaArtifact(net.minecraft.world.item.ItemStack stack) {
+        return stack.is(FogWeaponItems.SWORD.get())
+                || stack.is(FogWeaponItems.LONG_SPEAR.get())
+                || stack.is(FogWeaponItems.SHIELD.get())
+                || stack.is(FogWeaponItems.BOW.get())
+                || stack.is(FogWeaponItems.BAT_DIET_LUU_ANH.get());
     }
 
     // XỬ LÝ YÊU CẦU TỪ CLIENT

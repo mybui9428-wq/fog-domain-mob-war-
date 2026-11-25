@@ -608,22 +608,32 @@ public class FogDomainAbilityData extends SavedData {
 
         initializeCharacter(playerId);
 
-        return getCharacterLevel(playerId) < 5
-                && getAttribute(playerId, "agility") > 30
-                && getAttribute(playerId, "stamina") > 30
-                && getAttribute(playerId, "strength") > 30
-                && getAttribute(playerId, "spirit") > 30
-                && getAttribute(playerId, "charisma") < 20
-                && getSpiritPoints(playerId) >= 10_000;
+        // Năm điều kiện mới:
+        // 1) Cấp nhân vật ít nhất 5.
+        // 2) Bốn chỉ số chính đạt cực hạn hiện tại (không tính Mị lực).
+        // 3) Mị lực <= 20.
+        // 4) Có ít nhất một Kỳ Vật (được xác nhận từ túi đồ ở nơi gọi).
+        // 5) Có ít nhất 1.000 Linh Tính.
+        int maximum = getAttributeMaximum(playerId);
+        return getCharacterLevel(playerId) >= 5
+                && getAttribute(playerId, "agility") >= maximum
+                && getAttribute(playerId, "stamina") >= maximum
+                && getAttribute(playerId, "strength") >= maximum
+                && getAttribute(playerId, "spirit") >= maximum
+                && getAttribute(playerId, "charisma") <= 20
+                && getSpiritPoints(playerId) >= 1_000;
     }
 
     /** Chỉ cho phép gán một UUID duy nhất; không thể ghi đè người đã thức tỉnh. */
     public boolean awakenTucThanhGia(UUID playerId) {
-        if (playerId == null) return false;
+        // Giữ overload cũ để tương thích mã nguồn; thức tỉnh thật phải
+        // đi qua overload có xác minh đủ điều kiện và Kỳ Vật.
+        return false;
+    }
 
-        if (!tucThanhGiaUuid.isBlank()) {
-            return tucThanhGiaUuid.equals(playerId.toString());
-        }
+    public boolean awakenTucThanhGia(UUID playerId, boolean hasArtifact) {
+        if (!canAwakenTucThanhGia(playerId, hasArtifact)) return false;
+        if (!consumeSpiritPoints(playerId, 1_000)) return false;
 
         tucThanhGiaUuid = playerId.toString();
         setDirty();
@@ -632,10 +642,10 @@ public class FogDomainAbilityData extends SavedData {
 
     public int getAttributeMaximum(UUID playerId) {
         int level = getCharacterLevel(playerId);
-        // Túc Thanh Giả: mỗi cấp nhân vật mở thêm 20 điểm giới hạn.
-        // Vì vậy ở cấp nhân vật 10, mỗi chỉ số chính có thể đạt 200.
+        // Người bình thường: +5 giới hạn mỗi cấp (giữ mốc cơ sở hiện tại).
+        // Túc Thanh Giả: +30 giới hạn mỗi cấp nhân vật.
         if (isTucThanhGia(playerId)) {
-            return level * 20;
+            return level * 30;
         }
         return 10 + (5 * level);
     }

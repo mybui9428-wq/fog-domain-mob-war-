@@ -80,6 +80,28 @@ public record FogCharacterPayload(String data)
         };
     }
 
+    private static boolean hasTucThanhGiaArtifact(ServerPlayer player) {
+        for (var stack : player.getInventory().items) {
+            if (stack.is(FogWeaponItems.SWORD.get())
+                    || stack.is(FogWeaponItems.LONG_SPEAR.get())
+                    || stack.is(FogWeaponItems.SHIELD.get())
+                    || stack.is(FogWeaponItems.BOW.get())
+                    || stack.is(FogWeaponItems.BAT_DIET_LUU_ANH.get())) {
+                return true;
+            }
+        }
+        for (var stack : player.getInventory().offhand) {
+            if (stack.is(FogWeaponItems.SWORD.get())
+                    || stack.is(FogWeaponItems.LONG_SPEAR.get())
+                    || stack.is(FogWeaponItems.SHIELD.get())
+                    || stack.is(FogWeaponItems.BOW.get())
+                    || stack.is(FogWeaponItems.BAT_DIET_LUU_ANH.get())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // XỬ LÝ YÊU CẦU TỪ CLIENT
     private static void handleServer(
             FogCharacterPayload payload,
@@ -128,6 +150,17 @@ public record FogCharacterPayload(String data)
             message = success
                     ? "Da tang " + attribute + "."
                     : "Khong du Diem Linh Tinh hoac HP.";
+
+        } else if (request.equals("awaken_tuc")) {
+
+            boolean hasArtifact = hasTucThanhGiaArtifact(player);
+            if (data.isTucThanhGia(player.getUUID())) {
+                message = "Ban da la Tuc Thanh Gia.";
+            } else if (data.awakenTucThanhGia(player.getUUID(), hasArtifact)) {
+                message = "Tich Diet Tinh Hoa! Than the lam te dan, Ky Vat lam dan, 1.000 Linh Tinh lam co so. Le rua toi bat dau!";
+            } else {
+                message = "Chua du 5 dieu kien thuc tinh Tuc Thanh Gia.";
+            }
 
         } else if (request.equals("levelup")) {
 
@@ -262,7 +295,8 @@ public record FogCharacterPayload(String data)
                         id, FogDomainAbilityData.SKILL_TRIPLE_SPIRIT
                 )),
                 String.valueOf(data.isTucThanhGia(id)),
-                String.valueOf(data.getAttributeMaximum(id))
+                String.valueOf(data.getAttributeMaximum(id)),
+                String.valueOf(data.canAwakenTucThanhGia(id, hasTucThanhGiaArtifact(player)))
         );
 
         return new FogCharacterPayload(response);

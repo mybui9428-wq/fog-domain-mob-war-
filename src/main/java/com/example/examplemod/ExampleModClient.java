@@ -158,6 +158,7 @@ public class ExampleModClient {
 
                         boolean tucThanhGia = Boolean.parseBoolean(parts[20]);
                         int attributeMaximum = Integer.parseInt(parts[21]);
+                        boolean canAwakenTucThanhGia = Boolean.parseBoolean(parts[22]);
 
                         Minecraft.getInstance().execute(() -> {
                             FogCharacterScreen.updateData(
@@ -181,7 +182,8 @@ public class ExampleModClient {
                                     stealSkillLevel,
                                     tripleSpiritSkillLevel,
                                     tucThanhGia,
-                                    attributeMaximum
+                                    attributeMaximum,
+                                    canAwakenTucThanhGia
                             );
                         });
 

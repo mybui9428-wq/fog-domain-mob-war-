@@ -34,6 +34,7 @@ public class FogCharacterScreen extends Screen {
     private static String message = "";
     private static boolean tucThanhGia = false;
     private static int attributeMaximum = 15;
+    private static boolean canAwakenTucThanhGia = false;
 
     private static final int MAX_LEVEL = 20;
 
@@ -88,7 +89,8 @@ public class FogCharacterScreen extends Screen {
             int newStealSkillLevel,
             int newTripleSpiritSkillLevel,
             boolean newTucThanhGia,
-            int newAttributeMaximum
+            int newAttributeMaximum,
+            boolean newCanAwakenTucThanhGia
     ) {
         updateCommonData(
                 newLevel, newSpiritPoints, newFreePoints,
@@ -106,6 +108,7 @@ public class FogCharacterScreen extends Screen {
         tripleSpiritSkillLevel = Math.max(1, newTripleSpiritSkillLevel);
         tucThanhGia = newTucThanhGia;
         attributeMaximum = Math.max(1, newAttributeMaximum);
+        canAwakenTucThanhGia = newCanAwakenTucThanhGia;
 
         refreshOpenScreen();
     }
@@ -199,7 +202,7 @@ public class FogCharacterScreen extends Screen {
                 centerX - 130, startY + 90, 260);
 
         addLabel("Giới hạn mỗi chỉ số: " + attributeMaximum
-                        + (tucThanhGia ? " (Túc Thanh Giả: cấp x 20)" : ""),
+                        + (tucThanhGia ? " (Túc Thanh Giả: cấp x 30)" : ""),
                 centerX - 155, startY + 108, 310);
 
         int requiredAttribute = level * 10;
@@ -262,26 +265,39 @@ public class FogCharacterScreen extends Screen {
 
         addRenderableWidget(levelUpButton);
 
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal("KỸ NĂNG >>"),
-                        button -> {
-                            skillPage = true;
-                            refreshScreen();
-                        }
-                )
-                .bounds(centerX - 110, startY + 316, 105, 20)
-                .build()
-        );
+        if (!tucThanhGia && canAwakenTucThanhGia) {
+            addRenderableWidget(
+                    Button.builder(
+                            Component.literal("THỨC TỈNH TÚC THANH GIẢ"),
+                            button -> ClientPacketDistributor.sendToServer(
+                                    new FogCharacterPayload("awaken_tuc")
+                            )
+                    )
+                    .bounds(centerX - 110, startY + 316, 220, 20)
+                    .build()
+            );
+        } else {
+            addRenderableWidget(
+                    Button.builder(
+                            Component.literal("KỸ NĂNG >>"),
+                            button -> {
+                                skillPage = true;
+                                refreshScreen();
+                            }
+                    )
+                    .bounds(centerX - 110, startY + 316, 105, 20)
+                    .build()
+            );
 
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal("Đóng"),
-                        button -> onClose()
-                )
-                .bounds(centerX + 5, startY + 316, 105, 20)
-                .build()
-        );
+            addRenderableWidget(
+                    Button.builder(
+                            Component.literal("Đóng"),
+                            button -> onClose()
+                    )
+                    .bounds(centerX + 5, startY + 316, 105, 20)
+                    .build()
+            );
+        }
     }
 
     // =================================================

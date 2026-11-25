@@ -523,7 +523,9 @@ public class FogDomainAbilityData extends SavedData {
 
         if (currentLevel >= MAX_CHARACTER_LEVEL) return 0;
 
-        return currentLevel * 10;
+        // Điều kiện để lên cấp kế tiếp: cấp đích x 10.
+        // Ví dụ: cấp 3 muốn lên cấp 4 cần một chỉ số chính đạt 40.
+        return (currentLevel + 1) * 10;
     }
 
     public boolean canLevelUpByAttributes(UUID playerId) {
@@ -642,12 +644,16 @@ public class FogDomainAbilityData extends SavedData {
 
     public int getAttributeMaximum(UUID playerId) {
         int level = getCharacterLevel(playerId);
-        // Người bình thường: +5 giới hạn mỗi cấp (giữ mốc cơ sở hiện tại).
-        // Túc Thanh Giả: +30 giới hạn mỗi cấp nhân vật.
+        // Người bình thường: mốc cơ sở 10, mỗi cấp cộng thêm
+        // 5 x cấp hiện tại. Cộng dồn: cấp 1 +5, cấp 2 +10,
+        // cấp 3 +15... Ví dụ cấp 3 = 10 + 5 + 10 + 15 = 40.
+        // Túc Thanh Giả: nhận thêm 30 giới hạn mỗi cấp nhân vật.
         if (isTucThanhGia(playerId)) {
             return level * 30;
         }
-        return 10 + (5 * level);
+
+        int cumulativeBonus = 5 * level * (level + 1) / 2;
+        return 10 + cumulativeBonus;
     }
 
     // ==================== THUỘC TÍNH ====================

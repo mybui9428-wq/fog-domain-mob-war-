@@ -142,8 +142,9 @@ public record FogCharacterPayload(String data)
                 int required =
                         data.getRequiredAttributeForLevelUp(player.getUUID());
 
-                message = "Ca 5 thuoc tinh phai dat toi thieu "
-                        + required + " moi duoc tang cap.";
+                message = "Chi can 1 trong 4 chi so chinh (Nhanh nhen, The luc,"
+                        + " Suc manh, Tinh than) dat " + required
+                        + " diem de tang cap.";
 
             } else {
 

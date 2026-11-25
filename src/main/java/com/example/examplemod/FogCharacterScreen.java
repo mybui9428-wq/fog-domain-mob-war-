@@ -199,11 +199,17 @@ public class FogCharacterScreen extends Screen {
                 centerX - 130, startY + 90, 260);
 
         addLabel("Giới hạn mỗi chỉ số: " + attributeMaximum
-                        + (tucThanhGia ? " (Túc Thanh Giả)" : ""),
+                        + (tucThanhGia ? " (Túc Thanh Giả: cấp x 20)" : ""),
                 centerX - 155, startY + 108, 310);
 
-        addLabel("Giá tăng: " + (level * 10) + " Linh Tính; trên 10 mất HP",
-                centerX - 155, startY + 126, 310);
+        int requiredAttribute = level * 10;
+        boolean hasLevelUpAttribute = agility >= requiredAttribute
+                || stamina >= requiredAttribute
+                || strength >= requiredAttribute
+                || spirit >= requiredAttribute;
+        addLabel("Tăng cấp: 1/4 chỉ số chính đạt " + requiredAttribute
+                        + " | Giá tăng: " + (level * 100) + " LT + " + level + " Mảnh",
+                centerX - 165, startY + 126, 330);
 
         addAttribute("Nhanh nhẹn", "agility",
                 agility, centerX, startY + 146);
@@ -217,13 +223,8 @@ public class FogCharacterScreen extends Screen {
         addAttribute("Tinh thần", "spirit",
                 spirit, centerX, startY + 200);
 
-        if (!tucThanhGia) {
-            addAttribute("Mị lực", "charisma",
-                    charisma, centerX, startY + 218);
-        } else {
-            addLabel("Mị lực: Đã loại bỏ khi thức tỉnh",
-                    centerX - 130, startY + 218, 260);
-        }
+        addAttribute("Mị lực", "charisma",
+                charisma, centerX, startY + 218);
 
         addLabel("Máu: " + (int) health + "/" + (int) maxHealth,
                 centerX - 120, startY + 238, 240);
@@ -255,6 +256,7 @@ public class FogCharacterScreen extends Screen {
 
         levelUpButton.active =
                 !maxLevel
+                && hasLevelUpAttribute
                 && spiritPoints >= spiritCost
                 && ruleFragments >= fragmentCost;
 

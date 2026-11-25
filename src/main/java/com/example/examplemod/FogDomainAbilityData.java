@@ -455,10 +455,6 @@ public class FogDomainAbilityData extends SavedData {
         }
 
         for (String attribute : ATTRIBUTES) {
-            if (isTucThanhGia(playerId) && "charisma".equals(attribute)) {
-                playerAttributes.remove("charisma");
-                continue;
-            }
             if (!playerAttributes.containsKey(attribute)) {
                 playerAttributes.put(attribute, STARTING_ATTRIBUTE);
                 changed = true;
@@ -523,13 +519,12 @@ public class FogDomainAbilityData extends SavedData {
 
         if (required <= 0) return false;
 
-        for (String attribute : ATTRIBUTES) {
-            if (getAttribute(playerId, attribute) < required) {
-                return false;
-            }
-        }
-
-        return true;
+        // Chỉ cần MỘT trong bốn chỉ số chính đạt ngưỡng.
+        // Mị lực không được tính vào điều kiện đột phá cấp nhân vật.
+        return getAttribute(playerId, "agility") >= required
+                || getAttribute(playerId, "stamina") >= required
+                || getAttribute(playerId, "strength") >= required
+                || getAttribute(playerId, "spirit") >= required;
     }
 
     // ==================== TĂNG CẤP NHÂN VẬT ====================
@@ -588,56 +583,33 @@ public class FogDomainAbilityData extends SavedData {
                 && tucThanhGiaUuid.equals(playerId.toString());
     }
 
-    /** Kiểm tra toàn bộ điều kiện thức tỉnh; kỳ vật được xác nhận từ túi đồ ở command. */
-    public boolean canAwakenTucThanhGia(UUID playerId, boolean hasArtifact) {
-        if (playerId == null || !hasArtifact || !tucThanhGiaUuid.isBlank()) {
-            return false;
-        }
-        if (getCharacterLevel(playerId) >= 5 || getSpiritPoints(playerId) < 10_000) {
-            return false;
-        }
-        for (String attribute : List.of("agility", "stamina", "strength", "spirit")) {
-            if (getAttribute(playerId, attribute) <= 30) return false;
-        }
-        return getAttribute(playerId, "charisma") < 20;
-    }
-
-    /** Chỉ gán một UUID duy nhất; điều kiện được xác thực trước khi gọi. */
+    /** Chỉ cho phép gán một UUID duy nhất; không thể ghi đè người đã thức tỉnh. */
     public boolean awakenTucThanhGia(UUID playerId) {
         if (playerId == null) return false;
-        if (isTucThanhGia(playerId)) return true;
-        if (!tucThanhGiaUuid.isBlank()) return false;
+
+        if (!tucThanhGiaUuid.isBlank()) {
+            return tucThanhGiaUuid.equals(playerId.toString());
+        }
 
         tucThanhGiaUuid = playerId.toString();
-        Map<String, Integer> playerAttributes = attributes.get(key(playerId));
-        if (playerAttributes != null) playerAttributes.remove("charisma");
-
-        Map<String, Integer> levels = skillLevels.computeIfAbsent(
-                key(playerId), ignored -> new HashMap<>());
-        for (String skill : TUC_THANH_GIA_SKILLS) levels.putIfAbsent(skill, 1);
         setDirty();
         return true;
     }
 
-    public static final List<String> TUC_THANH_GIA_SKILLS = List.of(
-            "thien_hoa", "chan_thuc_chi_nhan", "cam_tuyet_khong_che",
-            "tich_diet_chi_hoa", "vo_vat_bat_tram", "tuyet_menh_nhat_dao",
-            "hoi_thanh", "ta_se_khong_chet", "bat_huu_chien",
-            "cuong_hoa", "cuop_doat_passive", "cuop_doat_active", "ket_hop"
-    );
-
     public int getAttributeMaximum(UUID playerId) {
         int level = getCharacterLevel(playerId);
-        // Cấp 4 được chạm mốc trên 30 để có thể đáp ứng điều kiện thức tỉnh.
-        if (!isTucThanhGia(playerId) && level == 4) return 35;
-        return (isTucThanhGia(playerId) ? 25 : 10) + (5 * level);
+        // Túc Thanh Giả: mỗi cấp nhân vật mở thêm 20 điểm giới hạn.
+        // Vì vậy ở cấp nhân vật 10, mỗi chỉ số chính có thể đạt 200.
+        if (isTucThanhGia(playerId)) {
+            return level * 20;
+        }
+        return 10 + (5 * level);
     }
 
     // ==================== THUỘC TÍNH ====================
 
     public int getAttribute(UUID playerId, String attribute) {
         if (playerId == null || !ATTRIBUTES.contains(attribute)) return 0;
-        if (isTucThanhGia(playerId) && "charisma".equals(attribute)) return 0;
 
         initializeCharacter(playerId);
 
@@ -649,9 +621,7 @@ public class FogDomainAbilityData extends SavedData {
         if (playerId == null) return Map.of();
 
         initializeCharacter(playerId);
-        Map<String, Integer> result = new HashMap<>(attributes.get(key(playerId)));
-        if (isTucThanhGia(playerId)) result.remove("charisma");
-        return Map.copyOf(result);
+        return Map.copyOf(attributes.get(key(playerId)));
     }
 
     // ==================== MÁU TỐI ĐA TỪ THỂ LỰC ====================
@@ -717,7 +687,6 @@ public class FogDomainAbilityData extends SavedData {
         }
 
         UUID playerId = player.getUUID();
-        if (isTucThanhGia(playerId) && "charisma".equals(attribute)) return false;
         initializeCharacter(playerId);
 
         String id = key(playerId);

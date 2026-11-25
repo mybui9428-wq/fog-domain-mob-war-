@@ -85,6 +85,13 @@ public class ExampleMod {
     public static final DeferredItem<Item> RULE_FRAGMENT =
             ITEMS.registerSimpleItem("rule_fragment");
 
+    // Cuộn Trục Phá Giới: mở giới hạn vượt cấp 10 cho một kỹ năng được chọn.
+    public static final DeferredItem<Item> BREAKTHROUGH_SCROLL =
+            ITEMS.registerSimpleItem(
+                    "breakthrough_scroll",
+                    p -> p.stacksTo(16)
+            );
+
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXAMPLE_TAB =
             CREATIVE_MODE_TABS.register(
                     "example_tab",
@@ -96,6 +103,7 @@ public class ExampleMod {
                                 output.accept(EXAMPLE_ITEM.get());
                                 output.accept(SOUL_CRYSTAL.get());
                                 output.accept(RULE_FRAGMENT.get());
+                                output.accept(BREAKTHROUGH_SCROLL.get());
                                 output.accept(FogArmorItems.CROWN.get());
                                 output.accept(FogArmorItems.CHESTPLATE.get());
                                 output.accept(FogArmorItems.LEGGINGS.get());

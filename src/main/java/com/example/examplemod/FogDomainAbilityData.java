@@ -1077,9 +1077,72 @@ public class FogDomainAbilityData extends SavedData {
 
         initializeCharacter(playerId);
 
+        if (level > 10 && !hasSkillLimitBreak(playerId, skillId)) {
+            return false;
+        }
+
         skillLevels.get(key(playerId)).put(skillId, level);
         setDirty();
         return true;
+    }
+
+    // ==================== CUỘN TRỤC PHÁ GIỚI ====================
+
+    private static final String LIMIT_BREAK_PREFIX = "__limit_break__:";
+
+    /**
+     * Ghi nhận kỹ năng đã dùng Cuộn Trục Phá Giới.
+     * Dữ liệu được lưu trong skill_levels nên tồn tại sau khi thoát game.
+     */
+    public boolean unlockSkillLimitBreak(UUID playerId, String skillId) {
+        if (playerId == null || skillId == null || skillId.isBlank()
+                || skillId.startsWith(LIMIT_BREAK_PREFIX)) {
+            return false;
+        }
+
+        initializeCharacter(playerId);
+
+        Map<String, Integer> levels = skillLevels.get(key(playerId));
+        String marker = LIMIT_BREAK_PREFIX + skillId;
+
+        if (levels.containsKey(marker)) {
+            return false;
+        }
+
+        // Chỉ cho phép phá giới kỹ năng nhân vật thực sự đang sở hữu.
+        boolean known = levels.containsKey(skillId)
+                || getCreatureSkills(playerId).contains(skillId);
+
+        if (!known) return false;
+
+        levels.put(marker, 1);
+        setDirty();
+        return true;
+    }
+
+    public boolean hasSkillLimitBreak(UUID playerId, String skillId) {
+        if (playerId == null || skillId == null || skillId.isBlank()) {
+            return false;
+        }
+
+        Map<String, Integer> levels = skillLevels.get(key(playerId));
+        return levels != null
+                && levels.containsKey(LIMIT_BREAK_PREFIX + skillId);
+    }
+
+    public List<String> getKnownSkillIds(UUID playerId) {
+        if (playerId == null) return List.of();
+
+        initializeCharacter(playerId);
+
+        LinkedHashSet<String> known = new LinkedHashSet<>(
+                skillLevels.get(key(playerId)).keySet()
+        );
+
+        known.removeIf(id -> id.startsWith(LIMIT_BREAK_PREFIX));
+        known.addAll(getCreatureSkills(playerId));
+
+        return List.copyOf(known);
     }
 
     public boolean upgradeSkill(
@@ -1099,6 +1162,11 @@ public class FogDomainAbilityData extends SavedData {
                 1,
                 getSkillLevel(playerId, skillId)
         );
+
+        if (currentSkillLevel >= 10
+                && !hasSkillLimitBreak(playerId, skillId)) {
+            return false;
+        }
 
         int requiredSoulCrystals = currentSkillLevel;
         int requiredSpiritPoints = currentSkillLevel * 100;

@@ -213,6 +213,23 @@ public final class FogDomainSkills {
                 "Đã tạo lồng Netherite trong 10 giây."));
     }
 
+    public static int castLegacy(ServerPlayer player, String id) {
+        if (!isController(player)) return 0;
+        if ("song_am".equals(id)) return FogArmorEffects.soundwave(player);
+        if ("anh_bo".equals(id)) return FogArmorEffects.dash(player);
+        if ("tam_linh_ho_the".equals(id)) return summonTripleSpirit(player);
+        if ("long_nhot".equals(id)) {
+            LivingEntity target = findTarget(player);
+            if (target == null) {
+                player.sendSystemMessage(Component.literal("Hãy ngắm mục tiêu trong phạm vi 25 block."));
+                return 0;
+            }
+            createCage(player, target);
+            return 1;
+        }
+        return 0;
+    }
+
     private static int cast(ServerPlayer player) {
         if (!isController(player)) {
             player.sendSystemMessage(Component.literal(
@@ -392,14 +409,12 @@ public final class FogDomainSkills {
                                         return 0;
                                     }
 
-                                    selectedSkill =
-                                            (selectedSkill + 1)
-                                                    % SKILLS.length;
-
-                                    player.sendSystemMessage(
-                                            Component.literal(
-                                                    "Kỹ năng: "
-                                                            + SKILLS[selectedSkill]));
+                                    if (FogTucThanhGiaSkills.cycle(player)) {
+                                        return 1;
+                                    }
+                                    selectedSkill = (selectedSkill + 1) % SKILLS.length;
+                                    player.sendSystemMessage(Component.literal(
+                                            "Kỹ năng: " + SKILLS[selectedSkill]));
                                     return 1;
                                 }))
 
@@ -412,16 +427,21 @@ public final class FogDomainSkills {
                                     player.sendSystemMessage(
                                             Component.literal(
                                                     "Kỹ năng đang chọn: "
-                                                            + SKILLS[selectedSkill]
-                                                            + " | Phạm vi: "
-                                                            + RANGE));
+                                                            + (FogTucThanhGiaSkills.selectedName(player))
+                                                            + " | Phạm vi: " + RANGE));
                                     return 1;
                                 }))
 
                         .then(Commands.literal("cast")
-                                .executes(context ->
-                                        cast(context.getSource()
-                                                .getPlayerOrException())))
+                                .executes(context -> {
+                                    ServerPlayer player = context.getSource().getPlayerOrException();
+                                    int tucResult = FogTucThanhGiaSkills.cast(player);
+                                    return tucResult >= 0 ? tucResult : cast(player);
+                                }))
+
+                        .then(Commands.literal("cuonghoa")
+                                .executes(context -> FogTucThanhGiaSkills.toggleFrenzy(
+                                        context.getSource().getPlayerOrException())))
 
                         .then(Commands.literal("triple")
                                 .executes(context ->

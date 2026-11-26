@@ -51,16 +51,12 @@ public class FogDomainAbilityData extends SavedData {
 
     // Các kỹ năng riêng được mở khóa khi trở thành Túc Thanh Giả.
     public static final List<String> TUC_THANH_GIA_SKILLS = List.of(
-            "thien_hoa",
-            "chan_thuc_chi_nhan",
-            "cam_tuyet_khong_che",
-            "tich_diet_chi_hoa",
-            "vo_vat_bat_tram",
-            "tuyet_menh_nhat_dao",
-            "hoi_thanh",
-            "ta_se_khong_chet",
-            "bat_huu_chien",
-            "cuong_hoa"
+            "thien_hoa", "chan_thuc_chi_nhan", "cam_tuyet_khong_che",
+            "tich_diet_chi_hoa", "vo_vat_bat_tram", "tuyet_menh_nhat_dao",
+            "hoi_thanh", "ta_se_khong_chet", "bat_huu_chien", "cuong_hoa",
+            "huyet_chien", "than_cuong", "bat_khuat", "nguoc_toa_tu_long",
+            "huyen_tinh_chu_the", "cuong_liet", "phan_sat_thuong",
+            "sinh_tu_luan_chuyen", "cuop_doat", "ket_hop"
     );
 
     // ==================== 10 NĂNG LỰC BẨM SINH ====================
@@ -638,8 +634,24 @@ public class FogDomainAbilityData extends SavedData {
         if (!consumeSpiritPoints(playerId, 1_000)) return false;
 
         tucThanhGiaUuid = playerId.toString();
+        initializeTucThanhGiaSkills(playerId);
         setDirty();
         return true;
+    }
+
+    /** Ensures every Túc Thanh Giả skill has a persisted starting level. */
+    public void initializeTucThanhGiaSkills(UUID playerId) {
+        if (playerId == null || !isTucThanhGia(playerId)) return;
+        initializeCharacter(playerId);
+        Map<String, Integer> levels = skillLevels.computeIfAbsent(key(playerId), ignored -> new HashMap<>());
+        boolean changed = false;
+        for (String skill : TUC_THANH_GIA_SKILLS) {
+            if (!levels.containsKey(skill)) {
+                levels.put(skill, 1);
+                changed = true;
+            }
+        }
+        if (changed) setDirty();
     }
 
     public int getAttributeMaximum(UUID playerId) {

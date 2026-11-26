@@ -99,7 +99,7 @@ public final class FogHudServer {
                 .append('\n');
 
         hud.append("Ky nang: ")
-                .append(FogDomainSkills.getSelectedSkillName())
+                .append(FogTucThanhGiaSkills.selectedName(player))
                 .append('\n');
 
         List<String> abilities =

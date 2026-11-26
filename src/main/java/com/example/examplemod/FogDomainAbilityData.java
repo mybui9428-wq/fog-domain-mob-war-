@@ -1461,6 +1461,22 @@ public double getTotalPower(UUID entityId) {
         return owned == null ? List.of() : List.copyOf(owned);
     }
 
+    /** Adds one explicitly selected skill stolen by Túc Thanh Giả. */
+    public boolean addStolenCreatureSkill(UUID playerId, String skillId, String sourceEntityId) {
+        if (playerId == null || skillId == null || skillId.isBlank()) return false;
+        String playerKey = key(playerId);
+        List<String> owned = creatureSkills.computeIfAbsent(playerKey, ignored -> new ArrayList<>());
+        if (owned.contains(skillId)) return false;
+        owned.add(skillId);
+        if (sourceEntityId != null && !sourceEntityId.isBlank()) {
+            Map<String, List<String>> sources = creatureSkillSources.computeIfAbsent(playerKey, ignored -> new HashMap<>());
+            List<String> from = sources.computeIfAbsent(skillId, ignored -> new ArrayList<>());
+            if (!from.contains(sourceEntityId)) from.add(sourceEntityId);
+        }
+        setDirty();
+        return true;
+    }
+
     public int getCreatureSkillCount(UUID playerId) {
         return getCreatureSkills(playerId).size();
     }

@@ -6,6 +6,8 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import java.util.HashMap;
+import java.util.Map;
 
 public class FogCharacterScreen extends Screen {
 
@@ -39,6 +41,20 @@ public class FogCharacterScreen extends Screen {
     private static final int MAX_LEVEL = 20;
 
     private boolean skillPage = false;
+    private boolean tucSkillPage = false;
+    private static final Map<String, Integer> tucSkillLevels = new HashMap<>();
+    private static final String[][] TUC_SKILLS = {
+            {"thien_hoa", "Thiên Hỏa"}, {"chan_thuc_chi_nhan", "Chân Thực Chi Nhãn"},
+            {"cam_tuyet_khong_che", "Cấm Tuyệt Khống Chế"}, {"tich_diet_chi_hoa", "Tịch Diệt Chi Hỏa"},
+            {"vo_vat_bat_tram", "Vô Vật Bất Trảm"}, {"tuyet_menh_nhat_dao", "Tuyệt Mệnh Nhất Đao"},
+            {"hoi_thanh", "Hồi Thanh"}, {"ta_se_khong_chet", "Ta Sẽ Không Chết"},
+            {"bat_huu_chien", "Bất Hưu Chiến"}, {"cuong_hoa", "Cuồng Hóa"},
+            {"huyet_chien", "Huyết Chiến"}, {"than_cuong", "Thân Cường"},
+            {"bat_khuat", "Bất Khuất"}, {"nguoc_toa_tu_long", "Ngục Tỏa Tù Long"},
+            {"huyen_tinh_chu_the", "Huyền Tinh Chú Thể"}, {"cuong_liet", "Cường Liệt"},
+            {"phan_sat_thuong", "Phản Sát Thương"}, {"sinh_tu_luan_chuyen", "Sinh Tử Luân Chuyển"},
+            {"cuop_doat", "Cướp Đoạt"}, {"ket_hop", "Kết Hợp"}
+    };
 
     public FogCharacterScreen() {
         super(Component.literal("Bảng nhân vật"));
@@ -90,7 +106,8 @@ public class FogCharacterScreen extends Screen {
             int newTripleSpiritSkillLevel,
             boolean newTucThanhGia,
             int newAttributeMaximum,
-            boolean newCanAwakenTucThanhGia
+            boolean newCanAwakenTucThanhGia,
+            String newTucSkillLevels
     ) {
         updateCommonData(
                 newLevel, newSpiritPoints, newFreePoints,
@@ -109,6 +126,16 @@ public class FogCharacterScreen extends Screen {
         tucThanhGia = newTucThanhGia;
         attributeMaximum = Math.max(1, newAttributeMaximum);
         canAwakenTucThanhGia = newCanAwakenTucThanhGia;
+        tucSkillLevels.clear();
+        if (newTucSkillLevels != null && !newTucSkillLevels.isBlank()) {
+            for (String pair : newTucSkillLevels.split(",")) {
+                String[] parts = pair.split(":", 2);
+                if (parts.length == 2) {
+                    try { tucSkillLevels.put(parts[0], Math.max(1, Integer.parseInt(parts[1]))); }
+                    catch (NumberFormatException ignored) { }
+                }
+            }
+        }
 
         refreshOpenScreen();
     }
@@ -168,7 +195,9 @@ public class FogCharacterScreen extends Screen {
     protected void init() {
         int centerX = this.width / 2;
 
-        if (skillPage) {
+        if (tucSkillPage) {
+            initTucThanhGiaSkillPage(centerX);
+        } else if (skillPage) {
             initSkillPage(centerX);
         } else {
             initAttributePage(centerX);
@@ -342,25 +371,56 @@ public class FogCharacterScreen extends Screen {
                 centerX - 165, startY + 274, 330);
 
         addRenderableWidget(
-                Button.builder(
-                        Component.literal("<< THUỘC TÍNH"),
-                        button -> {
-                            skillPage = false;
-                            refreshScreen();
-                        }
-                )
-                .bounds(centerX - 110, startY + 304, 105, 20)
-                .build()
+                Button.builder(Component.literal("<< THUỘC TÍNH"), button -> {
+                    skillPage = false;
+                    refreshScreen();
+                }).bounds(centerX - 110, startY + 304, 105, 20).build()
         );
 
-        addRenderableWidget(
-                Button.builder(
-                        Component.literal("Đóng"),
-                        button -> onClose()
-                )
-                .bounds(centerX + 5, startY + 304, 105, 20)
-                .build()
-        );
+        if (tucThanhGia) {
+            addRenderableWidget(Button.builder(Component.literal("TÚC THANH GIẢ >>"), button -> {
+                tucSkillPage = true;
+                refreshScreen();
+            }).bounds(centerX + 5, startY + 304, 105, 20).build());
+        } else {
+            addRenderableWidget(Button.builder(Component.literal("Đóng"), button -> onClose())
+                    .bounds(centerX + 5, startY + 304, 105, 20).build());
+        }
+    }
+
+    private void initTucThanhGiaSkillPage(int centerX) {
+        int startY = Math.max(2, (this.height - 340) / 2);
+        addLabel("NÂNG CẤP TOÀN BỘ KỸ NĂNG TÚC THANH GIẢ", centerX - 220, startY, 440);
+        addLabel("Linh Tính: " + spiritPoints + " | Tinh Thạch: " + soulCrystals,
+                centerX - 190, startY + 22, 380);
+        addLabel("Chi phí mỗi lần: cấp hiện tại x 100 LT + cấp hiện tại Tinh Thạch",
+                centerX - 220, startY + 40, 440);
+        for (int i = 0; i < TUC_SKILLS.length; i++) {
+            int col = i / 10;
+            int row = i % 10;
+            int x = centerX - 230 + col * 235;
+            int y = startY + 64 + row * 23;
+            addTucSkill(TUC_SKILLS[i][1], TUC_SKILLS[i][0], x, y);
+        }
+        addRenderableWidget(Button.builder(Component.literal("<< BẢNG KỸ NĂNG"), button -> {
+            tucSkillPage = false;
+            skillPage = true;
+            refreshScreen();
+        }).bounds(centerX - 110, startY + 302, 105, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Đóng"), button -> onClose())
+                .bounds(centerX + 5, startY + 302, 105, 20).build());
+    }
+
+    private void addTucSkill(String name, String skillId, int x, int y) {
+        int current = tucSkillLevels.getOrDefault(skillId, 1);
+        int spiritCost = current * 100;
+        int crystalCost = current;
+        addLabel(name + " Cấp " + current, x, y, 130);
+        Button upgrade = Button.builder(Component.literal("+1 (" + spiritCost + "/" + crystalCost + ")"), button ->
+                ClientPacketDistributor.sendToServer(new FogCharacterPayload("upgrade|" + skillId)))
+                .bounds(x + 132, y, 95, 18).build();
+        upgrade.active = spiritPoints >= spiritCost && soulCrystals >= crystalCost;
+        addRenderableWidget(upgrade);
     }
 
     private void addSkill(

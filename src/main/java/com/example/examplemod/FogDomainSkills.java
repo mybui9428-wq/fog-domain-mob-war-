@@ -443,6 +443,12 @@ public final class FogDomainSkills {
                                 .executes(context -> FogTucThanhGiaSkills.toggleFrenzy(
                                         context.getSource().getPlayerOrException())))
 
+                        .then(Commands.literal("imbue")
+                                .executes(context -> {
+                                    FogTucThanhGiaSkills.toggleSlashImbue(context.getSource().getPlayerOrException());
+                                    return 1;
+                                }))
+
                         .then(Commands.literal("triple")
                                 .executes(context ->
                                         summonTripleSpirit(

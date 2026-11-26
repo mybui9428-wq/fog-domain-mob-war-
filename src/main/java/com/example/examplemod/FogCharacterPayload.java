@@ -112,7 +112,7 @@ public record FogCharacterPayload(String data)
 
         String request = payload.data();
 
-        if (request == null || request.length() > 64) {
+        if (request == null || request.length() > 1024) {
             return;
         }
 
@@ -127,6 +127,19 @@ public record FogCharacterPayload(String data)
         );
 
         String message = "Du lieu da cap nhat.";
+
+        if (request.startsWith("stealpick|")) {
+            String[] fields = request.split("\\|", 3);
+            if (fields.length != 3) return;
+            try {
+                java.util.UUID targetId = java.util.UUID.fromString(fields[1]);
+                java.util.List<String> chosen = fields[2].isBlank() ? java.util.List.of() : java.util.Arrays.asList(fields[2].split(","));
+                FogTucThanhGiaSkills.completeSteal(player, targetId, chosen);
+            } catch (IllegalArgumentException ignored) {
+                player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§cDữ liệu lựa chọn Cướp Đoạt không hợp lệ."));
+            }
+            return;
+        }
 
         if (request.equals("open")) {
 
@@ -217,6 +230,10 @@ public record FogCharacterPayload(String data)
             if (!isUpgradeableSkill(skillId)) {
                 return;
             }
+            if (FogDomainAbilityData.TUC_THANH_GIA_SKILLS.contains(skillId)
+                    && !data.isTucThanhGia(player.getUUID())) {
+                return;
+            }
 
             int oldSkillLevel = data.getSkillLevel(
                     player.getUUID(),
@@ -295,7 +312,10 @@ public record FogCharacterPayload(String data)
                 )),
                 String.valueOf(data.isTucThanhGia(id)),
                 String.valueOf(data.getAttributeMaximum(id)),
-                String.valueOf(data.canAwakenTucThanhGia(id, hasTucThanhGiaArtifact(player)))
+                String.valueOf(data.canAwakenTucThanhGia(id, hasTucThanhGiaArtifact(player))),
+                FogDomainAbilityData.TUC_THANH_GIA_SKILLS.stream()
+                        .map(skillId -> skillId + ":" + data.getSkillLevel(id, skillId))
+                        .collect(java.util.stream.Collectors.joining(","))
         );
 
         return new FogCharacterPayload(response);

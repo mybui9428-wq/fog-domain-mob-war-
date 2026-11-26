@@ -108,6 +108,20 @@ public class ExampleModClient {
                 FogCharacterPayload.TYPE,
                 (payload, context) -> {
 
+                    if (payload.data().startsWith("stealmenu|")) {
+                        String[] menu = payload.data().split("\\|", 3);
+                        if (menu.length == 3) {
+                            try {
+                                java.util.UUID targetId = java.util.UUID.fromString(menu[1]);
+                                java.util.List<String> skills = menu[2].isBlank() ? java.util.List.of() : java.util.Arrays.asList(menu[2].split(","));
+                                Minecraft.getInstance().execute(() -> Minecraft.getInstance().gui.setScreen(new FogTucStealScreen(targetId, skills)));
+                            } catch (IllegalArgumentException ignored) {
+                                ExampleMod.LOGGER.warn("Cướp Đoạt nhận dữ liệu mục tiêu không hợp lệ.");
+                            }
+                        }
+                        return;
+                    }
+
                     String[] parts = payload.data().split("\\|", -1);
 
                     if (parts.length < 22
@@ -159,6 +173,7 @@ public class ExampleModClient {
                         boolean tucThanhGia = Boolean.parseBoolean(parts[20]);
                         int attributeMaximum = Integer.parseInt(parts[21]);
                         boolean canAwakenTucThanhGia = Boolean.parseBoolean(parts[22]);
+                        String tucSkillLevels = parts.length > 23 ? parts[23] : "";
 
                         Minecraft.getInstance().execute(() -> {
                             FogCharacterScreen.updateData(
@@ -183,7 +198,8 @@ public class ExampleModClient {
                                     tripleSpiritSkillLevel,
                                     tucThanhGia,
                                     attributeMaximum,
-                                    canAwakenTucThanhGia
+                                    canAwakenTucThanhGia,
+                                    tucSkillLevels
                             );
                         });
 

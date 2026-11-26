@@ -55,13 +55,13 @@ public final class FogTucThanhGiaSkills {
     private FogTucThanhGiaSkills() {}
 
     private static boolean owner(ServerPlayer p) {
-        FogDomainAbilityData d = FogDomainAbilityData.get(p.getServer());
+        FogDomainAbilityData d = FogDomainAbilityData.get(p.level().getServer());
         boolean isOwner = d.isTucThanhGia(p.getUUID());
         if (isOwner) d.initializeTucThanhGiaSkills(p.getUUID());
         return isOwner;
     }
     private static FogDomainAbilityData data(ServerPlayer p) {
-        return FogDomainAbilityData.get(p.getServer());
+        return FogDomainAbilityData.get(p.level().getServer());
     }
     private static int level(ServerPlayer p, String id) {
         return Math.max(1, data(p).getSkillLevel(p.getUUID(), id));
@@ -138,7 +138,7 @@ public final class FogTucThanhGiaSkills {
                 List<LivingEntity> victims = level.getEntitiesOfClass(LivingEntity.class, box,
                         e -> e != p && e.isAlive() && e.getBoundingBox().inflate(0.2).clip(eye, eye.add(look.scale(32))).isPresent());
                 for (LivingEntity e : victims) {
-                    e.setSecondsOnFire(5);
+                    e.igniteForSeconds(5);
                     level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, e.getX(), e.getY()+e.getBbHeight()/2, e.getZ(), 12, .4,.5,.4,.02);
                 }
                 setCooldown(p, id, now + 200);
@@ -232,7 +232,7 @@ public final class FogTucThanhGiaSkills {
         viewer.sendSystemMessage(Component.literal("§b[Chân Thực Chi Nhãn] Máu: " + (int)target.getHealth() + "/" + (int)target.getMaxHealth()));
         viewer.sendSystemMessage(Component.literal("§bLoài: " + net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(target.getType())));
         if (target instanceof ServerPlayer sp) {
-            FogDomainAbilityData td = FogDomainAbilityData.get(sp.getServer());
+            FogDomainAbilityData td = FogDomainAbilityData.get(sp.level().getServer());
             viewer.sendSystemMessage(Component.literal("§bLinh Tính: " + td.getSpiritPoints(sp.getUUID())));
             viewer.sendSystemMessage(Component.literal("§bThuộc tính: " + td.getAttributes(sp.getUUID())));
             viewer.sendSystemMessage(Component.literal("§bNăng lực: " + td.getAbilities(sp.getUUID())));
@@ -344,7 +344,7 @@ public final class FogTucThanhGiaSkills {
                 event.setNewDamage(Math.max(event.getNewDamage(), event.getEntity().getHealth()));
             }
             if (ad.getSkillLevel(attacker.getUUID(), "tich_diet_chi_hoa") > 0) {
-                event.getEntity().setSecondsOnFire(5);
+                event.getEntity().igniteForSeconds(5);
                 int gain = Math.max(1, (int)Math.ceil(event.getNewDamage() * 0.5F));
                 ad.addSpiritPoints(attacker.getUUID(), gain);
             }
@@ -356,7 +356,7 @@ public final class FogTucThanhGiaSkills {
         int counter=d.getSkillLevel(p.getUUID(),"phan_sat_thuong");
         if(counter>0 && event.getSource().getEntity() instanceof LivingEntity attacker) {
             int own=d.getAttributes(p.getUUID()).values().stream().mapToInt(Integer::intValue).sum();
-            int enemy=attacker instanceof ServerPlayer sp ? FogDomainAbilityData.get(sp.getServer()).getAttributes(sp.getUUID()).values().stream().mapToInt(Integer::intValue).sum() : 0;
+            int enemy=attacker instanceof ServerPlayer sp ? FogDomainAbilityData.get(sp.level().getServer()).getAttributes(sp.getUUID()).values().stream().mapToInt(Integer::intValue).sum() : 0;
             if(enemy<own) attacker.hurtServer((ServerLevel)p.level(),p.damageSources().thorns(p),event.getNewDamage()*Math.min(1.0F,counter*.05F));
         }
         int unbreak=d.getSkillLevel(p.getUUID(),"bat_khuat");

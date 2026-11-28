@@ -22,7 +22,14 @@ public final class FogTucAwakening {
         if (player == null || player.level().isClientSide()) return;
         player.sendSystemMessage(Component.literal("§6Lửa Tịch Diệt đã bắt đầu thiêu đốt thân thể ngươi!"));
         player.sendSystemMessage(Component.literal("§7Nghi thức thức tỉnh kéo dài 5 phút. Hãy sống sót!"));
-        player.playNotifySound(SoundEvents.BLAZE_AMBIENT, SoundSource.MASTER, 0.8F, 0.65F);
+        player.level().playSound(
+        null,
+        player.blockPosition(),
+        SoundEvents.BLAZE_AMBIENT,
+        SoundSource.MASTER,
+        0.8F,
+        0.65F
+);
     }
 
     @SubscribeEvent
@@ -76,7 +83,14 @@ public final class FogTucAwakening {
                         100, 1.0D, 1.8D, 1.0D, 0.08D);
                 player.sendSystemMessage(Component.literal("§6☀ Ánh sáng vàng giáng xuống!"));
                 player.sendSystemMessage(Component.literal("§eNgươi đã hoàn thành lễ rửa tội của ngọn lửa Tịch Diệt!"));
-                player.playNotifySound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.MASTER, 1.0F, 1.0F);
+                player.level().playSound(
+        null,
+        player.blockPosition(),
+        SoundEvents.UI_TOAST_CHALLENGE_COMPLETE,
+        SoundSource.MASTER,
+        1.0F,
+        1.0F
+);
             }
         }
     }

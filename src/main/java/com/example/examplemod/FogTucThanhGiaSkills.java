@@ -5,7 +5,6 @@ import java.util.*;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.particles.DustParticleOptions;
-import org.joml.Vector3f;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -366,8 +365,8 @@ public final class FogTucThanhGiaSkills {
         Vec3 forward = target.position().subtract(caster.position()).normalize();
         Vec3 right = new Vec3(-forward.z, 0.0D, forward.x).normalize();
         Vec3 center = target.position().add(0.0D, target.getBbHeight() * 0.55D, 0.0D);
-        DustParticleOptions black = new DustParticleOptions(new Vector3f(0.008F, 0.008F, 0.012F), 2.2F);
-        DustParticleOptions gray = new DustParticleOptions(new Vector3f(0.28F, 0.28F, 0.30F), 1.25F);
+        DustParticleOptions black = new DustParticleOptions(0x08080C, 2.2F);
+        DustParticleOptions gray = new DustParticleOptions(0x47474D, 1.25F);
         for (int i = 0; i <= 32; i++) {
             double angle = Math.PI * i / 32.0D;
             Vec3 point = center.add(right.scale(Math.cos(angle) * 1.8D)).add(0.0D, Math.sin(angle) * 2.0D - 0.4D, 0.0D);
@@ -491,7 +490,7 @@ public final class FogTucThanhGiaSkills {
             }
             if (now % 10L == 0L && burn.entity().level() instanceof ServerLevel burnLevel) {
                 burnLevel.sendParticles(ParticleTypes.SQUID_INK, burn.entity().getX(), burn.entity().getY() + burn.entity().getBbHeight() * .55D, burn.entity().getZ(), 10, .35, .45, .35, .015D);
-                burnLevel.sendParticles(new DustParticleOptions(new Vector3f(0.005F, 0.005F, 0.008F), 1.8F), burn.entity().getX(), burn.entity().getY() + burn.entity().getBbHeight() * .55D, burn.entity().getZ(), 18, .30, .45, .30, .005D);
+                burnLevel.sendParticles(new DustParticleOptions(0x050508, 1.8F), burn.entity().getX(), burn.entity().getY() + burn.entity().getBbHeight() * .55D, burn.entity().getZ(), 18, .30, .45, .30, .005D);
                 burnLevel.sendParticles(ParticleTypes.LARGE_SMOKE, burn.entity().getX(), burn.entity().getY() + burn.entity().getBbHeight() * .55D, burn.entity().getZ(), 8, .30, .40, .30, .01D);
             }
             if (now % 20L == 0L) {
@@ -516,7 +515,7 @@ public final class FogTucThanhGiaSkills {
                     if (now % 5L == 0L) {
                         ServerLevel burnLevel = (ServerLevel) mark.entity().level();
                         burnLevel.sendParticles(ParticleTypes.SQUID_INK, mark.entity().getX(), mark.entity().getY() + mark.entity().getBbHeight() * .55D, mark.entity().getZ(), 8, .35, .45, .35, .015D);
-                        burnLevel.sendParticles(new DustParticleOptions(new Vector3f(0.005F, 0.005F, 0.008F), 1.6F), mark.entity().getX(), mark.entity().getY() + mark.entity().getBbHeight() * .55D, mark.entity().getZ(), 14, .30, .45, .30, .005D);
+                        burnLevel.sendParticles(new DustParticleOptions(0x050508, 1.6F), mark.entity().getX(), mark.entity().getY() + mark.entity().getBbHeight() * .55D, mark.entity().getZ(), 14, .30, .45, .30, .005D);
                         burnLevel.sendParticles(ParticleTypes.LARGE_SMOKE, mark.entity().getX(), mark.entity().getY() + mark.entity().getBbHeight() * .55D, mark.entity().getZ(), 6, .30, .40, .30, .01D);
                     }
                 }
@@ -637,7 +636,7 @@ public final class FogTucThanhGiaSkills {
                         attacker.level().getGameTime() + 100L, tichDietLevel));
                 ServerLevel burnLevel = (ServerLevel) victim.level();
                 burnLevel.sendParticles(ParticleTypes.SQUID_INK, victim.getX(), victim.getY() + victim.getBbHeight() * .55D, victim.getZ(), 18, .4, .5, .4, .02D);
-                burnLevel.sendParticles(new DustParticleOptions(new Vector3f(0.005F, 0.005F, 0.008F), 2.0F), victim.getX(), victim.getY() + victim.getBbHeight() * .55D, victim.getZ(), 24, .35, .5, .35, .005D);
+                burnLevel.sendParticles(new DustParticleOptions(0x050508, 2.0F), victim.getX(), victim.getY() + victim.getBbHeight() * .55D, victim.getZ(), 24, .35, .5, .35, .005D);
                 burnLevel.sendParticles(ParticleTypes.LARGE_SMOKE, victim.getX(), victim.getY() + victim.getBbHeight() * .55D, victim.getZ(), 12, .35, .45, .35, .01D);
             }
         }

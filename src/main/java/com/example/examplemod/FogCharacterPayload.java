@@ -69,6 +69,7 @@ public record FogCharacterPayload(String data)
 
     // KIỂM TRA KỸ NĂNG ĐƯỢC PHÉP NÂNG CẤP
     private static boolean isUpgradeableSkill(String skillId) {
+        if (FogDomainAbilityData.TUC_THANH_GIA_SKILLS.contains(skillId)) return true;
         return switch (skillId) {
             case FogDomainAbilityData.SKILL_ENERGY,
                  FogDomainAbilityData.SKILL_CAGE,
@@ -141,7 +142,12 @@ public record FogCharacterPayload(String data)
             return;
         }
 
-        if (request.equals("open")) {
+        if (request.equals("combinemenu")) {
+            PacketDistributor.sendToPlayer(player, new FogCharacterPayload("combine_menu|"
+                    + data.getSkillLevel(player.getUUID(), "ket_hop")));
+            return;
+
+        } else if (request.equals("open")) {
 
             message = "Da mo bang nhan vat.";
 

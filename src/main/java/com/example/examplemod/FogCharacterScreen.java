@@ -231,15 +231,19 @@ public class FogCharacterScreen extends Screen {
                 centerX - 130, startY + 90, 260);
 
         addLabel("Giới hạn mỗi chỉ số: " + attributeMaximum
-                        + (tucThanhGia ? " (Túc Thanh Giả: cấp x 30)" : ""),
+                        + (tucThanhGia ? " (Túc Thanh Giả: +10/cấp)" : " (+5/cấp sau cấp 5)"),
                 centerX - 155, startY + 108, 310);
 
-        int requiredAttribute = level * 10;
-        boolean hasLevelUpAttribute = agility >= requiredAttribute
-                || stamina >= requiredAttribute
-                || strength >= requiredAttribute
-                || spirit >= requiredAttribute;
-        addLabel("Tăng cấp: 1/4 chỉ số chính đạt " + requiredAttribute
+        int requiredAttribute = attributeMaximum;
+        boolean hasLevelUpAttribute = tucThanhGia
+                ? agility >= requiredAttribute && stamina >= requiredAttribute
+                    && strength >= requiredAttribute && spirit >= requiredAttribute
+                    && charisma >= requiredAttribute
+                : agility >= requiredAttribute || stamina >= requiredAttribute
+                    || strength >= requiredAttribute || spirit >= requiredAttribute;
+        addLabel((tucThanhGia
+                        ? "Tăng cấp: cả 5 chỉ số đạt " + requiredAttribute
+                        : "Tăng cấp: 1/4 chỉ số chính đạt " + requiredAttribute)
                         + " | Giá tăng: " + (level * 100) + " LT + " + level + " Mảnh",
                 centerX - 165, startY + 126, 330);
 
@@ -395,11 +399,13 @@ public class FogCharacterScreen extends Screen {
                 centerX - 190, startY + 22, 380);
         addLabel("Chi phí mỗi lần: cấp hiện tại x 100 LT + cấp hiện tại Tinh Thạch",
                 centerX - 220, startY + 40, 440);
+        addLabel("Chọn kỹ năng để nâng cấp từng kỹ năng riêng biệt",
+                centerX - 220, startY + 54, 440);
         for (int i = 0; i < TUC_SKILLS.length; i++) {
             int col = i / 10;
             int row = i % 10;
-            int x = centerX - 230 + col * 235;
-            int y = startY + 64 + row * 23;
+            int x = centerX - 195 + col * 195;
+            int y = startY + 72 + row * 22;
             addTucSkill(TUC_SKILLS[i][1], TUC_SKILLS[i][0], x, y);
         }
         addRenderableWidget(Button.builder(Component.literal("<< BẢNG KỸ NĂNG"), button -> {
@@ -415,11 +421,11 @@ public class FogCharacterScreen extends Screen {
         int current = tucSkillLevels.getOrDefault(skillId, 1);
         int spiritCost = current * 100;
         int crystalCost = current;
-        addLabel(name + " Cấp " + current, x, y, 130);
+        addLabel(name + " Cấp " + current, x, y, 94);
         Button upgrade = Button.builder(Component.literal("+1 (" + spiritCost + "/" + crystalCost + ")"), button ->
                 ClientPacketDistributor.sendToServer(new FogCharacterPayload("upgrade|" + skillId)))
-                .bounds(x + 132, y, 95, 18).build();
-        upgrade.active = spiritPoints >= spiritCost && soulCrystals >= crystalCost;
+                .bounds(x + 96, y, 88, 18).build();
+        upgrade.active = true;
         addRenderableWidget(upgrade);
     }
 

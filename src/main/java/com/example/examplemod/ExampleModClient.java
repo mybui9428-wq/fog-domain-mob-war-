@@ -108,6 +108,11 @@ public class ExampleModClient {
                 FogCharacterPayload.TYPE,
                 (payload, context) -> {
 
+                    if (payload.data().startsWith("combine_menu|")) {
+                        Minecraft.getInstance().execute(() -> Minecraft.getInstance().gui.setScreen(new FogTucCombineScreen()));
+                        return;
+                    }
+
                     if (payload.data().startsWith("stealmenu|")) {
                         String[] menu = payload.data().split("\\|", 3);
                         if (menu.length == 3) {

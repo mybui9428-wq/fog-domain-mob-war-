@@ -519,9 +519,8 @@ public class FogDomainAbilityData extends SavedData {
 
         if (currentLevel >= MAX_CHARACTER_LEVEL) return 0;
 
-        // Điều kiện để lên cấp kế tiếp: cấp đích x 10.
-        // Ví dụ: cấp 3 muốn lên cấp 4 cần một chỉ số chính đạt 40.
-        return (currentLevel + 1) * 10;
+        // Phải chạm giới hạn thuộc tính hiện tại trước khi đột phá.
+        return getAttributeMaximum(playerId);
     }
 
     public boolean canLevelUpByAttributes(UUID playerId) {
@@ -531,8 +530,13 @@ public class FogDomainAbilityData extends SavedData {
 
         if (required <= 0) return false;
 
-        // Chỉ cần MỘT trong bốn chỉ số chính đạt ngưỡng.
-        // Mị lực không được tính vào điều kiện đột phá cấp nhân vật.
+        if (isTucThanhGia(playerId)) {
+            // Túc Thanh Giả phải nâng TẤT CẢ thuộc tính đến giới hạn hiện tại.
+            int maximum = getAttributeMaximum(playerId);
+            return ATTRIBUTES.stream().allMatch(name -> getAttribute(playerId, name) >= maximum);
+        }
+
+        // Nhân vật bình thường chỉ cần một trong bốn chỉ số chính đạt ngưỡng.
         return getAttribute(playerId, "agility") >= required
                 || getAttribute(playerId, "stamina") >= required
                 || getAttribute(playerId, "strength") >= required
@@ -656,16 +660,13 @@ public class FogDomainAbilityData extends SavedData {
 
     public int getAttributeMaximum(UUID playerId) {
         int level = getCharacterLevel(playerId);
-        // Người bình thường: mốc cơ sở 10, mỗi cấp cộng thêm
-        // 5 x cấp hiện tại. Cộng dồn: cấp 1 +5, cấp 2 +10,
-        // cấp 3 +15... Ví dụ cấp 3 = 10 + 5 + 10 + 15 = 40.
-        // Túc Thanh Giả: nhận thêm 30 giới hạn mỗi cấp nhân vật.
-        if (isTucThanhGia(playerId)) {
-            return level * 30;
-        }
+        if (level <= 1) return 10;
+        if (level <= 5) return 25 + (level - 2) * 10;
 
-        int cumulativeBonus = 5 * level * (level + 1) / 2;
-        return 10 + cumulativeBonus;
+        // Cấp 5 có giới hạn 55. Từ cấp 6, Túc Thanh Giả tăng 10 mỗi cấp;
+        // người bình thường tiếp tục tăng 5 mỗi cấp.
+        if (isTucThanhGia(playerId)) return 55 + (level - 5) * 10;
+        return 55 + (level - 5) * 5;
     }
 
     // ==================== THUỘC TÍNH ====================

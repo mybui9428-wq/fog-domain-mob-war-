@@ -4,6 +4,8 @@ import java.util.*;
 
 import net.minecraft.commands.Commands;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.particles.DustParticleOptions;
+import org.joml.Vector3f;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -27,6 +29,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /** Runtime effects and per-player selector for Túc Thanh Giả skills. */
@@ -56,6 +59,8 @@ public final class FogTucThanhGiaSkills {
     private static final Set<UUID> slashImbued = new HashSet<>();
     private static final Map<UUID, UUID> truthTargets = new HashMap<>();
     private static final Map<UUID, Long> truthEyeUntil = new HashMap<>();
+    private static final Map<UUID, TruthDisplayMark> truthDisplays = new HashMap<>();
+    private static final Map<UUID, SpiritBurnMark> spiritBurns = new HashMap<>();
     private static final Map<UUID, UUID> deathSealTargets = new HashMap<>();
     private static final Set<UUID> deathSealSelf = new HashSet<>();
     private static final Identifier BLOOD_ATTACK = Identifier.fromNamespaceAndPath(ExampleMod.MODID, "tuc_blood_attack");
@@ -71,6 +76,8 @@ public final class FogTucThanhGiaSkills {
     private record DeathMark(UUID target, long expiresAt, float initialHealth, int level) {}
     private record PrisonZone(ServerLevel level, Vec3 center, double radius, double halfHeight, long expiresAt) {}
     private record BurningMark(LivingEntity entity, long expiresAt) {}
+    private record TruthDisplayMark(Entity entity, long expiresAt, Component oldName, boolean oldVisible) {}
+    private record SpiritBurnMark(LivingEntity entity, UUID owner, long expiresAt, int level) {}
 
     private FogTucThanhGiaSkills() {}
 
@@ -175,8 +182,7 @@ public final class FogTucThanhGiaSkills {
                 if (target == null) { d.addSpiritPoints(p.getUUID(), 5); p.sendSystemMessage(Component.literal("§cKhông có mục tiêu trong tầm nhìn.")); return 0; }
                 truthTargets.put(p.getUUID(), target.getUUID());
                 truthEyeUntil.put(p.getUUID(), now + 200L);
-                showTruth(p, target);
-                p.sendSystemMessage(Component.literal("§bChân Thực Chi Nhãn duy trì 10 giây."));
+                showTruth(p, target, now + 200L);
                 return 1;
             }
             case "vo_vat_bat_tram" -> {
@@ -185,7 +191,7 @@ public final class FogTucThanhGiaSkills {
                     LivingEntity target = lookTarget(p, 96.0D);
                     if (target == null) { p.sendSystemMessage(Component.literal("§cHãy ngắm mục tiêu ở tầm xa (tối đa 96 khối) để phóng trảm kích.")); return 0; }
                     slashCharges.remove(p.getUUID());
-                    releaseSlashes(p, target, stored, slashImbued.remove(p.getUUID()));
+                    releaseSlashes(p, target, stored, slashImbued.remove(p.getUUID()), lv);
                     return 1;
                 }
                 int count = slashCount(lv);
@@ -263,7 +269,10 @@ public final class FogTucThanhGiaSkills {
                     String type = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString();
                     candidates = new ArrayList<>(FogDomainCreatureSkills.getSkills(type));
                 }
-                if (candidates.isEmpty()) { p.sendSystemMessage(Component.literal("§cĐối thủ không có năng lực có thể cướp.")); return 0; }
+                List<String> alreadyOwned = d.getCreatureSkills(p.getUUID());
+                candidates.removeIf(skill -> alreadyOwned.contains(skill));
+                candidates = new ArrayList<>(new LinkedHashSet<>(candidates));
+                if (candidates.isEmpty()) { p.sendSystemMessage(Component.literal("§cKhông còn kỹ năng mới nào để Cướp Đoạt từ mục tiêu này.")); return 0; }
                 stealCandidates.put(p.getUUID(), List.copyOf(candidates));
                 stealTargets.put(p.getUUID(), target.getUUID());
                 String type = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString();
@@ -272,23 +281,58 @@ public final class FogTucThanhGiaSkills {
                 return 1;
             }
             case "ket_hop" -> {
-                p.sendSystemMessage(Component.literal("§dKết Hợp cấp " + lv + ": mở " + (lv*2) + " ô kết hợp. Hệ thống ghép vật phẩm sẽ được nối ở phần vật phẩm.")); return 1;
+                PacketDistributor.sendToPlayer(p, new FogCharacterPayload("combine_menu|" + lv));
+                return 1;
             }
             default -> { return 0; }
         }
     }
 
-    private static void showTruth(ServerPlayer viewer, LivingEntity target) {
-        viewer.sendSystemMessage(Component.literal("§b[Chân Thực Chi Nhãn] Máu: " + (int)target.getHealth() + "/" + (int)target.getMaxHealth()));
-        viewer.sendSystemMessage(Component.literal("§bLoài: " + net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(target.getType())));
-        if (target instanceof ServerPlayer sp) {
-            FogDomainAbilityData td = FogDomainAbilityData.get(sp.level().getServer());
-            viewer.sendSystemMessage(Component.literal("§bLinh Tính: " + td.getSpiritPoints(sp.getUUID())));
-            viewer.sendSystemMessage(Component.literal("§bThuộc tính: " + td.getAttributes(sp.getUUID())));
-            viewer.sendSystemMessage(Component.literal("§bNăng lực: " + td.getAbilities(sp.getUUID())));
-        } else {
-            viewer.sendSystemMessage(Component.literal("§bKỹ năng sinh vật: " + FogDomainCreatureSkills.getSkills(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString())));
+    private static void showTruth(ServerPlayer viewer, LivingEntity target, long expiresAt) {
+        truthDisplays.computeIfAbsent(target.getUUID(), ignored ->
+                new TruthDisplayMark(target, expiresAt, target.getCustomName(), target.isCustomNameVisible()));
+        TruthDisplayMark old = truthDisplays.get(target.getUUID());
+        truthDisplays.put(target.getUUID(), new TruthDisplayMark(target, expiresAt, old.oldName(), old.oldVisible()));
+        FogDomainAbilityData targetData = FogDomainAbilityData.get(viewer.level().getServer());
+        double spiritValue = target instanceof ServerPlayer playerTarget
+                ? targetData.getSpiritPoints(playerTarget.getUUID())
+                : creatureSpirit(targetData, target);
+        String kind = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString();
+        target.setCustomName(Component.literal("§b❤ " + (int) target.getHealth() + "/" + (int) target.getMaxHealth()
+                + "  §d✧ " + (int) spiritValue + "  §7" + kind));
+        target.setCustomNameVisible(true);
+    }
+
+    private static void restoreTruthDisplay(UUID entityId) {
+        TruthDisplayMark mark = truthDisplays.remove(entityId);
+        if (mark == null || mark.entity().isRemoved()) return;
+        mark.entity().setCustomName(mark.oldName());
+        mark.entity().setCustomNameVisible(mark.oldVisible());
+    }
+
+    private static double creatureSpirit(FogDomainAbilityData data, LivingEntity entity) {
+        if (entity instanceof ServerPlayer player) return data.getSpiritPoints(player.getUUID());
+        double initialized = data.getPower(entity.getUUID(), "creature_spirit_initialized");
+        if (initialized <= 0.0D) {
+            double startingSpirit = Math.max(10.0D, Math.ceil(entity.getMaxHealth() * 10.0D));
+            data.setPower(entity.getUUID(), "creature_spirit", startingSpirit);
+            data.setPower(entity.getUUID(), "creature_spirit_initialized", 1.0D);
         }
+        return data.getPower(entity.getUUID(), "creature_spirit");
+    }
+
+    private static int drainEntitySpirit(LivingEntity entity, int requested) {
+        if (requested <= 0) return 0;
+        if (entity instanceof ServerPlayer player) {
+            FogDomainAbilityData victimData = FogDomainAbilityData.get(player.level().getServer());
+            int drained = Math.min(victimData.getSpiritPoints(player.getUUID()), requested);
+            return drained > 0 && victimData.consumeSpiritPoints(player.getUUID(), drained) ? drained : 0;
+        }
+        FogDomainAbilityData worldData = FogDomainAbilityData.get(((ServerLevel) entity.level()).getServer());
+        double current = creatureSpirit(worldData, entity);
+        int drained = Math.min((int) Math.ceil(current), requested);
+        worldData.setPower(entity.getUUID(), "creature_spirit", Math.max(0.0D, current - drained));
+        return drained;
     }
 
     private static void setCooldown(ServerPlayer player, String skillId, long until) {
@@ -302,16 +346,49 @@ public final class FogTucThanhGiaSkills {
         if (lv==1) return 10; if (lv==2) return 20; if (lv==3) return 40; if (lv==4) return 80;
         return 100 + (lv-5)*20;
     }
-    private static void releaseSlashes(ServerPlayer p, LivingEntity target, int count, boolean imbued) {
+    private static void releaseSlashes(ServerPlayer p, LivingEntity target, int count, boolean imbued, int skillLevel) {
         int applied = Math.max(0, count);
         ServerLevel level = (ServerLevel) p.level();
+        float damage = 4.0F + Math.max(1, skillLevel) * 2.0F;
+        if (imbued && data(p).getSkillLevel(p.getUUID(), "tich_diet_chi_hoa") > 0) damage += 4.0F;
         for (int i = 0; i < applied && target.isAlive(); i++) {
-            float damage = 2.0F;
-            if (imbued && data(p).getSkillLevel(p.getUUID(), "tich_diet_chi_hoa") > 0) damage += 2.0F;
             target.hurtServer(level, p.damageSources().playerAttack(p), damage);
         }
-        level.sendParticles(ParticleTypes.SWEEP_ATTACK, target.getX(), target.getY() + 1, target.getZ(), Math.min(50, applied), .7, .7, .7, .08);
-        p.sendSystemMessage(Component.literal("§fVô Vật Bất Trảm phóng " + applied + " trảm kích tầm xa" + (imbued ? " kèm Tịch Diệt Chi Hỏa." : ".")));
+        spawnBlackCrescent(level, p, target, Math.min(12, Math.max(3, applied / 4)));
+        if (imbued) {
+            spiritBurns.put(target.getUUID(), new SpiritBurnMark(target, p.getUUID(), level.getGameTime() + 100L,
+                    data(p).getSkillLevel(p.getUUID(), "tich_diet_chi_hoa")));
+        }
+        p.sendSystemMessage(Component.literal("§8Vô Vật Bất Trảm phóng " + applied + " đạo Hắc Nguyệt Trảm Kích" + (imbued ? " kèm Tịch Diệt Chi Hỏa." : "!")));
+    }
+
+    private static void spawnBlackCrescent(ServerLevel level, ServerPlayer caster, LivingEntity target, int waves) {
+        Vec3 forward = target.position().subtract(caster.position()).normalize();
+        Vec3 right = new Vec3(-forward.z, 0.0D, forward.x).normalize();
+        Vec3 center = target.position().add(0.0D, target.getBbHeight() * 0.55D, 0.0D);
+        DustParticleOptions black = new DustParticleOptions(new Vector3f(0.008F, 0.008F, 0.012F), 2.2F);
+        DustParticleOptions gray = new DustParticleOptions(new Vector3f(0.28F, 0.28F, 0.30F), 1.25F);
+        for (int i = 0; i <= 32; i++) {
+            double angle = Math.PI * i / 32.0D;
+            Vec3 point = center.add(right.scale(Math.cos(angle) * 1.8D)).add(0.0D, Math.sin(angle) * 2.0D - 0.4D, 0.0D);
+            level.sendParticles(black, point.x, point.y, point.z, 2, .025, .025, .025, 0.0D);
+            if (i % 2 == 0) level.sendParticles(ParticleTypes.LARGE_SMOKE, point.x, point.y, point.z, 1, .03, .03, .03, .005D);
+        }
+        for (int row = 0; row < waves; row++) {
+            double y = center.y + (row - waves / 2.0D) * 0.16D;
+            double length = 1.2D + (row % 4) * 0.55D;
+            Vec3 start = center.add(right.scale(-length)).add(0.0D, (row - waves / 2.0D) * 0.12D, 0.0D);
+            Vec3 end = center.add(right.scale(length)).add(0.0D, (row - waves / 2.0D) * 0.12D, 0.0D);
+            level.sendParticles(black, start.x, y, start.z, 1, 0, 0, 0, 0);
+            level.sendParticles(gray, end.x, y, end.z, 1, 0, 0, 0, 0);
+        }
+        Vec3 streakStart = caster.getEyePosition().add(forward.scale(1.0D));
+        Vec3 streakEnd = center;
+        for (int i = 0; i < 18; i++) {
+            double t = i / 18.0D;
+            Vec3 point = streakStart.lerp(streakEnd, t);
+            level.sendParticles(black, point.x, point.y, point.z, 3, .10, .10, .10, 0.0D);
+        }
     }
 
     private static List<LivingEntity> visibleTargets(ServerPlayer p, double range, double minDot) {
@@ -362,7 +439,8 @@ public final class FogTucThanhGiaSkills {
         if (selected.stream().anyMatch(id -> !candidates.contains(id))) return false;
         String source = "unknown";
         Entity target = ((ServerLevel) p.level()).getEntity(targetId);
-        if (target != null) source = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString();
+        if (!(target instanceof LivingEntity livingTarget) || !livingTarget.isAlive()) return false;
+        source = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString();
         int count = 0;
         for (String skill : new LinkedHashSet<>(selected)) if (data(p).addStolenCreatureSkill(p.getUUID(), skill, source)) count++;
         stealCandidates.remove(p.getUUID());
@@ -383,8 +461,49 @@ public final class FogTucThanhGiaSkills {
                 })));
     }
 
+
+    @SubscribeEvent
+    public static void onLivingEntityJoin(EntityJoinLevelEvent event) {
+        if (!(event.getLevel() instanceof ServerLevel level)
+                || !(event.getEntity() instanceof LivingEntity living)
+                || living instanceof ServerPlayer) return;
+        FogDomainAbilityData worldData = FogDomainAbilityData.get(level.getServer());
+        creatureSpirit(worldData, living);
+    }
+
     @SubscribeEvent public static void tick(ServerTickEvent.Post event) {
         long now=event.getServer().overworld().getGameTime();
+        Iterator<Map.Entry<UUID, TruthDisplayMark>> truthIterator = truthDisplays.entrySet().iterator();
+        while (truthIterator.hasNext()) {
+            Map.Entry<UUID, TruthDisplayMark> entry = truthIterator.next();
+            TruthDisplayMark mark = entry.getValue();
+            if (now >= mark.expiresAt() || mark.entity().isRemoved() || !mark.entity().isAlive()) {
+                if (!mark.entity().isRemoved()) { mark.entity().setCustomName(mark.oldName()); mark.entity().setCustomNameVisible(mark.oldVisible()); }
+                truthIterator.remove();
+            }
+        }
+        Iterator<Map.Entry<UUID, SpiritBurnMark>> spiritIterator = spiritBurns.entrySet().iterator();
+        while (spiritIterator.hasNext()) {
+            SpiritBurnMark burn = spiritIterator.next().getValue();
+            if (now >= burn.expiresAt() || !burn.entity().isAlive() || burn.entity().isRemoved()) {
+                spiritIterator.remove();
+                continue;
+            }
+            if (now % 10L == 0L && burn.entity().level() instanceof ServerLevel burnLevel) {
+                burnLevel.sendParticles(ParticleTypes.SQUID_INK, burn.entity().getX(), burn.entity().getY() + burn.entity().getBbHeight() * .55D, burn.entity().getZ(), 10, .35, .45, .35, .015D);
+                burnLevel.sendParticles(new DustParticleOptions(new Vector3f(0.005F, 0.005F, 0.008F), 1.8F), burn.entity().getX(), burn.entity().getY() + burn.entity().getBbHeight() * .55D, burn.entity().getZ(), 18, .30, .45, .30, .005D);
+                burnLevel.sendParticles(ParticleTypes.LARGE_SMOKE, burn.entity().getX(), burn.entity().getY() + burn.entity().getBbHeight() * .55D, burn.entity().getZ(), 8, .30, .40, .30, .01D);
+            }
+            if (now % 20L == 0L) {
+                ServerPlayer source = event.getServer().getPlayerList().getPlayer(burn.owner());
+                if (source != null && source.isAlive()) {
+                    FogDomainAbilityData sourceData = data(source);
+                    int drained = drainEntitySpirit(burn.entity(), Math.max(1, burn.level() * 2));
+                    if (drained > 0) sourceData.addSpiritPoints(source.getUUID(), drained);
+                    burn.entity().hurtServer((ServerLevel) burn.entity().level(), source.damageSources().magic(), Math.max(1.0F, burn.level() * .5F));
+                }
+            }
+        }
         for(ServerPlayer p:event.getServer().getPlayerList().getPlayers()) {
             if(!owner(p)) continue;
             FogDomainAbilityData d=data(p);
@@ -394,7 +513,12 @@ public final class FogTucThanhGiaSkills {
                 if (!mark.entity().isAlive() || mark.entity().isRemoved() || now >= mark.expiresAt()) {
                     burnIterator.remove();
                 } else {
-                    mark.entity().igniteForSeconds(1);
+                    if (now % 5L == 0L) {
+                        ServerLevel burnLevel = (ServerLevel) mark.entity().level();
+                        burnLevel.sendParticles(ParticleTypes.SQUID_INK, mark.entity().getX(), mark.entity().getY() + mark.entity().getBbHeight() * .55D, mark.entity().getZ(), 8, .35, .45, .35, .015D);
+                        burnLevel.sendParticles(new DustParticleOptions(new Vector3f(0.005F, 0.005F, 0.008F), 1.6F), mark.entity().getX(), mark.entity().getY() + mark.entity().getBbHeight() * .55D, mark.entity().getZ(), 14, .30, .45, .30, .005D);
+                        burnLevel.sendParticles(ParticleTypes.LARGE_SMOKE, mark.entity().getX(), mark.entity().getY() + mark.entity().getBbHeight() * .55D, mark.entity().getZ(), 6, .30, .40, .30, .01D);
+                    }
                 }
             }
             PrisonZone zone = prisonZones.get(p.getUUID());
@@ -452,7 +576,7 @@ public final class FogTucThanhGiaSkills {
                 if (now >= eyeUntil) { truthEyeUntil.remove(p.getUUID()); truthTargets.remove(p.getUUID()); }
                 else if (now % 20 == 0) {
                     Entity seen = ((ServerLevel)p.level()).getEntity(truthTargets.get(p.getUUID()));
-                    if (seen instanceof LivingEntity living && living.isAlive()) showTruth(p, living);
+                    if (seen instanceof LivingEntity living && living.isAlive()) showTruth(p, living, eyeUntil);
                 }
             }
             Integer ticks=deathSealTicks.get(p.getUUID());
@@ -508,15 +632,13 @@ public final class FogTucThanhGiaSkills {
             int tichDietLevel = ad.getSkillLevel(attacker.getUUID(), "tich_diet_chi_hoa");
             if (tichDietLevel > 0) {
                 LivingEntity victim = event.getEntity();
-                victim.igniteForSeconds(5);
-                event.setNewDamage(event.getNewDamage() + Math.max(1.0F, tichDietLevel * 0.5F));
-                if (victim instanceof ServerPlayer victimPlayer) {
-                    FogDomainAbilityData victimData = FogDomainAbilityData.get(victimPlayer.level().getServer());
-                    int drain = Math.min(victimData.getSpiritPoints(victimPlayer.getUUID()), Math.max(1, tichDietLevel * 2));
-                    if (drain > 0 && victimData.consumeSpiritPoints(victimPlayer.getUUID(), drain)) ad.addSpiritPoints(attacker.getUUID(), drain);
-                } else {
-                    ad.addSpiritPoints(attacker.getUUID(), Math.max(1, tichDietLevel));
-                }
+                event.setNewDamage(event.getNewDamage() + Math.max(1.0F, tichDietLevel * 1.5F));
+                spiritBurns.put(victim.getUUID(), new SpiritBurnMark(victim, attacker.getUUID(),
+                        attacker.level().getGameTime() + 100L, tichDietLevel));
+                ServerLevel burnLevel = (ServerLevel) victim.level();
+                burnLevel.sendParticles(ParticleTypes.SQUID_INK, victim.getX(), victim.getY() + victim.getBbHeight() * .55D, victim.getZ(), 18, .4, .5, .4, .02D);
+                burnLevel.sendParticles(new DustParticleOptions(new Vector3f(0.005F, 0.005F, 0.008F), 2.0F), victim.getX(), victim.getY() + victim.getBbHeight() * .55D, victim.getZ(), 24, .35, .5, .35, .005D);
+                burnLevel.sendParticles(ParticleTypes.LARGE_SMOKE, victim.getX(), victim.getY() + victim.getBbHeight() * .55D, victim.getZ(), 12, .35, .45, .35, .01D);
             }
         }
         if(!(event.getEntity() instanceof ServerPlayer p) || !owner(p)) return;
@@ -602,6 +724,8 @@ public final class FogTucThanhGiaSkills {
             slashImbued.remove(deadPlayer.getUUID());
             prisonZones.remove(deadPlayer.getUUID());
             deathMarks.remove(deadPlayer.getUUID());
+            restoreTruthDisplay(deadPlayer.getUUID());
+            spiritBurns.remove(deadPlayer.getUUID());
             applyModifier(deadPlayer, Attributes.ARMOR, DEATH_FORM_ARMOR, 0.0D);
             applyModifier(deadPlayer, Attributes.ARMOR, DEATH_FORM_ARMOR_SURGE, 0.0D);
             applyModifier(deadPlayer, Attributes.ATTACK_DAMAGE, DEATH_FORM_ATTACK, 0.0D);

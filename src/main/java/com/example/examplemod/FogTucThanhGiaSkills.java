@@ -297,8 +297,18 @@ public final class FogTucThanhGiaSkills {
                 ? targetData.getSpiritPoints(playerTarget.getUUID())
                 : creatureSpirit(targetData, target);
         String kind = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString();
-        target.setCustomName(Component.literal("§b❤ " + (int) target.getHealth() + "/" + (int) target.getMaxHealth()
-                + "  §d✧ " + (int) spiritValue + "  §7" + kind));
+        int evolutionLevel = Math.max(1, (int) targetData.getPower(target.getUUID(), "evolution_level"));
+        double evolutionXp = targetData.getPower(target.getUUID(), "evolution_xp");
+        double attack = target.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE);
+        Component creaturePanel = Component.literal(
+                "§l§b「 CHÂN THỰC 」\n"
+                + "§b❤ Máu: " + (int) target.getHealth() + "/" + (int) target.getMaxHealth() + "\n"
+                + "§d✧ Linh Tính: " + (int) spiritValue + "\n"
+                + "§e★ Tiến hóa: Cấp " + evolutionLevel + "\n"
+                + "§6⚔ Sát thương: " + String.format(java.util.Locale.ROOT, "%.1f", attack) + "\n"
+                + "§7Kinh nghiệm: " + (int) evolutionXp + "/" + (evolutionLevel * 100) + "\n"
+                + "§8Loài: " + kind);
+        target.setCustomName(creaturePanel);
         target.setCustomNameVisible(true);
     }
 

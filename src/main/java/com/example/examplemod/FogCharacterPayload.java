@@ -174,10 +174,12 @@ public record FogCharacterPayload(String data)
             boolean hasArtifact = hasTucThanhGiaArtifact(player);
             if (data.isTucThanhGia(player.getUUID())) {
                 message = "Ban da la Tuc Thanh Gia.";
-            } else if (data.awakenTucThanhGia(player.getUUID(), hasArtifact)) {
-                message = "Tich Diet Tinh Hoa! Than the lam te dan, Ky Vat lam dan, 1.000 Linh Tinh lam co so. Le rua toi bat dau!";
+            } else if (data.beginTucThanhGiaAwakening(
+                    player.getUUID(), hasArtifact, player.level().getGameTime())) {
+                FogTucAwakening.start(player);
+                message = "Nghi thức Tịch Diệt bắt đầu! Hãy sống sót qua 5 phút thiêu đốt.";
             } else {
-                message = "Chua du 5 dieu kien thuc tinh Tuc Thanh Gia.";
+                message = "Chưa đủ 5 điều kiện thức tỉnh hoặc bạn đang trong nghi thức.";
             }
 
         } else if (request.equals("levelup")) {

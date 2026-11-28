@@ -633,14 +633,27 @@ public class FogDomainAbilityData extends SavedData {
         return false;
     }
 
-    public boolean awakenTucThanhGia(UUID playerId, boolean hasArtifact) {
+    public boolean beginTucThanhGiaAwakening(UUID playerId, boolean hasArtifact, long gameTime) {
         if (!canAwakenTucThanhGia(playerId, hasArtifact)) return false;
+        if (getPower(playerId, "tuc_awakening_started") > 0.0D) return false;
         if (!consumeSpiritPoints(playerId, 1_000)) return false;
+        setPower(playerId, "tuc_awakening_started", Math.max(1L, gameTime));
+        return true;
+    }
 
+    public boolean completeTucThanhGiaAwakening(UUID playerId) {
+        if (playerId == null || !tucThanhGiaUuid.isBlank()
+                || getPower(playerId, "tuc_awakening_started") <= 0.0D) return false;
         tucThanhGiaUuid = playerId.toString();
+        setPower(playerId, "tuc_awakening_started", 0.0D);
         initializeTucThanhGiaSkills(playerId);
         setDirty();
         return true;
+    }
+
+    public boolean awakenTucThanhGia(UUID playerId, boolean hasArtifact) {
+        // Tương thích mã nguồn cũ: không thức tỉnh tức thì, phải trải qua nghi thức 5 phút.
+        return false;
     }
 
     /** Ensures every Túc Thanh Giả skill has a persisted starting level. */
